@@ -5,11 +5,12 @@ import {
 } from "@/features/notes/server/get-relevant-notes";
 import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceIdentitySelect } from "@/lib/device-matching";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToMatchingConnect,
   fetchPaginated,
-  findVulnerabilitiesMatchingDeviceGroups,
+  findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
@@ -113,49 +114,25 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       };
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/vulnerabilities - List vulnerabilities for a device group
-  getManyByDeviceGroup: protectedProcedure
-    .input(
-      paginationInputSchema.extend({
-        deviceGroupId: z.string(),
-      }),
-    )
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/vulnerabilities",
-        tags: ["Vulnerabilities", "DeviceGroups"],
-        summary: "List Vulnerabilities by Device Group",
-        description:
-          "Get all vulnerabilities affecting a specific device group. Any authenticated user can view all vulnerabilities.",
-      },
-    })
+  // not exposed on OpenAPI. The vulnerabilities whose matchings apply to an
+  // asset's manufacturer, product, and version.
+  getManyByAsset: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
     .output(paginatedVulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      const { search, deviceGroupId } = input;
-      const searchFilter = createSearchFilter(search);
-
-      // Resolve the device group's identity, then find every vulnerability whose
-      // match objects apply to it (VERS ranges require the in-memory matcher).
-      const deviceGroup = await prisma.deviceGroup.findUnique({
-        where: { id: deviceGroupId },
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
+      const { search, id } = input;
+      const asset = await prisma.asset.findUnique({
+        where: { id },
+        select: deviceIdentitySelect,
       });
-      const matchedVulns = deviceGroup
-        ? await findVulnerabilitiesMatchingDeviceGroups([deviceGroup])
-        : [];
-      const matchedIds = matchedVulns.map((vuln) => vuln.id);
+      const found = requireExistence(asset, "Asset");
+      const matchedVulns = await findVulnerabilitiesMatchingDevices([found]);
 
-      const idFilter = { id: { in: matchedIds } };
-      const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
+      const idFilter = { id: { in: matchedVulns.map((vuln) => vuln.id) } };
       const result = await fetchPaginated(prisma.vulnerability, input, {
-        where: whereFilter,
+        where: search
+          ? { AND: [createSearchFilter(search), idFilter] }
+          : idFilter,
         include: vulnerabilityInclude,
       });
 

@@ -3,8 +3,8 @@ import type { QuestionWithIssue } from "@/features/questions/types";
 import type { QuestionAudience } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  deviceGroupWhereForMatching,
-  matchingAppliesToDevice,
+  deviceIdentitySelect,
+  findAssetsStrictlyMatching,
 } from "@/lib/device-matching";
 import { effectiveAudience } from "./process_output";
 import type {
@@ -26,38 +26,28 @@ async function resolveIssueDevice(
   if (matching) {
     const manufacturerName = matching.manufacturer.canonicalDisplayName;
 
-    const candidates = await prisma.deviceGroup.findMany({
-      where: deviceGroupWhereForMatching(matching),
-      select: {
-        id: true,
-        manufacturerId: true,
-        productId: true,
-        versionId: true,
-        version: { select: { canonicalName: true } },
-        assets: { select: { id: true } },
-      },
-    });
+    const matched = await findAssetsStrictlyMatching([matching], (where) =>
+      prisma.asset.findMany({ where, select: deviceIdentitySelect }),
+    );
 
     return {
       manufacturerName,
       productName:
         matching.product?.canonicalDisplayName ??
         `All ${manufacturerName} devices`,
-      assetIds: candidates
-        .filter((group) => matchingAppliesToDevice(matching, group))
-        .flatMap((group) => group.assets.map((asset) => asset.id)),
+      assetIds: matched.map((asset) => asset.id),
     };
   }
 
-  const group = issue.asset?.deviceGroup;
-  if (group?.manufacturer) {
-    const manufacturerName = group.manufacturer.canonicalDisplayName;
+  const asset = issue.asset;
+  if (asset?.manufacturer) {
+    const manufacturerName = asset.manufacturer.canonicalDisplayName;
     return {
       manufacturerName,
       productName:
-        group.product?.canonicalDisplayName ??
+        asset.product?.canonicalDisplayName ??
         `All ${manufacturerName} devices`,
-      assetIds: [issue.asset!.id],
+      assetIds: [asset.id],
     };
   }
   return null;

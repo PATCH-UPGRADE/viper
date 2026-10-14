@@ -14,16 +14,13 @@ import { createAgentCaller } from "@/trpc/agent-caller";
 export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",
   "assets.getOne",
-  "assets.getManyByDeviceGroup",
   "assets.getManyByWorkflow",
   "assets.getUtilization",
   "vulnerabilities.getMany",
   "vulnerabilities.getOne",
-  "vulnerabilities.getManyByDeviceGroup", // TODO: VW-409
+  "vulnerabilities.getManyByAsset", // TODO: VW-409
   "remediations.getMany",
   "remediations.getOne",
-  "deviceGroups.getMany",
-  "deviceGroups.getOne",
   "deviceTypes.getMany",
   "workflows.getManyByAsset",
   "workflows.getManyForLlm",
@@ -43,8 +40,8 @@ related work, not work filed for that item. "direct" means it was filed for that
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
 export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
-  search matches hostname, ip, serial number, device type, manufacturer, product or
-  CPE, never the role. To find an asset you know by its role, search its device type.
+  search matches hostname, ip, serial number, device type, manufacturer or product,
+  never the role. To find an asset you know by its role, search its device type.
 - assets.getOne — one asset by id. input: { id }
   Both carry "managedBy": who services the asset, as a vendor or a department, with
   their responsibilities. An entry whose "workOrderIntegration" is set names the
@@ -52,16 +49,13 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
   An entry with a "contract" is serviced under that agreement: cite its title when you
   say who owns the work, and do not schedule past its "effectiveTo" date without
   saying that the contract ends first. A null contract still means a real manager.
-- assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
 - assets.getManyByWorkflow — assets used in a clinical workflow. input: { id } (workflow id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
-- vulnerabilities.getManyByDeviceGroup — vulnerabilities affecting a device group. input: { deviceGroupId, search?, page?, pageSize? }
+- vulnerabilities.getManyByAsset — vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version. input: { id, search?, page?, pageSize? } (asset id)
 - remediations.getMany — list/search remediations. input: { search?, page?, pageSize? }
 - remediations.getOne — one remediation by id. input: { id }
-- deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
-- deviceGroups.getOne — one device group by id. input: { id }
 - deviceTypes.getMany — every device type with its assetCount, the hospital's number of assets of that type (decommissioned ones are not counted). untypedAssetCount is the assets with no device type; while it is above 0, a count is only a minimum. input: {}
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
@@ -77,13 +71,13 @@ announcements that arrive from vendors and feeds. Each carries a triaged priorit
 the matching rules it was matched to.
 
 A notification's "deviceGroupsMatchings" and "affectedAssets" entries are matching RULES
-(manufacturer/product/version), not device groups. They give asset COUNTS per triage
-bucket, not asset records, and their ids are NOT device group ids — never send one as a
-deviceGroupId, because that returns an empty page instead of an error and reads as "no
-assets affected". To get the assets themselves, find the device group with
-deviceGroups.getMany, and search on the matching's manufacturer/product/version names.
-Then follow that device group's "_links.assets". A notification's "vulnerabilities"
-array holds vulnerabilityId values; send one to vulnerabilities.getOne for the CVE.
+(manufacturer/product/version), not assets. They give asset COUNTS per triage bucket,
+not asset records, and their ids are NOT asset ids — never send one as an asset id. To
+get the assets themselves, search assets.getMany on the matching's manufacturer and
+product names. That search does not filter on a version or a version range, so compare
+each asset's version with the matching before you call the asset affected. A
+notification's "vulnerabilities" array holds vulnerabilityId values; send one to
+vulnerabilities.getOne for the CVE.
 
 'Work orders' show whether anyone is already working an item. Notifications, assets,
 and vulnerabilities carry "_links.workOrders"; follow it before you say whether an item
@@ -99,7 +93,7 @@ may change your recommendation. (Hospital-wide persistent notes are provided sep
 
 Some returned objects include a "_links" map — each entry is a follow-up call you can make.
 To follow one, call query_platform_data again with that entry's "procedure" and "input"
-verbatim. Use only ids that appear in retrieved data (e.g. an asset's deviceGroup.id); never
+verbatim. Use only ids that appear in retrieved data (e.g. an asset's id); never
 invent them. When a patch/service window matters, follow the asset's "_links.utilization"
 to get a readable schedule summary.`;
 
@@ -107,21 +101,6 @@ const workOrdersLink = (input: Record<string, string>) => ({
   procedure: "tracking.getManyForLlm",
   input,
 });
-
-/**
- * see src/lib/prisma-client-extensions.ts
- * Device Groups embed HATEOAS-style links to other endpoints
- * They are HTTP hrefs the agent cannot call, so we strip them and replace
- * them with tRPC call hints.
- * Goal: Make "progressive disclosure" obvious to LLM
- */
-const DEVICE_GROUP_URL_KEYS = [
-  "url",
-  "sbomUrl",
-  "vulnerabilitiesUrl",
-  "assetsUrl",
-  "deviceArtifactsUrl",
-] as const;
 
 /**
  * Merge navigation hints into an object's `_links` map.
@@ -141,23 +120,6 @@ function addLinks(
   obj._links = { ...existing, ...links };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
-function linkifyDeviceGroup(dg: Record<string, any>): void {
-  const id = dg.id;
-  for (const key of DEVICE_GROUP_URL_KEYS) delete dg[key];
-  if (typeof id !== "string") return;
-  addLinks(dg, {
-    assets: {
-      procedure: "assets.getManyByDeviceGroup",
-      input: { deviceGroupId: id },
-    },
-    vulnerabilities: {
-      procedure: "vulnerabilities.getManyByDeviceGroup",
-      input: { deviceGroupId: id },
-    },
-  });
-}
-
 /**
  * Strip an asset's raw hourly utilization blob (high token cost, low value) and,
  * only when the asset actually has utilization data, replace it with a
@@ -173,6 +135,10 @@ function linkifyAsset(asset: Record<string, any>): void {
   addLinks(asset, {
     workflows: {
       procedure: "workflows.getManyByAsset",
+      input: { id },
+    },
+    vulnerabilities: {
+      procedure: "vulnerabilities.getManyByAsset",
       input: { id },
     },
     workOrders: workOrdersLink({ assetId: id }),
@@ -209,14 +175,13 @@ function linkifyWorkflow(workflow: Record<string, any>): void {
  * record repeats once per row that references it. One vendor advisory carries
  * 18 device group matchings, so the identical manufacturer arrives 18 times.
  *
- * Keep the id and the names. The catalog tells the model to find a device group
- * by searching these names, so they are load-bearing.
+ * Keep the id and the names. The catalog tells the model to find assets by
+ * searching these names, so they are load-bearing.
  *
  * Every key below is a scalar or a string array, so the order against the child
  * walk does not matter.
  */
 const CANONICAL_NOISE_KEYS = [
-  "hasCpe",
   "nameMappings",
   "versScheme",
   "createdAt",
@@ -286,11 +251,11 @@ function dropSelfLinks(value: unknown, call: PlatformCall): void {
 }
 
 /**
- * Deep-walk a tRPC result and turn every device group's HATEOAS URLs into tRPC
- * "_links" navigation hints. Also drops payloads too expensive to put in context.
+ * Deep-walk a tRPC result and add tRPC "_links" navigation hints to each
+ * entity. Also drops payloads too expensive to put in context.
  *
  * Entities are matched by shape, not by the procedure that produced them, so a
- * nested entity is linkified too (e.g. the device group inside an asset result).
+ * nested entity is linkified too (e.g. the asset inside a work order result).
  *
  * Exported for tests; the tool itself is the only production caller.
  */
@@ -315,8 +280,6 @@ function linkEntities(value: unknown): void {
   for (const key of Object.keys(obj)) linkEntities(obj[key]);
   if ("canonicalName" in obj && "canonicalDisplayName" in obj)
     trimCanonicalRecord(obj);
-  if ("assetsUrl" in obj || "vulnerabilitiesUrl" in obj)
-    linkifyDeviceGroup(obj);
   if ("utilization" in obj) linkifyAsset(obj);
   // hospitalImpact exists only on Notification
   if ("hospitalImpact" in obj) linkifyNotification(obj);
@@ -342,7 +305,7 @@ type PlatformProcedure = (typeof PLATFORM_QUERY_PROCEDURES)[number];
  * count. `paginationInputSchema` accepts up to 100, and prose in the catalog is
  * advisory — the model can ignore it and often will.
  *
- * notifications.getMany runs one deviceGroup.findMany per matching per row, with
+ * notifications.getMany runs one asset.findMany per matching per row, with
  * no batching. A vendor advisory carries ~18 matchings, so a page of 100 is
  * ~1800 concurrent queries against a Prisma pool of roughly 17. The overflow
  * throws P2024, which reaches the model as "an unexpected error occurred", and
@@ -418,7 +381,7 @@ export function makeQueryPlatformDataTool(
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups, device type counts, clinical workflows, inbox notifications, work orders) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device type counts, clinical workflows, inbox notifications, work orders) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset to its vulnerabilities or workflows).
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

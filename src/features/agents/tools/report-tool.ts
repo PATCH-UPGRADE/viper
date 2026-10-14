@@ -6,14 +6,12 @@ import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
 import type { Retrieval } from "./query-platform-tool";
 
-// Citable route segments; keep in step with the examples in graph.ts. The
-// deviceGroups key is its API route — device groups have no dashboard page.
+// Citable route segments; keep in step with the examples in graph.ts.
 type Finder = Parameters<typeof existingIds>[0];
 const FINDERS = {
   assets: (a) => prisma.asset.findMany(a),
   vulnerabilities: (a) => prisma.vulnerability.findMany(a),
   remediations: (a) => prisma.remediation.findMany(a),
-  "api/v1/deviceGroups": (a) => prisma.deviceGroup.findMany(a),
   workflows: (a) => prisma.workflow.findMany(a),
   inbox: (a) => prisma.notification.findMany(a),
 } satisfies Record<string, Finder>;
@@ -22,8 +20,8 @@ const ROUTE_RE = new RegExp(
 );
 
 /**
- * Whether a lookup returned a record with this id, nested ones included (an
- * asset carries its device group). The database does the search, so saved
+ * Whether a lookup returned a record with this id, nested ones included (a
+ * work order carries its assets). The database does the search, so saved
  * history is never loaded. Outputs are compact JSON, saved jsonb is spaced.
  */
 async function wasRetrieved(id: string, threadId: string, outputs: string[]) {

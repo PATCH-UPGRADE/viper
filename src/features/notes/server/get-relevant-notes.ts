@@ -154,28 +154,14 @@ export async function getScopedNotesByInstance(
 }
 
 /**
- * Notes matching a single device group. Stubbed today: notes cannot attach to a
- * device group directly, only to device group matchings.
- */
-export async function getNotesForDeviceGroup(
-  _deviceGroupId: string,
-): Promise<RelevantNote[]> {
-  // TODO(device-group-matching): resolve the DeviceGroupMatchings that match
-  // this device group (reuse matchingWhereForDevice +
-  // matchingAppliesToDevice from @/lib/device-matching), then
-  // `return getNotesForInstance("DEVICE_GROUP_MATCHING", matchingIds)`.
-  return [];
-}
-
-/**
  * Notes matching a single asset. Today: notes attached directly to the asset.
  */
 export async function getNotesForAsset(
   assetId: string,
 ): Promise<RelevantNote[]> {
   // TODO(device-group-matching): also include notes on the DeviceGroupMatching(s)
-  // this asset's device group belongs to — look up asset.deviceGroupId and
-  // delegate to getNotesForDeviceGroup.
+  // that apply to this asset — resolve them with findMatchingIdsForDevice, then
+  // add getNotesForInstance("DEVICE_GROUP_MATCHING", matchingIds).
   return getNotesForInstance("ASSET", [assetId]);
 }
 

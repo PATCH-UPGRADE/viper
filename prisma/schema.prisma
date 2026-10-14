@@ -230,9 +230,9 @@ model Manufacturer {
   id                   String                @id @default(cuid())
   canonicalName        String                @unique
   canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
   nameMappings         String[]              @default([])
-  deviceGroups         DeviceGroup[]
+  products             Product[]
+  assets               Asset[]
   matchings            DeviceGroupMatching[]
   vendors              Vendor[]
   createdAt            DateTime              @default(now())
@@ -341,17 +341,22 @@ model ManagesRelationship {
 
 model Product {
   id                   String                @id @default(cuid())
-  canonicalName        String                @unique
+  manufacturerId       String
+  manufacturer         Manufacturer          @relation(fields: [manufacturerId], references: [id], onDelete: Restrict)
+  canonicalName        String
   canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
   nameMappings         String[]              @default([])
   deviceTypeId         String?
   deviceType           DeviceType?           @relation(fields: [deviceTypeId], references: [id], onDelete: SetNull)
-  deviceGroups         DeviceGroup[]
+  versions             Version[]
+  assets               Asset[]
   matchings            DeviceGroupMatching[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
+  @@unique([manufacturerId, canonicalName])
+  // Target of Asset's composite foreign key, which keeps an asset's product inside its manufacturer.
+  @@unique([manufacturerId, id])
   @@index([canonicalName])
   @@index([deviceTypeId])
   @@map("product")
@@ -378,42 +383,21 @@ model DeviceType {
 
 model Version {
   id                   String                @id @default(cuid())
-  canonicalName        String                @unique
+  productId            String
+  product              Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  canonicalName        String
   canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
   versScheme           VersScheme?
-  deviceGroups         DeviceGroup[]
+  udiDi                String?               @unique
+  assets               Asset[]
   matchings            DeviceGroupMatching[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
+  @@unique([productId, canonicalName])
+  // Target of Asset's composite foreign key, which keeps an asset's version inside its product.
+  @@unique([productId, id])
   @@map("version")
-}
-
-model DeviceGroup {
-  id String @id @default(cuid())
-
-  manufacturerId String?
-  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
-  productId      String?
-  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
-  versionId      String?
-  version        Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  versionStatus  VersionStatus @default(UNKNOWN)
-
-  cpe        String[] @default([])
-  udi        String?
-  helmSbomId String?
-
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  deviceGroupHistories DeviceGroupHistory[]
-  assets               Asset[]
-
-  // Explicit map: the generated name would be 65 chars and Postgres truncates at 63.
-  @@unique([manufacturerId, productId, versionId, versionStatus], name: "device_group_identity", map: "device_group_identity_key")
-  @@index([manufacturerId, productId])
-  @@map("device_group")
 }
 
 model DeviceGroupMatching {
@@ -445,19 +429,6 @@ model DeviceGroupMatching {
   @@map("device_group_matching")
 }
 
-model DeviceGroupHistory {
-  id            String      @id @default(cuid())
-  deviceGroupId String
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@map("device_group_history")
-}
-
 enum AssetStatus {
   Active
   Decommissioned
@@ -477,15 +448,20 @@ model Asset {
   status       AssetStatus?
   utilization  Json? // [{ [key: string]: number }]
 
-  deviceGroupId String
-  // TODO: is Cascade the correct behavior for this?
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  // Each can be null, so that an asset can have a known product and an unknown version.
+  manufacturerId String?
+  productId      String?
+  versionId      String?
+  versionStatus  VersionStatus @default(UNKNOWN)
+
+  manufacturer Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: Restrict)
+  product      Product?      @relation(fields: [manufacturerId, productId], references: [manufacturerId, id], onDelete: Restrict)
+  version      Version?      @relation(fields: [productId, versionId], references: [productId, id], onDelete: Restrict)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   issues               Issue[]
-  deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
   assetTickets         AssetTicket[]
   notificationMappings NotificationAssetMapping[]
@@ -496,7 +472,8 @@ model Asset {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([deviceGroupId])
+  @@index([versionId])
+  @@index([manufacturerId, productId])
   @@index([createdAt])
   @@index([serialNumber])
   @@index([macAddress])

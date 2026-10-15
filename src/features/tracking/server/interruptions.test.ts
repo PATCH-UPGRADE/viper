@@ -124,7 +124,7 @@ describe("interruption calendar", () => {
     rescheduleRequests: [],
     assets: devices.map(({ at, icon }) => ({
       asset: asset(icon),
-      ticket: { scheduledAt: at },
+      ticket: { scheduledAt: at, rescheduleRequests: [] as { id: string }[] },
     })),
   });
 
@@ -148,6 +148,7 @@ describe("interruption calendar", () => {
           summary: "Patch pumps",
           scheduledAt: ownerTime,
           scheduledEndTime: null,
+          rescheduleRequests: [],
         },
         asset: asset("Activity"),
         ticket: {
@@ -181,19 +182,51 @@ describe("interruption calendar", () => {
     expect(events.map((event) => event.icon)).toEqual([null, null]);
   });
 
-  it("marks an event whose ticket has a pending reschedule request", async () => {
+  it("marks an owner's event for a pending request on it or on a device, and a device's for its owner's", async () => {
+    const pending = [{ id: "r1" }];
+    const withDevice = (rescheduleRequests: { id: string }[]) => {
+      const owner = ownerEvent([{ at: null, icon: null }]);
+      owner.assets[0].ticket.rescheduleRequests = rescheduleRequests;
+      return owner;
+    };
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
       {
         ...ownerEvent([{ at: null, icon: null }]),
-        rescheduleRequests: [{ id: "r1" }],
+        rescheduleRequests: pending,
       },
+      withDevice(pending),
       ownerEvent([{ at: null, icon: null }]),
     ]);
     const events = await getInterruptionCalendar("u1", range);
     expect(events.map((event) => event.reschedulePending)).toEqual([
       true,
+      true,
       false,
     ]);
+
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        parentTicketId: "owner",
+        parentTicket: {
+          id: "owner",
+          summary: "Patch pumps",
+          scheduledAt: ownerTime,
+          scheduledEndTime: null,
+          rescheduleRequests: pending,
+        },
+        asset: asset(null),
+        ticket: {
+          id: "t3",
+          status: "TO_DO",
+          category: "PATCH",
+          scheduledAt: otherDay,
+          rescheduleRequests: [],
+        },
+      },
+    ]);
+    const [device] = await getInterruptionCalendar("u1", range);
+    expect(device.reschedulePending).toBe(true);
   });
 
   it("drops the owner's event when every device is on another day", async () => {
@@ -217,6 +250,7 @@ describe("interruption list", () => {
           scheduledAt: ownerTime,
           scheduledEndTime: null,
           seenBy: [],
+          rescheduleRequests: [],
         },
         asset: { id: "a1", hostname: "pump-1" },
         ticket: {
@@ -225,10 +259,12 @@ describe("interruption list", () => {
           status: "TO_DO",
           category: "PATCH",
           scheduledAt: null,
+          rescheduleRequests: [],
         },
       },
     ]);
     const [item] = await getInterruptionList("u1");
     expect(item.scheduledAt).toEqual(ownerTime);
+    expect(item.reschedulePending).toBe(false);
   });
 });

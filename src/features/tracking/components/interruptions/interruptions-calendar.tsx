@@ -23,7 +23,6 @@ import {
 } from "date-fns";
 import {
   CalendarIcon,
-  CalendarSyncIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CircleHelpIcon,
@@ -45,6 +44,7 @@ import { useTRPC } from "@/trpc/client";
 import { availabilityStyle } from "../ticket-detail/shared";
 import { DeviceBadge } from "./device-badge";
 import { InterruptionsList } from "./interruptions-list";
+import { PendingRescheduleIcon } from "./pending-reschedule-icon";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
@@ -141,16 +141,6 @@ const ItemButton = ({
 const clock = (date: Date) =>
   format(date, date.getMinutes() ? "h:mm a" : "h a");
 
-// Marks an event that has a reschedule request waiting for a decision.
-const PendingIcon = ({ item }: { item: Item }) =>
-  item.reschedulePending && (
-    <CalendarSyncIcon
-      className="size-3 shrink-0"
-      role="img"
-      aria-label="Reschedule requested"
-    />
-  );
-
 const TicketBlock = ({ block }: { block: Block }) => {
   const { item } = block;
   const { Icon, label } = availabilityStyle(item.availability);
@@ -175,7 +165,7 @@ const TicketBlock = ({ block }: { block: Block }) => {
         <span className="flex shrink-0 items-center gap-1 text-xs font-medium">
           <DeviceBadge count={item.deviceCount} icon={item.icon} />
           <span className="truncate">{item.summary}</span>
-          <PendingIcon item={item} />
+          {item.reschedulePending && <PendingRescheduleIcon />}
         </span>
         {block.len < 45 ? (
           <span className="sr-only">{label}</span>
@@ -201,7 +191,7 @@ const MonthChip = ({ item }: { item: Item }) => (
   <ItemButton item={item} className="truncate px-1">
     {clock(item.scheduledAt)}{" "}
     <DeviceBadge count={item.deviceCount} icon={item.icon} /> {item.summary}
-    <PendingIcon item={item} />
+    {item.reschedulePending && <PendingRescheduleIcon />}
   </ItemButton>
 );
 

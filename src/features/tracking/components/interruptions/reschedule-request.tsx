@@ -103,6 +103,8 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
   const { data: session } = authClient.useSession();
   const time = formatSlot(pending.proposedAt);
   const mine = pending.requestedBy.id === session?.user.id;
+  const act = (decision: "approve" | "decline" | "cancel") => () =>
+    decide.mutate({ requestId: pending.id, decision, reason });
 
   return (
     <>
@@ -132,13 +134,7 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
                 size="sm"
                 variant="outline"
                 disabled={decide.isPending}
-                onClick={() =>
-                  decide.mutate({
-                    requestId: pending.id,
-                    decision: "cancel",
-                    reason,
-                  })
-                }
+                onClick={act("cancel")}
               >
                 Cancel request
               </Button>
@@ -147,12 +143,7 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
                 <Button
                   size="sm"
                   disabled={decide.isPending}
-                  onClick={() =>
-                    decide.mutate({
-                      requestId: pending.id,
-                      decision: "approve",
-                    })
-                  }
+                  onClick={act("approve")}
                 >
                   Approve
                 </Button>
@@ -160,13 +151,7 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
                   size="sm"
                   variant="outline"
                   disabled={decide.isPending}
-                  onClick={() =>
-                    decide.mutate({
-                      requestId: pending.id,
-                      decision: "decline",
-                      reason,
-                    })
-                  }
+                  onClick={act("decline")}
                 >
                   Decline
                 </Button>

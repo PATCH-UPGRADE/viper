@@ -98,6 +98,9 @@ const pendingReschedule = {
   take: 1,
 } as const;
 
+const anyPending = (...tickets: { rescheduleRequests: unknown[] }[]) =>
+  tickets.some((ticket) => ticket.rescheduleRequests.length > 0);
+
 // The list is one row per device ticket. Duration, availability and "unread"
 // belong to the owner ticket: a reader opens that, not every device ticket.
 const itemSelect = (userId: string) =>
@@ -110,6 +113,7 @@ const itemSelect = (userId: string) =>
         scheduledAt: true,
         scheduledEndTime: true,
         seenBy: { where: { userId }, select: { userId: true } },
+        rescheduleRequests: pendingReschedule,
       },
     },
     asset: { select: assetSelect },
@@ -120,6 +124,7 @@ const itemSelect = (userId: string) =>
         status: true,
         category: true,
         scheduledAt: true,
+        rescheduleRequests: pendingReschedule,
       },
     },
   }) satisfies Prisma.AssetTicketSelect;
@@ -136,6 +141,7 @@ const toItem = ({ parentTicketId, parentTicket, asset, ticket }: ItemRow) => ({
   // A device ticket with no time of its own is on its owner's schedule.
   scheduledAt: ticket.scheduledAt ?? parentTicket.scheduledAt,
   unread: parentTicket.seenBy.length === 0,
+  reschedulePending: anyPending(ticket, parentTicket),
   workOrderId: parentTicketId,
   workOrderSummary: parentTicket.summary,
   ...timing(parentTicket),
@@ -174,7 +180,12 @@ export const getInterruptionCalendar = async (
           where: scopedDevice(departmentId),
           select: {
             asset: { select: assetSelect },
-            ticket: { select: { scheduledAt: true } },
+            ticket: {
+              select: {
+                scheduledAt: true,
+                rescheduleRequests: pendingReschedule,
+              },
+            },
           },
         },
       },
@@ -189,6 +200,7 @@ export const getInterruptionCalendar = async (
             summary: true,
             scheduledAt: true,
             scheduledEndTime: true,
+            rescheduleRequests: pendingReschedule,
           },
         },
         asset: { select: assetSelect },
@@ -223,7 +235,10 @@ export const getInterruptionCalendar = async (
         scheduledAt: owner.scheduledAt as Date,
         ...timing(owner),
         unread: owner.seenBy.length === 0,
-        reschedulePending: owner.rescheduleRequests.length > 0,
+        reschedulePending: anyPending(
+          owner,
+          ...owner.assets.map(({ ticket }) => ticket),
+        ),
         deviceCount: here.length,
         icon: sharedIcon(here.map(({ asset }) => iconOf(asset))),
         assetName: `${here.length} ${plural("device", here.length)}`,
@@ -243,7 +258,7 @@ export const getInterruptionCalendar = async (
         scheduledAt: ticket.scheduledAt as Date,
         ...timing(parentTicket),
         unread: false,
-        reschedulePending: ticket.rescheduleRequests.length > 0,
+        reschedulePending: anyPending(ticket, parentTicket),
         deviceCount: 1,
         icon: iconOf(asset),
         assetName: getAssetDisplayName(asset),

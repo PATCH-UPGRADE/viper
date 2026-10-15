@@ -4,6 +4,7 @@ import { processIntegrationSync } from "@/features/integrations/core/sync/upsert
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { cpesToMatchingConnect } from "@/lib/router-utils";
+import { impactRowsUpdate } from "../impact";
 import type { integrationRemediationInputSchema } from "../types";
 
 type IntegrationRemediationItem = z.infer<
@@ -28,6 +29,7 @@ export function processRemediationIntegrationSync(
           artifacts,
           cpes,
           vulnerabilityIds,
+          impacts,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           ...itemData
@@ -41,11 +43,13 @@ export function processRemediationIntegrationSync(
           createData: {
             ...itemData,
             userId,
+            impacts: { create: impacts ?? [] },
             deviceGroupMatchings: { connect: matchingConnect },
             vulnerabilities: { connect: vulnerabilities ?? [] },
           },
           updateData: {
             ...itemData,
+            impacts: impactRowsUpdate(impacts, "replace"),
             // Only replace matchings when CPEs were provided; omitting them
             // on re-sync must not clear a remediation's existing matchings.
             ...(cpes ? { deviceGroupMatchings: { set: matchingConnect } } : {}),

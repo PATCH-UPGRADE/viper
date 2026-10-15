@@ -19,6 +19,8 @@ const { mockPrisma } = vi.hoisted(() => {
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    notificationRemediationMapping: { upsert: vi.fn() },
+    remediation: { findUnique: vi.fn(), update: vi.fn() },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
     // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
@@ -35,6 +37,8 @@ vi.mock("@/lib/router-utils", () => ({ resolveMatchingId: vi.fn() }));
 import { notRejected } from "../types";
 import type { Candidates } from "./candidate-search";
 import { applyDecisions, type Decision } from "./match";
+import { requireSameCollection } from "@/features/integrations/platforms/medisao/utils";
+import { statedImpactFields } from "@/features/remediations/impact";
 
 const candidates: Candidates = {
   deviceGroups: [
@@ -307,5 +311,160 @@ describe("applyDecisions — vulnerability mapping", () => {
 
     expect(summary).toMatchObject({ linked: 0, skipped: 1 });
     expect(mockPrisma.vulnerability.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDecision - remediation impact", () => {
+  const NURSE_CALL = {
+    phase: "DURING_APPLY",
+    feature: "nurse call button",
+    effect: "UNAVAILABLE",
+  } as const;
+
+  const remCandidates: Candidates = {
+    ...candidates,
+    remediations: [
+      {
+        extracted: {
+          description: "Bedside monitor software update",
+          impact: {
+            requiresDowntime: true,
+            estimatedDowntimeSeconds: 600,
+            impacts: [NURSE_CALL],
+          },
+        },
+        matches: [
+          {
+            id: "rem-1",
+            linkedCveIds: [],
+            description: "update",
+            statedImpactFields: [],
+          },
+        ],
+      },
+    ],
+  };
+  const updateDecision: Decision = {
+    kind: "remediation",
+    op: "update",
+    targetId: "rem-1",
+    extractedIndex: 1,
+    confidence: "Matched",
+    reasonWhy: "same update",
+    fields: null,
+  };
+  const stored = (over: Record<string, unknown> = {}, impactRows = 0) => ({
+    mechanism: null,
+    requiresDowntime: null,
+    restartRequired: null,
+    estimatedDUrationSeconds: null,
+    estimatedDowntimeSeconds: null,
+    disablesFeatures: null,
+    reversible: null,
+    verificationRequired: null,
+    verificationNotes: null,
+    _count: { impacts: impactRows },
+    ...over,
+  });
+
+  it("fills impact fields and rows that are still empty", async () => {
+    mockPrisma.remediation.findUnique.mockResolvedValue(stored());
+    const summary = await applyDecisions(
+      { notificationId: "notif-1" },
+      [updateDecision],
+      remCandidates,
+    );
+    expect(summary.updated).toBe(1);
+    expect(mockPrisma.remediation.update).toHaveBeenCalledWith({
+      where: { id: "rem-1" },
+      data: {
+        requiresDowntime: true,
+        estimatedDowntimeSeconds: 600,
+        impacts: { deleteMany: {}, create: [NURSE_CALL] },
+      },
+    });
+  });
+  it("never overwrites a stated value or existing rows", async () => {
+    mockPrisma.remediation.findUnique.mockResolvedValue(
+      stored({ requiresDowntime: false }, 1),
+    );
+    await applyDecisions(
+      { notificationId: "notif-1" },
+      [updateDecision],
+      remCandidates,
+    );
+    expect(mockPrisma.remediation.update).toHaveBeenCalledWith({
+      where: { id: "rem-1" },
+      data: { estimatedDowntimeSeconds: 600 },
+    });
+  });
+  it("writes nothing when every field is already stated", async () => {
+    mockPrisma.remediation.findUnique.mockResolvedValue(
+      stored({ requiresDowntime: false, estimatedDowntimeSeconds: 900 }, 1),
+    );
+    await applyDecisions(
+      { notificationId: "notif-1" },
+      [updateDecision],
+      remCandidates,
+    );
+    expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
+  });
+
+  it("ignores an extractedIndex whose candidates do not include the target", async () => {
+    const wrongIndex = {
+      ...remCandidates,
+      remediations: [
+        ...remCandidates.remediations,
+        {
+          extracted: { impact: { restartRequired: true } },
+          matches: [
+            {
+              id: "rem-2",
+              linkedCveIds: [],
+              description: null,
+              statedImpactFields: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    await applyDecisions(
+      { notificationId: "notif-1" },
+      [{ ...updateDecision, extractedIndex: 2 }],
+      wrongIndex,
+    );
+    expect(mockPrisma.remediation.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
+  });
+
+  it("still writes a new description when nothing about impact is stated", async () => {
+    await applyDecisions(
+      { notificationId: "notif-1" },
+      [
+        {
+          ...updateDecision,
+          extractedIndex: null,
+          fields: { description: "Apply update 4.2" },
+        },
+      ],
+      remCandidates,
+    );
+    expect(mockPrisma.remediation.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.remediation.update).toHaveBeenCalledWith({
+      where: { id: "rem-1" },
+      data: { description: "Apply update 4.2" },
+    });
+  });
+  it("does not touch impact on a link decision", async () => {
+    await applyDecisions(
+      { notificationId: "notif-1" },
+      [{ ...updateDecision, op: "link" }],
+      remCandidates,
+    );
+    expect(
+      mockPrisma.notificationRemediationMapping.upsert,
+    ).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
   });
 });

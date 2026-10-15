@@ -48,3 +48,53 @@ describe("keepWellFormedCveIds", () => {
     expect(result.remediations[0].linkedCveIds).toBeUndefined();
   });
 });
+
+describe("extractSchema - remediation impact", () => {
+  it("accepts the bedside monitor impact as a notification states it", () => {
+    const parsed = extractSchema.safeParse({
+      ...empty,
+      remediations: [
+        {
+          description: "Bedside monitor software update",
+          impact: {
+            mechanism: "REMOTE_DEPLOYMENT",
+            estimatedDurationSeconds: 1800,
+            requiresDowntime: false,
+            reversible: true,
+            impacts: [
+              {
+                phase: "DURING_APPLY",
+                feature: "nurse call button",
+                effect: "UNAVAILABLE",
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.remediations[0].impact?.reversible).toBe(true);
+  });
+  it("drops an impact it cannot parse instead of failing the whole extraction", () => {
+    const parsed = extractSchema.safeParse({
+      ...empty,
+      remediations: [
+        { description: "patch it", impact: { mechanism: "CARRIER" } },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.remediations[0]).toEqual({
+      description: "patch it",
+      impact: null,
+    });
+  });
+  it("keeps impact through keepWellFormedCveIds", () => {
+    const result = keepWellFormedCveIds({
+      ...empty,
+      remediations: [
+        { description: "patch it", impact: { restartRequired: true } },
+      ],
+    });
+    expect(result.remediations[0].impact).toEqual({ restartRequired: true });
+  });
+});

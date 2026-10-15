@@ -91,6 +91,13 @@ const timing = (w: {
   availability: availabilityOf(w),
 });
 
+// Is a reschedule request waiting for a decision on this ticket?
+const pendingReschedule = {
+  where: { status: RescheduleStatus.PENDING },
+  select: { id: true },
+  take: 1,
+} as const;
+
 // The list is one row per device ticket. Duration, availability and "unread"
 // belong to the owner ticket: a reader opens that, not every device ticket.
 const itemSelect = (userId: string) =>
@@ -162,6 +169,7 @@ export const getInterruptionCalendar = async (
         scheduledAt: true,
         scheduledEndTime: true,
         seenBy: { where: { userId }, select: { userId: true } },
+        rescheduleRequests: pendingReschedule,
         assets: {
           where: scopedDevice(departmentId),
           select: {
@@ -185,7 +193,13 @@ export const getInterruptionCalendar = async (
         },
         asset: { select: assetSelect },
         ticket: {
-          select: { id: true, status: true, category: true, scheduledAt: true },
+          select: {
+            id: true,
+            status: true,
+            category: true,
+            scheduledAt: true,
+            rescheduleRequests: pendingReschedule,
+          },
         },
       },
     }),
@@ -209,6 +223,7 @@ export const getInterruptionCalendar = async (
         scheduledAt: owner.scheduledAt as Date,
         ...timing(owner),
         unread: owner.seenBy.length === 0,
+        reschedulePending: owner.rescheduleRequests.length > 0,
         deviceCount: here.length,
         icon: sharedIcon(here.map(({ asset }) => iconOf(asset))),
         assetName: `${here.length} ${plural("device", here.length)}`,
@@ -228,6 +243,7 @@ export const getInterruptionCalendar = async (
         scheduledAt: ticket.scheduledAt as Date,
         ...timing(parentTicket),
         unread: false,
+        reschedulePending: ticket.rescheduleRequests.length > 0,
         deviceCount: 1,
         icon: iconOf(asset),
         assetName: getAssetDisplayName(asset),
@@ -350,16 +366,29 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   }
   const workOrder = ticket.ticket?.parentTicket ?? ticket;
   // Devices on the work order that this department does not manage.
-  const elsewhere = await prisma.assetTicket.findMany({
-    where: {
-      parentTicketId: workOrder.id,
-      ticket: open,
-      asset: { managedBy: { none: { departmentId } } },
-    },
-    select: {
-      asset: { select: { managedBy: { select: { departmentId: true } } } },
-    },
-  });
+  const [elsewhere, related] = await Promise.all([
+    prisma.assetTicket.findMany({
+      where: {
+        parentTicketId: workOrder.id,
+        ticket: open,
+        asset: { managedBy: { none: { departmentId } } },
+      },
+      select: {
+        asset: { select: { managedBy: { select: { departmentId: true } } } },
+      },
+    }),
+    // A request on a device ticket and one on its owner are not on the same
+    // ticket, so each side looks at the other.
+    prisma.rescheduleRequest.findFirst({
+      where: {
+        status: RescheduleStatus.PENDING,
+        ...(ticket.ticket
+          ? { ticketId: workOrder.id }
+          : { ticket: { parentId: id, ticket: scopedDevice(departmentId) } }),
+      },
+      select: { proposedAt: true, requestedBy: { select: { name: true } } },
+    }),
+  ]);
   return {
     comments: ticket.comments,
     activities: ticket.activities,
@@ -382,6 +411,10 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
       ticket.rescheduleRequests.find(
         (r) => r.status === RescheduleStatus.PENDING,
       ) ?? null,
+    relatedReschedule: related && {
+      ...related,
+      onWorkOrder: Boolean(ticket.ticket),
+    },
     pastReschedules: ticket.rescheduleRequests.filter(
       (r) => r.status !== RescheduleStatus.PENDING,
     ),

@@ -8,6 +8,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     user: { findUnique: vi.fn() },
     assetTicket: { findMany: vi.fn() },
     workOrderTicket: { findFirst: vi.fn(), findMany: vi.fn() },
+    rescheduleRequest: { findFirst: vi.fn() },
   },
 }));
 
@@ -58,6 +59,47 @@ describe("interruptions scope", () => {
     expect(select.assignee.select.phone).toBe(true);
     expect(detail.contact.phone).toBe("Ext. 3104");
   });
+
+  it("shows a pending request on the other side of an owner and its device", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
+      id: "dev-1",
+      assignee: null,
+      creator: { phone: null },
+      ticket: {
+        parentTicket: {
+          id: "wo-1",
+          assets: [],
+          seenBy: [],
+          descriptions: [],
+          departments: [],
+        },
+      },
+      seenBy: [],
+      departments: [],
+      assets: [],
+      descriptions: [],
+      rescheduleRequests: [],
+    });
+    const proposedAt = new Date("2026-10-16T10:00:00Z");
+    mockPrisma.rescheduleRequest.findFirst.mockResolvedValue({
+      proposedAt,
+      requestedBy: { name: "Sam" },
+    });
+
+    const detail = await getInterruptionDetail("u1", "dev-1");
+
+    expect(
+      mockPrisma.rescheduleRequest.findFirst.mock.calls[0][0].where,
+    ).toMatchObject({
+      ticketId: "wo-1",
+    });
+    expect(detail.relatedReschedule).toEqual({
+      proposedAt,
+      requestedBy: { name: "Sam" },
+      onWorkOrder: true,
+    });
+  });
 });
 
 describe("interruption calendar", () => {
@@ -79,6 +121,7 @@ describe("interruption calendar", () => {
     scheduledAt: ownerTime,
     scheduledEndTime: null,
     seenBy: [],
+    rescheduleRequests: [],
     assets: devices.map(({ at, icon }) => ({
       asset: asset(icon),
       ticket: { scheduledAt: at },
@@ -112,6 +155,7 @@ describe("interruption calendar", () => {
           status: "TO_DO",
           category: "PATCH",
           scheduledAt: otherDay,
+          rescheduleRequests: [],
         },
       },
     ]);
@@ -135,6 +179,21 @@ describe("interruption calendar", () => {
     ]);
     const events = await getInterruptionCalendar("u1", range);
     expect(events.map((event) => event.icon)).toEqual([null, null]);
+  });
+
+  it("marks an event whose ticket has a pending reschedule request", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      {
+        ...ownerEvent([{ at: null, icon: null }]),
+        rescheduleRequests: [{ id: "r1" }],
+      },
+      ownerEvent([{ at: null, icon: null }]),
+    ]);
+    const events = await getInterruptionCalendar("u1", range);
+    expect(events.map((event) => event.reschedulePending)).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("drops the owner's event when every device is on another day", async () => {

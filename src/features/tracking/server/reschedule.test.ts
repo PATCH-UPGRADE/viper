@@ -61,7 +61,7 @@ const request = {
 };
 const ask = (input = {}) =>
   caller.requestReschedule({ ticketId: "t1", proposedAt, ...input });
-const decide = (decision: "approve" | "decline", reason?: string) =>
+const decide = (decision: "approve" | "decline" | "cancel", reason?: string) =>
   caller.decideReschedule({ requestId: "r1", decision, reason });
 
 beforeEach(() => {
@@ -150,6 +150,31 @@ describe("decideReschedule", () => {
     ).toMatchObject({
       type: "RESCHEDULE_DECLINED",
       data: { reason: "Only on site in the morning" },
+    });
+  });
+
+  it("lets the requester cancel and keeps the reason", async () => {
+    mockPrisma.rescheduleRequest.findUnique.mockResolvedValue({
+      ...request,
+      requestedById: "me",
+    });
+    await decide("cancel", "No longer needed");
+
+    expect(
+      mockPrisma.rescheduleRequest.updateMany.mock.calls[0][0].data,
+    ).toMatchObject({ status: "CANCELLED" });
+    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.ticketActivity.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      type: "RESCHEDULE_CANCELLED",
+      data: { reason: "No longer needed" },
+    });
+  });
+
+  it("does not let anyone but the requester cancel", async () => {
+    await expect(decide("cancel")).rejects.toMatchObject({
+      code: "FORBIDDEN",
     });
   });
 

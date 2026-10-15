@@ -282,6 +282,15 @@ const renderActivity = (a: Activity): React.ReactNode => {
           {data.reason ? ` ${data.reason}` : null}
         </>
       );
+    case "RESCHEDULE_CANCELLED":
+      return (
+        <>
+          Cancelled the reschedule request to {formatSlot(data.to)}
+          {data.reason ? (
+            <span className="text-muted-foreground"> — {data.reason}</span>
+          ) : null}
+        </>
+      );
     case "TICKET_LINKED":
     case "TICKET_UNLINKED":
       return (

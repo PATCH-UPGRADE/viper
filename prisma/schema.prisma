@@ -1689,6 +1689,7 @@ enum TicketActivityType {
   RESCHEDULE_REQUESTED
   RESCHEDULE_APPROVED
   RESCHEDULE_DECLINED
+  RESCHEDULE_CANCELLED
 }
 
 model TicketActivity {
@@ -1711,6 +1712,7 @@ enum RescheduleStatus {
   PENDING
   APPROVED
   DECLINED
+  CANCELLED
 }
 
 model RescheduleRequest {

@@ -126,7 +126,9 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
         </div>
         <RescheduleRequest
           ticketId={id}
+          scheduledAt={ticket.scheduledAt}
           pending={data.reschedule}
+          related={data.relatedReschedule}
           past={data.pastReschedules}
         />
       </div>

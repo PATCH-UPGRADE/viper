@@ -308,6 +308,21 @@ const withRowFlags = <
 const badRequest = (message: string) =>
   new TRPCError({ code: "BAD_REQUEST", message });
 
+const RESCHEDULE_OUTCOME = {
+  approve: {
+    status: RescheduleStatus.APPROVED,
+    activity: "RESCHEDULE_APPROVED",
+  },
+  decline: {
+    status: RescheduleStatus.DECLINED,
+    activity: "RESCHEDULE_DECLINED",
+  },
+  cancel: {
+    status: RescheduleStatus.CANCELLED,
+    activity: "RESCHEDULE_CANCELLED",
+  },
+} as const;
+
 export const trackingRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(trackingInputSchema)
@@ -1395,7 +1410,7 @@ export const trackingRouter = createTRPCRouter({
     .input(
       z.object({
         requestId: z.string(),
-        decision: z.enum(["approve", "decline"]),
+        decision: z.enum(["approve", "decline", "cancel"]),
         reason: z.string().trim().max(1000).optional(),
       }),
     )
@@ -1412,21 +1427,24 @@ export const trackingRouter = createTRPCRouter({
         });
       }
       await assertCanOpen(userId, request.ticketId);
-      if (request.requestedById === userId) {
+      // The requester can only cancel; anyone else approves or declines.
+      const cancel = input.decision === "cancel";
+      if ((request.requestedById === userId) !== cancel) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You cannot decide your own request",
+          message: cancel
+            ? "Only the requester can cancel a request"
+            : "You cannot decide your own request",
         });
       }
       const approve = input.decision === "approve";
       const reason = approve ? null : input.reason || null;
+      const outcome = RESCHEDULE_OUTCOME[input.decision];
       return prisma.$transaction(async (tx) => {
         const { count } = await tx.rescheduleRequest.updateMany({
           where: { id: request.id, status: RescheduleStatus.PENDING },
           data: {
-            status: approve
-              ? RescheduleStatus.APPROVED
-              : RescheduleStatus.DECLINED,
+            status: outcome.status,
             decidedById: userId,
             decidedAt: new Date(),
           },
@@ -1441,7 +1459,7 @@ export const trackingRouter = createTRPCRouter({
           data: {
             ticketId: request.ticketId,
             userId,
-            type: approve ? "RESCHEDULE_APPROVED" : "RESCHEDULE_DECLINED",
+            type: outcome.activity,
             data: {
               requestId: request.id,
               from: request.fromScheduledAt,

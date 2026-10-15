@@ -23,6 +23,7 @@ import {
 } from "date-fns";
 import {
   CalendarIcon,
+  CalendarSyncIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CircleHelpIcon,
@@ -58,6 +59,7 @@ type Item = DrawerTicket & {
   unread: boolean;
   deviceCount: number;
   icon: string | null;
+  reschedulePending: boolean;
 };
 type Block = {
   item: Item;
@@ -139,6 +141,16 @@ const ItemButton = ({
 const clock = (date: Date) =>
   format(date, date.getMinutes() ? "h:mm a" : "h a");
 
+// Marks an event that has a reschedule request waiting for a decision.
+const PendingIcon = ({ item }: { item: Item }) =>
+  item.reschedulePending && (
+    <CalendarSyncIcon
+      className="size-3 shrink-0"
+      role="img"
+      aria-label="Reschedule requested"
+    />
+  );
+
 const TicketBlock = ({ block }: { block: Block }) => {
   const { item } = block;
   const { Icon, label } = availabilityStyle(item.availability);
@@ -163,6 +175,7 @@ const TicketBlock = ({ block }: { block: Block }) => {
         <span className="flex shrink-0 items-center gap-1 text-xs font-medium">
           <DeviceBadge count={item.deviceCount} icon={item.icon} />
           <span className="truncate">{item.summary}</span>
+          <PendingIcon item={item} />
         </span>
         {block.len < 45 ? (
           <span className="sr-only">{label}</span>
@@ -188,6 +201,7 @@ const MonthChip = ({ item }: { item: Item }) => (
   <ItemButton item={item} className="truncate px-1">
     {clock(item.scheduledAt)}{" "}
     <DeviceBadge count={item.deviceCount} icon={item.icon} /> {item.summary}
+    <PendingIcon item={item} />
   </ItemButton>
 );
 

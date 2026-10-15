@@ -23,20 +23,36 @@ type Pending = {
 
 type Past = { id: string; status: RescheduleStatus; proposedAt: Date };
 
-const RequestForm = ({ ticketId }: { ticketId: string }) => {
+type Related = {
+  proposedAt: Date;
+  requestedBy: { name: string };
+  onWorkOrder: boolean;
+};
+
+const RequestForm = ({
+  ticketId,
+  scheduledAt,
+}: {
+  ticketId: string;
+  scheduledAt: Date | null;
+}) => {
   const [open, setOpen] = useState(false);
   const [proposedAt, setProposedAt] = useState("");
   const [reason, setReason] = useState("");
   const request = useRequestReschedule();
 
+  // Start from the ticket's time, or from now when that has passed.
+  const openForm = () => {
+    const now = new Date();
+    setProposedAt(
+      toDateTimeLocal(scheduledAt && scheduledAt > now ? scheduledAt : now),
+    );
+    setOpen(true);
+  };
+
   if (!open) {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="w-fit"
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" variant="outline" className="w-fit" onClick={openForm}>
         <CalendarClockIcon className="size-4" aria-hidden />
         Request reschedule
       </Button>
@@ -98,38 +114,64 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
       {pending.reason && (
         <p className="text-muted-foreground">{pending.reason}</p>
       )}
-      {session && !mine && (
+      {session && (
         <>
           <Textarea
             aria-label="Reason"
-            placeholder="Reason, if you decline (optional)"
+            placeholder={
+              mine
+                ? "Reason for cancelling (optional)"
+                : "Reason, if you decline (optional)"
+            }
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              disabled={decide.isPending}
-              onClick={() =>
-                decide.mutate({ requestId: pending.id, decision: "approve" })
-              }
-            >
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={decide.isPending}
-              onClick={() =>
-                decide.mutate({
-                  requestId: pending.id,
-                  decision: "decline",
-                  reason,
-                })
-              }
-            >
-              Decline
-            </Button>
+            {mine ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={decide.isPending}
+                onClick={() =>
+                  decide.mutate({
+                    requestId: pending.id,
+                    decision: "cancel",
+                    reason,
+                  })
+                }
+              >
+                Cancel request
+              </Button>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  disabled={decide.isPending}
+                  onClick={() =>
+                    decide.mutate({
+                      requestId: pending.id,
+                      decision: "approve",
+                    })
+                  }
+                >
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={decide.isPending}
+                  onClick={() =>
+                    decide.mutate({
+                      requestId: pending.id,
+                      decision: "decline",
+                      reason,
+                    })
+                  }
+                >
+                  Decline
+                </Button>
+              </>
+            )}
           </div>
         </>
       )}
@@ -140,11 +182,15 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
 // Sits in the drawer's schedule card, under the schedule and duration.
 export const RescheduleRequest = ({
   ticketId,
+  scheduledAt,
   pending,
+  related,
   past,
 }: {
   ticketId: string;
+  scheduledAt: Date | null;
   pending: Pending | null;
+  related: Related | null;
   past: Past[];
 }) => (
   <>
@@ -152,7 +198,14 @@ export const RescheduleRequest = ({
       {pending ? (
         <PendingRequest pending={pending} />
       ) : (
-        <RequestForm ticketId={ticketId} />
+        <RequestForm ticketId={ticketId} scheduledAt={scheduledAt} />
+      )}
+      {related && (
+        <p className="text-xs text-muted-foreground">
+          {related.onWorkOrder ? "The work order" : "A device ticket"} also has
+          a reschedule pending: {formatSlot(related.proposedAt)}, asked by{" "}
+          {related.requestedBy.name}
+        </p>
       )}
     </div>
     {past.length > 0 && (
@@ -169,7 +222,7 @@ export const RescheduleRequest = ({
             <li key={r.id} className="flex justify-between px-3 py-2">
               {formatSlot(r.proposedAt)}
               <span className="text-muted-foreground">
-                {r.status === "APPROVED" ? "Approved" : "Declined"}
+                {r.status[0] + r.status.slice(1).toLowerCase()}
               </span>
             </li>
           ))}

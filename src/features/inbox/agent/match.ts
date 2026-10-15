@@ -5,13 +5,13 @@
 import "server-only";
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
-import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
 import {
   impactRowsUpdate,
   impactScalarData,
   impactStateSelect,
   statedImpactFields,
 } from "@/features/remediations/impact";
+import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";

@@ -78,16 +78,31 @@ FOR DEVICE GROUPS: A device group is a class of affected product, identified by 
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
 - versionRange: if the notification specifies a range (e.g. "affects firmware 2.1 through 2.3"), express it as a VERS string (e.g, "vers:generic />2.1|<=2.3"). Omit if only a single exact version is mentioned.
-- impacts: one entry per device feature affected, with phase DURING_APPLY (only while applying) or AFTER_APPLY (persists), feature (e.g. "nurse call button"), effect UNAVIABLE / DEGRADED / CHANGED, clinicalWorkflowImpact (clinicians must be told in advance), notes
 
 FOR VULNERABILITIES: CVEids or security issues explicitly named
-- cveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
+- cveId: must match format CVE-YYYY-NNNN+ (e.g. CVE-2020-25175). Omit if not explicitly named.
 - cvssScore: the CVSS base score(0.0-10.0), only if explicity stated. Omit if not given.
 - cvssVector: the CVSS vector string (e.g CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H), only if explicitly stated. Omit if not given.
 
 FOR REMEDIATIONS: Patches, firmware updates, or mitigations explicitly described
 - linkedCveIds: every CVE that this fix explicitly addresses. Each must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if none are explicitly named.
-- description: a short description of the fix (e.g Apply GE Healthcare ICS security controls per CISA advisory)
+- description: a short description of the fix (e.g. Apply GE Healthcare ICS security controls per CISA advisory)
+- impact: what the notification states about applying this fix. Omit any field it does not state; do not estimate or infer.
+- mechanism: how it reaches the device: REMOTE_DEPLOYMENT (pushed over the network), ON_SITE (a technician at the device), REMOVABLE_MEDIA (USB stick), OTHER.
+- requiresDowntime: true or false, whether the device is out of service while it is applied.
+- restartRequired: true or false.
+- disablesFeatures: true or false, whether any device feature is disabled. 
+- reversible: true or false, whether the fix can be rolled back.
+- estimatedDurationSeconds: total time to apply, whether or not the device is down, in seconds.
+- estimatedDowntimeSeconds: how long the device is down, in seconds.
+- verificationRequired: true or false, whether the vendor requires validation after it is applied.
+- verificationNotes: what to verify afterwards, as a short quote or close paraphrase.
+- impacts: one entry per affected device feature, each with:
+  - phase: DURING_APPLY (only while it is applied) or AFTER_APPLY (persists afterward)
+  - feature: the affected feature (e.g. "nurse call button")
+  - effect: UNAVAILABLE / DEGRADED / CHANGED
+  - clinicalWorkflowImpact: true or false, whether clinicians must be told in advance
+  - notes: any detail the notification gives about it
 
 FOR ASSETS: Specific devices named by network identity
 - ip address: (in IPv4 or IPv6 format)

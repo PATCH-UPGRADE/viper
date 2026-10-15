@@ -75,18 +75,14 @@ describe("extractSchema - remediation impact", () => {
     expect(parsed.success).toBe(true);
     expect(parsed.data?.remediations[0].impact?.reversible).toBe(true);
   });
-  it("drops an impact it cannot parse instead of failing the whole extraction", () => {
+  it("rejects an impact with an unknow mechanism", () => {
     const parsed = extractSchema.safeParse({
       ...empty,
       remediations: [
         { description: "patch it", impact: { mechanism: "CARRIER" } },
       ],
     });
-    expect(parsed.success).toBe(true);
-    expect(parsed.data?.remediations[0]).toEqual({
-      description: "patch it",
-      impact: null,
-    });
+    expect(parsed.success).toBe(false);
   });
   it("keeps impact through keepWellFormedCveIds", () => {
     const result = keepWellFormedCveIds({

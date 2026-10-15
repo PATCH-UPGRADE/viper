@@ -37,8 +37,6 @@ vi.mock("@/lib/router-utils", () => ({ resolveMatchingId: vi.fn() }));
 import { notRejected } from "../types";
 import type { Candidates } from "./candidate-search";
 import { applyDecisions, type Decision } from "./match";
-import { requireSameCollection } from "@/features/integrations/platforms/medisao/utils";
-import { statedImpactFields } from "@/features/remediations/impact";
 
 const candidates: Candidates = {
   deviceGroups: [

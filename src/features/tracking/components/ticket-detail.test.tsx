@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -486,6 +486,55 @@ describe("TicketEditForm", () => {
     expect(payload.descriptions).toEqual([
       { departmentId: "d-radio", body: "Initial Radiology description" },
     ]);
+  });
+
+  describe("scheduled end", () => {
+    const scheduled = makeTicket({
+      scheduledAt: new Date(2026, 5, 1, 9, 0),
+      scheduledEndTime: new Date(2026, 5, 1, 10, 30),
+    });
+    const saved = async () => {
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: /^save$/i }));
+      return mockMutate.mock.calls[0][0];
+    };
+
+    it("flags an end that is not after the start and blocks Save", () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+      const end = screen.getByLabelText(/scheduled end/i);
+      expect(end).toHaveValue("2026-06-01T10:30");
+
+      fireEvent.change(end, { target: { value: "2026-06-01T08:00" } });
+
+      expect(screen.getByText(/end time must be after/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+
+    it("moves the shown end with the start and sends no end", async () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText(/scheduled for/i), {
+        target: { value: "2026-06-02T13:00" },
+      });
+
+      expect(screen.getByLabelText(/scheduled end/i)).toHaveValue(
+        "2026-06-02T14:30",
+      );
+      expect(await saved()).not.toHaveProperty("scheduledEndTime");
+    });
+
+    it("sends the end the user typed", async () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText(/scheduled end/i), {
+        target: { value: "2026-06-01T11:00" },
+      });
+
+      expect((await saved()).scheduledEndTime).toEqual(
+        new Date(2026, 5, 1, 11, 0),
+      );
+    });
   });
 
   it("drops a department's description from the payload when its textarea is cleared", async () => {

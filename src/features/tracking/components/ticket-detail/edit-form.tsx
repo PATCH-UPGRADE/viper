@@ -52,6 +52,7 @@ type EditState = {
   descriptionsByDept: Record<string, string>;
   assigneeId: string;
   scheduledAt: string;
+  scheduledEndTime: string;
 };
 
 const buildEditState = (data: TicketDetail): EditState => ({
@@ -66,6 +67,7 @@ const buildEditState = (data: TicketDetail): EditState => ({
   ),
   assigneeId: data.assignee?.id ?? UNASSIGNED,
   scheduledAt: toDateTimeLocal(data.scheduledAt),
+  scheduledEndTime: toDateTimeLocal(data.scheduledEndTime),
 });
 
 const editStateFingerprint = (state: EditState) =>
@@ -95,9 +97,31 @@ export const TicketEditForm = ({
   // whatever the latest server refetch produced.
   const [initial] = useState(() => buildEditState(data));
   const [form, setForm] = useState<EditState>(initial);
+  const [endEdited, setEndEdited] = useState(false);
   const update = useUpdateTicket(data.id);
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
+
+  // Moving the start moves the end by the same amount, as the server does.
+  const shiftedEnd = (scheduledAt: string) => {
+    if (!scheduledAt) return "";
+    if (!initial.scheduledAt || !initial.scheduledEndTime) {
+      return initial.scheduledEndTime;
+    }
+    const shift =
+      new Date(scheduledAt).getTime() - new Date(initial.scheduledAt).getTime();
+    return toDateTimeLocal(
+      new Date(new Date(initial.scheduledEndTime).getTime() + shift),
+    );
+  };
+
+  const endError = !form.scheduledEndTime
+    ? null
+    : !form.scheduledAt
+      ? "Set a start time before an end time"
+      : new Date(form.scheduledEndTime) <= new Date(form.scheduledAt)
+        ? "The end time must be after the start time"
+        : null;
 
   const isDirty = editStateFingerprint(form) !== editStateFingerprint(initial);
   useBeforeUnload(isDirty);
@@ -149,7 +173,7 @@ export const TicketEditForm = ({
 
   const handleSubmit = () => {
     const trimmedSummary = form.summary.trim();
-    if (!trimmedSummary) return;
+    if (!trimmedSummary || endError) return;
     const descriptions = form.departmentIds
       .map((id) => ({
         departmentId: id,
@@ -168,6 +192,11 @@ export const TicketEditForm = ({
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
+        ...(endEdited && {
+          scheduledEndTime: form.scheduledEndTime
+            ? new Date(form.scheduledEndTime)
+            : null,
+        }),
       },
       { onSuccess: () => onCancel() },
     );
@@ -253,9 +282,30 @@ export const TicketEditForm = ({
               type="datetime-local"
               value={form.scheduledAt}
               onChange={(e) =>
-                setForm((f) => ({ ...f, scheduledAt: e.target.value }))
+                setForm((f) => ({
+                  ...f,
+                  scheduledAt: e.target.value,
+                  scheduledEndTime: endEdited
+                    ? f.scheduledEndTime
+                    : shiftedEnd(e.target.value),
+                }))
               }
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-scheduled-end">Scheduled end</Label>
+            <Input
+              id="ticket-scheduled-end"
+              type="datetime-local"
+              value={form.scheduledEndTime}
+              aria-invalid={!!endError}
+              onChange={(e) => {
+                setEndEdited(true);
+                setForm((f) => ({ ...f, scheduledEndTime: e.target.value }));
+              }}
+            />
+            {endError && <p className="text-xs text-destructive">{endError}</p>}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -359,7 +409,7 @@ export const TicketEditForm = ({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={update.isPending}>
+        <Button type="submit" disabled={update.isPending || !!endError}>
           {update.isPending ? "Saving..." : "Save"}
         </Button>
         <Button

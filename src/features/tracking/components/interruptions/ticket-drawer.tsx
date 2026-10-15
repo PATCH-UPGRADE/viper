@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { addMinutes, format, isSameDay } from "date-fns";
 import { ClockIcon, MailIcon, PhoneIcon } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
@@ -43,6 +44,15 @@ export type DrawerTicket = {
   place?: string | null;
   durationEstimate: number | null;
   availability: Availability | null;
+};
+
+// "Oct 13, 2026 at 1:00 PM – 2:00 PM", with the end's date when it is another day.
+const scheduleText = ({ scheduledAt, durationEstimate }: DrawerTicket) => {
+  if (!scheduledAt) return "No time recorded";
+  const start = formatScheduled(scheduledAt);
+  if (!durationEstimate) return start;
+  const end = addMinutes(scheduledAt, durationEstimate);
+  return `${start} – ${isSameDay(scheduledAt, end) ? format(end, "h:mm a") : formatScheduled(end)}`;
 };
 
 const Count = ({ n }: { n: number }) => (
@@ -105,9 +115,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           <p className="text-xs text-muted-foreground">
             Schedule (according to work order)
           </p>
-          <p className="font-medium">
-            {formatScheduled(ticket.scheduledAt) ?? "No time recorded"}
-          </p>
+          <p className="font-medium">{scheduleText(ticket)}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Estimated duration</p>

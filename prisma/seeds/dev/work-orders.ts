@@ -1,3 +1,4 @@
+import { addHours } from "date-fns";
 import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import {
   SourceChannel,
@@ -605,6 +606,7 @@ async function createWorkOrderTicket(
         ],
       },
       scheduledAt: ticket.scheduledAt,
+      scheduledEndTime: ticket.scheduledAt && addHours(ticket.scheduledAt, 1),
       vulnerabilities: { connect: linkedVulns.map((v) => ({ id: v.id })) },
       remediations: {
         connect: linkedRemediations.map((r) => ({ id: r.id })),

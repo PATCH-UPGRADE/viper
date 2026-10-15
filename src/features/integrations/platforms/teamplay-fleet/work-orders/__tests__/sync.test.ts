@@ -13,7 +13,7 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 import { TicketCategory, TicketStatus } from "@/generated/prisma";
 import type { FleetWorkOrderItem } from "../activities";
-import { reconcileProvisionalMappings } from "../sync";
+import { reconcileProvisionalMappings, ticketFields } from "../sync";
 
 const item = (
   externalId: string,
@@ -26,6 +26,7 @@ const item = (
   status: TicketStatus.TO_DO,
   category: TicketCategory.FIRMWARE_UPDATE,
   scheduledAt: null,
+  scheduledEndTime: null,
   body: "",
   ownIncidentNumber,
   raw: { ticketKey: externalId },
@@ -115,5 +116,19 @@ describe("reconcileProvisionalMappings", () => {
     );
 
     expect(mockPrisma.externalWorkOrderMapping.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("ticketFields", () => {
+  it("carries the planned end, and leaves it empty when Fleet has none", () => {
+    const withEnd = {
+      ...item("US_1", null),
+      scheduledAt: "2026-07-22T13:02:00-05:00",
+      scheduledEndTime: "2026-07-22T17:32:00-05:00",
+    };
+    expect(ticketFields(withEnd).scheduledEndTime).toEqual(
+      new Date("2026-07-22T17:32:00-05:00"),
+    );
+    expect(ticketFields(item("US_1", null)).scheduledEndTime).toBeNull();
   });
 });

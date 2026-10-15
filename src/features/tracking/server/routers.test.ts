@@ -224,6 +224,7 @@ const makeUpdateBefore = (overrides: Record<string, any> = {}): any => ({
   category: "PATCH",
   priority: "Unsorted",
   scheduledAt: null,
+  scheduledEndTime: null,
   assigneeId: null,
   assignee: null,
   departments: [],
@@ -338,6 +339,74 @@ describe("trackingRouter.update", () => {
 
     const arg = mockPrisma.workOrderTicket.update.mock.calls[0][0];
     expect(arg.data.scheduledAt).toBeNull();
+  });
+
+  describe("scheduled end time", () => {
+    const start = new Date("2026-06-01T09:00:00Z");
+    const end = new Date("2026-06-01T10:30:00Z");
+    const stored = (overrides = {}) =>
+      mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+        makeUpdateBefore({
+          scheduledAt: start,
+          scheduledEndTime: end,
+          ...overrides,
+        }),
+      );
+    const updateData = () =>
+      mockPrisma.workOrderTicket.update.mock.calls[0][0].data;
+
+    beforeEach(() => {
+      mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
+    });
+
+    it.each([
+      ["before the start", new Date("2026-06-01T08:00:00Z")],
+      ["equal to the start", start],
+    ])("rejects an end %s", async (_name, scheduledEndTime) => {
+      stored();
+      await expect(
+        setup().update({ id: "t1", scheduledEndTime }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects an end when there is no start", async () => {
+      stored({ scheduledAt: null, scheduledEndTime: null });
+      await expect(
+        setup().update({ id: "t1", scheduledEndTime: end }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("moving only the start moves the end by the same amount", async () => {
+      stored();
+      await setup().update({
+        id: "t1",
+        scheduledAt: new Date("2026-06-02T13:00:00Z"),
+      });
+      expect(updateData().scheduledEndTime).toEqual(
+        new Date("2026-06-02T14:30:00Z"),
+      );
+    });
+
+    it("writes both as given when both are sent", async () => {
+      stored();
+      const scheduledAt = new Date("2026-06-02T13:00:00Z");
+      const scheduledEndTime = new Date("2026-06-02T13:45:00Z");
+      await setup().update({ id: "t1", scheduledAt, scheduledEndTime });
+      expect(updateData()).toMatchObject({ scheduledAt, scheduledEndTime });
+    });
+
+    it("clearing the start clears the end", async () => {
+      stored();
+      await setup().update({ id: "t1", scheduledAt: null });
+      expect(updateData().scheduledEndTime).toBeNull();
+    });
+
+    it("leaves the end alone when the update does not touch the times", async () => {
+      stored();
+      await setup().update({ id: "t1", summary: "Renamed" });
+      expect(updateData()).not.toHaveProperty("scheduledEndTime");
+    });
   });
 
   it("rejects an empty summary", async () => {

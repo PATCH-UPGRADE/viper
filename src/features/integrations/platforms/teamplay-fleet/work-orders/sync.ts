@@ -74,6 +74,19 @@ export async function reconcileProvisionalMappings(
   }
 }
 
+// The ticket columns a Fleet activity fills in, on create and on every re-sync.
+export const ticketFields = (item: FleetWorkOrderItem) => ({
+  summary: item.summary,
+  body: item.body,
+  status: item.status,
+  category: item.category,
+  scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
+  scheduledEndTime: item.scheduledEndTime
+    ? new Date(item.scheduledEndTime)
+    : null,
+  sourceLabel: FLEET_SOURCE_LABEL,
+});
+
 async function ingestFleetWorkOrders(
   items: FleetWorkOrderItem[],
   integrationId: string,
@@ -95,14 +108,7 @@ async function ingestFleetWorkOrders(
       // consecutiveFailures.
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetWorkOrderItem, userId: string) => {
-        const fields = {
-          summary: item.summary,
-          body: item.body,
-          status: item.status,
-          category: item.category,
-          scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
-          sourceLabel: FLEET_SOURCE_LABEL,
-        };
+        const fields = ticketFields(item);
         return {
           createData: { ...fields, creatorId: userId },
           // Never reassign the creator on re-sync; only refresh mutable fields.

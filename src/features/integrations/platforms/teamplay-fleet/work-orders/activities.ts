@@ -43,6 +43,7 @@ export interface FleetWorkOrderItem {
   status: TicketStatus;
   category: TicketCategory;
   scheduledAt: string | null;
+  scheduledEndTime: string | null;
   body: string;
   ownIncidentNumber: string | null;
   raw: FleetActivity;
@@ -176,6 +177,8 @@ export async function get(
 }
 
 export function toCanonical(raw: FleetActivity): FleetWorkOrderItem {
+  const plannedStart = toIso(raw.plannedStart);
+  const plannedEnd = toIso(raw.plannedEnd);
   return {
     externalId: raw.ticketKey,
     equipmentKey: raw.equipmentKey ?? null,
@@ -184,7 +187,14 @@ export function toCanonical(raw: FleetActivity): FleetWorkOrderItem {
       `${raw.shortText ?? "Activity"}: ${raw.qmtext ?? raw.ticketKey}`,
     status: mapStatus(raw),
     category: mapCategory(raw),
-    scheduledAt: toIso(raw.plannedStart ?? raw.dueDate),
+    scheduledAt: plannedStart ?? toIso(raw.dueDate),
+    // An end that is missing or not after the planned start is left empty.
+    scheduledEndTime:
+      plannedStart &&
+      plannedEnd &&
+      new Date(plannedEnd) > new Date(plannedStart)
+        ? plannedEnd
+        : null,
     body: buildBody(raw),
     ownIncidentNumber: raw.ownIncidentNumber ?? null,
     raw,

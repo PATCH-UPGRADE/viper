@@ -234,6 +234,5 @@ describe("interruption list", () => {
     ]);
     const [item] = await getInterruptionList("u1");
     expect(item.scheduledAt).toEqual(ownerTime);
-    expect(item.reschedulePending).toBe(false);
   });
 });

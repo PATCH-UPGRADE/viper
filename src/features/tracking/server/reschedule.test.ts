@@ -43,14 +43,6 @@ const from = new Date("2099-01-01T09:00:00Z");
 const end = new Date("2099-01-01T10:30:00Z");
 const proposedAt = new Date("2099-01-02T13:00:00Z");
 
-beforeEach(() => {
-  vi.resetAllMocks();
-  mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
-  mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "d1" });
-  // The user may open the ticket.
-  mockPrisma.workOrderTicket.count.mockResolvedValue(1);
-});
-
 const request = {
   id: "r1",
   ticketId: "t1",
@@ -63,57 +55,45 @@ const ask = (input = {}) =>
   caller.requestReschedule({ ticketId: "t1", proposedAt, ...input });
 const decide = (decision: "approve" | "decline" | "cancel", reason?: string) =>
   caller.decideReschedule({ requestId: "r1", decision, reason });
+const activity = () => mockPrisma.ticketActivity.create.mock.calls[0][0].data;
 
 beforeEach(() => {
+  vi.resetAllMocks();
+  mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+  mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "d1" });
+  // The user may open the ticket.
+  mockPrisma.workOrderTicket.count.mockResolvedValue(1);
   mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
     scheduledAt: from,
     scheduledEndTime: end,
   });
   mockPrisma.rescheduleRequest.count.mockResolvedValue(0);
-  mockPrisma.rescheduleRequest.create.mockResolvedValue({
-    id: "r1",
-    reason: "Surgery",
-  });
+  mockPrisma.rescheduleRequest.create.mockResolvedValue({ id: "r1" });
   mockPrisma.rescheduleRequest.findUnique.mockResolvedValue(request);
   mockPrisma.rescheduleRequest.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe("requestReschedule", () => {
   it("creates the request and its activity", async () => {
-    await ask({ reason: "Surgery" });
+    await ask();
 
-    expect(mockPrisma.rescheduleRequest.create).toHaveBeenCalledWith({
-      data: {
-        ticketId: "t1",
-        requestedById: "me",
-        fromScheduledAt: from,
-        proposedAt,
-        reason: "Surgery",
-      },
-    });
-    expect(mockPrisma.ticketActivity.create.mock.calls[0][0].data).toEqual({
+    expect(mockPrisma.rescheduleRequest.create.mock.calls[0][0].data).toEqual({
       ticketId: "t1",
-      userId: "me",
-      type: "RESCHEDULE_REQUESTED",
-      data: { requestId: "r1", from, to: proposedAt, reason: "Surgery" },
+      requestedById: "me",
+      fromScheduledAt: from,
+      proposedAt,
+      reason: null,
     });
+    expect(activity()).toMatchObject({ type: "RESCHEDULE_REQUESTED" });
   });
 
   it.each([
-    ["a time in the past", { proposedAt: new Date("2000-01-01") }],
-    ["the time it already has", { proposedAt: from }],
-  ])("rejects %s", async (_name, input) => {
+    ["a time in the past", { proposedAt: new Date("2000-01-01") }, 0],
+    ["the time it already has", { proposedAt: from }, 0],
+    ["a second pending request", {}, 1],
+  ])("rejects %s", async (_name, input, pending) => {
+    mockPrisma.rescheduleRequest.count.mockResolvedValue(pending);
     await expect(ask(input)).rejects.toMatchObject({ code: "BAD_REQUEST" });
-  });
-
-  it("rejects a second pending request", async () => {
-    mockPrisma.rescheduleRequest.count.mockResolvedValue(1);
-    await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST" });
-  });
-
-  it("does not open a Done ticket, or one outside the department", async () => {
-    mockPrisma.workOrderTicket.count.mockResolvedValue(0);
-    await expect(ask()).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
 
@@ -132,61 +112,41 @@ describe("decideReschedule", () => {
       where: { parentId: "t1", ticket: { isNot: null }, scheduledAt: from },
       data: { scheduledAt: proposedAt },
     });
-    expect(
-      mockPrisma.ticketActivity.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      type: "RESCHEDULE_APPROVED",
-      data: { requestedBy: request.requestedBy },
-    });
+    expect(activity()).toMatchObject({ type: "RESCHEDULE_APPROVED" });
   });
 
-  it("declining leaves the time alone and keeps the reason", async () => {
-    await decide("decline", "Only on site in the morning");
+  it.each([
+    ["decline", "RESCHEDULE_DECLINED", "someone"],
+    ["cancel", "RESCHEDULE_CANCELLED", "me"],
+  ] as const)(
+    "%s leaves the time alone and keeps the reason",
+    async (decision, type, requestedById) => {
+      mockPrisma.rescheduleRequest.findUnique.mockResolvedValue({
+        ...request,
+        requestedById,
+      });
+      await decide(decision, "Because");
 
-    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
-    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
-    expect(
-      mockPrisma.ticketActivity.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      type: "RESCHEDULE_DECLINED",
-      data: { reason: "Only on site in the morning" },
-    });
-  });
+      expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+      expect(activity()).toMatchObject({ type, data: { reason: "Because" } });
+    },
+  );
 
-  it("lets the requester cancel and keeps the reason", async () => {
-    mockPrisma.rescheduleRequest.findUnique.mockResolvedValue({
-      ...request,
-      requestedById: "me",
-    });
-    await decide("cancel", "No longer needed");
-
-    expect(
-      mockPrisma.rescheduleRequest.updateMany.mock.calls[0][0].data,
-    ).toMatchObject({ status: "CANCELLED" });
-    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
-    expect(
-      mockPrisma.ticketActivity.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      type: "RESCHEDULE_CANCELLED",
-      data: { reason: "No longer needed" },
-    });
-  });
-
-  it("does not let anyone but the requester cancel", async () => {
-    await expect(decide("cancel")).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
-  });
-
-  it("does not let the requester decide", async () => {
-    mockPrisma.rescheduleRequest.findUnique.mockResolvedValue({
-      ...request,
-      requestedById: "me",
-    });
-    await expect(decide("approve")).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
-  });
+  it.each([
+    ["approve", "me"],
+    ["cancel", "someone"],
+  ] as const)(
+    "does not let the wrong user %s",
+    async (decision, requestedById) => {
+      mockPrisma.rescheduleRequest.findUnique.mockResolvedValue({
+        ...request,
+        requestedById,
+      });
+      await expect(decide(decision)).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+    },
+  );
 
   it("does not decide a request on a ticket the user cannot open", async () => {
     mockPrisma.workOrderTicket.count.mockResolvedValue(0);

@@ -5,7 +5,13 @@
 import "server-only";
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
-import type { ConfidenceLevel } from "@/generated/prisma";
+import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
+import {
+  impactRowsUpdate,
+  impactScalarData,
+  impactStateSelect,
+  statedImpactFields,
+} from "@/features/remediations/impact";
 import prisma from "@/lib/db";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
@@ -52,6 +58,7 @@ const decisionSchema = z.object({
   op: z.enum(["link", "update", "create"]),
   // The id of an existing candidate to link/update. Omitted for create.
   targetId: z.string().nullish(),
+  extractedIndex: z.number().int().min(1).nullish(),
   // The LLM may only express these two — Confirmed is reserved for humans.
   confidence: z.enum(["NeedsReview", "Matched"]),
   reasonWhy: z.string(),
@@ -92,7 +99,7 @@ For each extracted Vulnerability, choose exactly ONE action:
 
 For each extracted Remediation, choose exactly ONE action:
 - "link": the remediation clearly matches an existing candidate. Set targetId to that candidate's id.
-- "update": matches an existing candidate, but the notification has new info worth saving (description) Set targetId and put the new value in fields.
+- "update": matches an existing candidate, but the notification has new info worth saving: a better description, or impact the candidate lacks (statesImpact lists what the notification says; hasImpact lists what the candidate already has). Set targetId, put a new description in fields if there is one, and set extractedIndex to the remediation's # number.
 
 For each extracted Asset, choose exactly ONE action:
 - "link": the asset clearly matches an existing candidate (same IP/hostname/Mac Address/serial number). Set targetId to that candidate's id. If the notification states a MAC address or serial number the matched record is missing, include it in fields so it can be saved.
@@ -165,13 +172,14 @@ function renderCandidates(candidates: Candidates): string {
         candidates.remediations
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Remediations #${i + 1} extracted: linkedtoCveIds=${e.linkedCveIds?.join(", ") || "?"} | description=${e.description ?? "?"}`;
+            const statesImpact = e.impact ? statedImpactFields(e.impact) : [];
+            const line = `Remediations #${i + 1} extracted: linkedtoCveIds=${e.linkedCveIds?.join(", ") || "?"} | description=${e.description ?? "?"} | statesImpact=${statesImpact.join(", ") || "(none)"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | linkedtoCveIds: ${m.linkedCveIds.join(", ") || "(none)"} | description: ${m.description ?? "(none)"}`,
+                        ` - id: ${m.id} | linkedtoCveIds: ${m.linkedCveIds.join(", ") || "(none)"} | description: ${m.description ?? "(none)"} | hasImpact: ${m.statedImpactFields.join(",") || "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -584,10 +592,29 @@ export async function applyDecisions(
         });
         if (decision.op === "update") {
           const data = cleanFields(decision.fields);
-          if (data.description) {
+          const targetId = decision.targetId;
+          const entry = decision.extractedIndex
+            ? candidates.remediations[decision.extractedIndex - 1]
+            : undefined;
+          const impact = entry?.matches.some((m) => m.id === targetId)
+            ? entry.extracted.impact
+            : null;
+          const existing = impact
+            ? await tx.remediation.findUnique({
+                where: { id: targetId },
+                select: impactStateSelect,
+              })
+            : null;
+          const update: Prisma.RemediationUpdateInput = {
+            ...(data.description && { description: data.description }),
+            ...impactScalarData(impact, "fillGaps", existing),
+          };
+          const rows = impactRowsUpdate(impact?.impacts, "fillGaps", existing);
+          if (rows) update.impacts = rows;
+          if (Object.keys(update).length > 0) {
             await tx.remediation.update({
-              where: { id: decision.targetId },
-              data: { description: data.description },
+              where: { id: targetId },
+              data: update,
             });
           }
           summary.updated++;

@@ -1,6 +1,10 @@
 // Match extracted items from notification to VIPER db items (e.g, DeviceGroup)
 
 import "server-only";
+import {
+  impactStateSelect,
+  statedImpactFields,
+} from "@/features/remediations/impact";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { isUniqueViolation, nameOrClauses } from "@/lib/router-utils";
@@ -34,6 +38,7 @@ export type RemediationCandidate = {
   id: string;
   linkedCveIds: string[];
   description: string | null;
+  statedImpactFields: string[];
 };
 
 export type AssetCandidate = {
@@ -238,6 +243,7 @@ async function searchRemediation(
     select: {
       id: true,
       description: true,
+      ...impactStateSelect,
       vulnerabilities: { select: { cveId: true } },
       deviceGroupMatchings: {
         select: {
@@ -256,6 +262,7 @@ async function searchRemediation(
       v.cveId ? [v.cveId] : [],
     ),
     description: row.description ?? null,
+    statedImpactFields: statedImpactFields(row),
   }));
 }
 

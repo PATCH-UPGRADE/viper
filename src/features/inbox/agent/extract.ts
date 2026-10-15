@@ -3,6 +3,7 @@
 import "server-only";
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
+import { remediationImpactSchema } from "@/features/remediations/impact";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
@@ -38,6 +39,7 @@ const CVE_ID = /^CVE-\d{4}-\d{4,}$/i;
 export const extractedRemediationSchema = z.object({
   linkedCveIds: z.array(z.string()).nullish(),
   description: z.string().nullish(),
+  impact: remediationImpactSchema.nullish(),
 });
 
 export const extractedAssetSchema = z.object({
@@ -76,6 +78,7 @@ FOR DEVICE GROUPS: A device group is a class of affected product, identified by 
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
 - versionRange: if the notification specifies a range (e.g. "affects firmware 2.1 through 2.3"), express it as a VERS string (e.g, "vers:generic />2.1|<=2.3"). Omit if only a single exact version is mentioned.
+- impacts: one entry per device feature affected, with phase DURING_APPLY (only while applying) or AFTER_APPLY (persists), feature (e.g. "nurse call button"), effect UNAVIABLE / DEGRADED / CHANGED, clinicalWorkflowImpact (clinicians must be told in advance), notes
 
 FOR VULNERABILITIES: CVEids or security issues explicitly named
 - cveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
@@ -109,7 +112,7 @@ export async function extractEntities(
     model: MODEL,
     useResponsesApi: true,
     reasoning: { effort: "none" },
-    maxTokens: 2048,
+    maxTokens: 3072,
   }).withStructuredOutput(extractSchema, { method: "functionCalling" });
 
   const result = await model.invoke([

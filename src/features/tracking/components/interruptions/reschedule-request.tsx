@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { RescheduleStatus } from "@/generated/prisma";
 import { authClient } from "@/lib/auth-client";
 import { formatSlot, toDateTimeLocal } from "@/lib/date-utils";
 import { plural } from "@/lib/utils";
@@ -13,21 +12,15 @@ import {
   useDecideReschedule,
   useRequestReschedule,
 } from "../../hooks/use-tracking";
+import type { getInterruptionDetail } from "../../server/interruptions";
 
-type Pending = {
-  id: string;
-  proposedAt: Date;
-  reason: string | null;
-  requestedBy: { id: string; name: string };
-};
+type Detail = Awaited<ReturnType<typeof getInterruptionDetail>>;
 
-type Past = { id: string; status: RescheduleStatus; proposedAt: Date };
-
-type Related = {
-  proposedAt: Date;
-  requestedBy: { name: string };
-  onWorkOrder: boolean;
-};
+const LABELS = {
+  approve: "Approve",
+  decline: "Decline",
+  cancel: "Cancel request",
+} as const;
 
 const RequestForm = ({
   ticketId,
@@ -97,14 +90,16 @@ const RequestForm = ({
   );
 };
 
-const PendingRequest = ({ pending }: { pending: Pending }) => {
+const PendingRequest = ({
+  pending,
+}: {
+  pending: NonNullable<Detail["reschedule"]>;
+}) => {
   const [reason, setReason] = useState("");
   const decide = useDecideReschedule();
   const { data: session } = authClient.useSession();
   const time = formatSlot(pending.proposedAt);
   const mine = pending.requestedBy.id === session?.user.id;
-  const act = (decision: "approve" | "decline" | "cancel") => () =>
-    decide.mutate({ requestId: pending.id, decision, reason });
 
   return (
     <>
@@ -129,34 +124,22 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
             onChange={(e) => setReason(e.target.value)}
           />
           <div className="flex gap-2">
-            {mine ? (
+            {(mine
+              ? (["cancel"] as const)
+              : (["approve", "decline"] as const)
+            ).map((decision) => (
               <Button
+                key={decision}
                 size="sm"
-                variant="outline"
+                variant={decision === "approve" ? "default" : "outline"}
                 disabled={decide.isPending}
-                onClick={act("cancel")}
+                onClick={() =>
+                  decide.mutate({ requestId: pending.id, decision, reason })
+                }
               >
-                Cancel request
+                {LABELS[decision]}
               </Button>
-            ) : (
-              <>
-                <Button
-                  size="sm"
-                  disabled={decide.isPending}
-                  onClick={act("approve")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={decide.isPending}
-                  onClick={act("decline")}
-                >
-                  Decline
-                </Button>
-              </>
-            )}
+            ))}
           </div>
         </>
       )}
@@ -174,9 +157,9 @@ export const RescheduleRequest = ({
 }: {
   ticketId: string;
   scheduledAt: Date | null;
-  pending: Pending | null;
-  related: Related | null;
-  past: Past[];
+  pending: Detail["reschedule"];
+  related: Detail["relatedReschedule"];
+  past: Detail["pastReschedules"];
 }) => (
   <>
     <div className="flex flex-col gap-2 border-t p-3">

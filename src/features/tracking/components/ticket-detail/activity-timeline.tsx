@@ -260,9 +260,13 @@ const renderActivity = (a: Activity): React.ReactNode => {
         </>
       );
     case "RESCHEDULE_REQUESTED":
+    case "RESCHEDULE_CANCELLED":
       return (
         <>
-          Requested a reschedule to {formatSlot(data.to)}
+          {a.type === "RESCHEDULE_REQUESTED"
+            ? "Requested a reschedule to"
+            : "Cancelled the reschedule request to"}{" "}
+          {formatSlot(data.to)}
           {data.reason ? (
             <span className="text-muted-foreground"> — {data.reason}</span>
           ) : null}
@@ -280,15 +284,6 @@ const renderActivity = (a: Activity): React.ReactNode => {
         <>
           Reschedule declined in VIPER.
           {data.reason ? ` ${data.reason}` : null}
-        </>
-      );
-    case "RESCHEDULE_CANCELLED":
-      return (
-        <>
-          Cancelled the reschedule request to {formatSlot(data.to)}
-          {data.reason ? (
-            <span className="text-muted-foreground"> — {data.reason}</span>
-          ) : null}
         </>
       );
     case "TICKET_LINKED":

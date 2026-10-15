@@ -308,19 +308,10 @@ const withRowFlags = <
 const badRequest = (message: string) =>
   new TRPCError({ code: "BAD_REQUEST", message });
 
-const RESCHEDULE_OUTCOME = {
-  approve: {
-    status: RescheduleStatus.APPROVED,
-    activity: "RESCHEDULE_APPROVED",
-  },
-  decline: {
-    status: RescheduleStatus.DECLINED,
-    activity: "RESCHEDULE_DECLINED",
-  },
-  cancel: {
-    status: RescheduleStatus.CANCELLED,
-    activity: "RESCHEDULE_CANCELLED",
-  },
+const RESCHEDULE_STATUS = {
+  approve: "APPROVED",
+  decline: "DECLINED",
+  cancel: "CANCELLED",
 } as const;
 
 export const trackingRouter = createTRPCRouter({
@@ -1439,12 +1430,12 @@ export const trackingRouter = createTRPCRouter({
       }
       const approve = input.decision === "approve";
       const reason = approve ? null : input.reason || null;
-      const outcome = RESCHEDULE_OUTCOME[input.decision];
+      const status = RESCHEDULE_STATUS[input.decision];
       return prisma.$transaction(async (tx) => {
         const { count } = await tx.rescheduleRequest.updateMany({
           where: { id: request.id, status: RescheduleStatus.PENDING },
           data: {
-            status: outcome.status,
+            status,
             decidedById: userId,
             decidedAt: new Date(),
           },
@@ -1459,7 +1450,7 @@ export const trackingRouter = createTRPCRouter({
           data: {
             ticketId: request.ticketId,
             userId,
-            type: outcome.activity,
+            type: `RESCHEDULE_${status}`,
             data: {
               requestId: request.id,
               from: request.fromScheduledAt,

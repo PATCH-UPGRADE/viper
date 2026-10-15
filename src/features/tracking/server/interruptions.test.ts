@@ -42,18 +42,24 @@ describe("interruptions scope", () => {
     });
   });
 
+  const detailTicket = (overrides = {}) => ({
+    id: "wo-1",
+    assignee: null,
+    creator: { phone: null },
+    ticket: null,
+    seenBy: [],
+    departments: [],
+    assets: [],
+    descriptions: [],
+    rescheduleRequests: [],
+    ...overrides,
+  });
+
   it("gives the contact's phone", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
-    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
-      id: "wo-1",
-      assignee: { phone: "Ext. 3104" },
-      ticket: null,
-      seenBy: [],
-      departments: [],
-      assets: [],
-      descriptions: [],
-      rescheduleRequests: [],
-    });
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(
+      detailTicket({ assignee: { phone: "Ext. 3104" } }),
+    );
     const detail = await getInterruptionDetail("u1", "wo-1");
     const { select } = mockPrisma.workOrderTicket.findFirst.mock.calls[0][0];
     expect(select.assignee.select.phone).toBe(true);
@@ -62,43 +68,24 @@ describe("interruptions scope", () => {
 
   it("shows a pending request on the other side of an owner and its device", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
-    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
-      id: "dev-1",
-      assignee: null,
-      creator: { phone: null },
-      ticket: {
-        parentTicket: {
-          id: "wo-1",
-          assets: [],
-          seenBy: [],
-          descriptions: [],
-          departments: [],
-        },
-      },
-      seenBy: [],
-      departments: [],
-      assets: [],
-      descriptions: [],
-      rescheduleRequests: [],
-    });
-    const proposedAt = new Date("2026-10-16T10:00:00Z");
-    mockPrisma.rescheduleRequest.findFirst.mockResolvedValue({
-      proposedAt,
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(
+      detailTicket({
+        id: "dev-1",
+        ticket: { parentTicket: detailTicket() },
+      }),
+    );
+    const related = {
+      proposedAt: new Date("2026-10-16T10:00:00Z"),
       requestedBy: { name: "Sam" },
-    });
+    };
+    mockPrisma.rescheduleRequest.findFirst.mockResolvedValue(related);
 
     const detail = await getInterruptionDetail("u1", "dev-1");
 
     expect(
       mockPrisma.rescheduleRequest.findFirst.mock.calls[0][0].where,
-    ).toMatchObject({
-      ticketId: "wo-1",
-    });
-    expect(detail.relatedReschedule).toEqual({
-      proposedAt,
-      requestedBy: { name: "Sam" },
-      onWorkOrder: true,
-    });
+    ).toMatchObject({ ticketId: "wo-1" });
+    expect(detail.relatedReschedule).toEqual({ ...related, onWorkOrder: true });
   });
 });
 
@@ -128,6 +115,26 @@ describe("interruption calendar", () => {
     })),
   });
 
+  // A device on another day than its owner, so it gets an event of its own.
+  const deviceEvent = (ownerRequests: { id: string }[] = []) => ({
+    parentTicketId: "owner",
+    parentTicket: {
+      id: "owner",
+      summary: "Patch pumps",
+      scheduledAt: ownerTime,
+      scheduledEndTime: null,
+      rescheduleRequests: ownerRequests,
+    },
+    asset: asset("Activity"),
+    ticket: {
+      id: "t3",
+      status: "TO_DO",
+      category: "PATCH",
+      scheduledAt: otherDay,
+      rescheduleRequests: [],
+    },
+  });
+
   beforeEach(() => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
   });
@@ -140,26 +147,7 @@ describe("interruption calendar", () => {
         { at: otherDay, icon: "Activity" },
       ]),
     ]);
-    mockPrisma.assetTicket.findMany.mockResolvedValue([
-      {
-        parentTicketId: "owner",
-        parentTicket: {
-          id: "owner",
-          summary: "Patch pumps",
-          scheduledAt: ownerTime,
-          scheduledEndTime: null,
-          rescheduleRequests: [],
-        },
-        asset: asset("Activity"),
-        ticket: {
-          id: "t3",
-          status: "TO_DO",
-          category: "PATCH",
-          scheduledAt: otherDay,
-          rescheduleRequests: [],
-        },
-      },
-    ]);
+    mockPrisma.assetTicket.findMany.mockResolvedValue([deviceEvent()]);
     const events = await getInterruptionCalendar("u1", range);
     expect(events.map((event) => event.deviceCount)).toEqual([2, 1]);
     expect(events[0].assetName).toBe("2 devices");
@@ -205,26 +193,7 @@ describe("interruption calendar", () => {
     ]);
 
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-    mockPrisma.assetTicket.findMany.mockResolvedValue([
-      {
-        parentTicketId: "owner",
-        parentTicket: {
-          id: "owner",
-          summary: "Patch pumps",
-          scheduledAt: ownerTime,
-          scheduledEndTime: null,
-          rescheduleRequests: pending,
-        },
-        asset: asset(null),
-        ticket: {
-          id: "t3",
-          status: "TO_DO",
-          category: "PATCH",
-          scheduledAt: otherDay,
-          rescheduleRequests: [],
-        },
-      },
-    ]);
+    mockPrisma.assetTicket.findMany.mockResolvedValue([deviceEvent(pending)]);
     const [device] = await getInterruptionCalendar("u1", range);
     expect(device.reschedulePending).toBe(true);
   });

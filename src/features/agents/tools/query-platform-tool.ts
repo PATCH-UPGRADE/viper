@@ -305,7 +305,7 @@ type PlatformProcedure = (typeof PLATFORM_QUERY_PROCEDURES)[number];
  * count. `paginationInputSchema` accepts up to 100, and prose in the catalog is
  * advisory — the model can ignore it and often will.
  *
- * notifications.getMany runs one asset.findMany per matching per row, with
+ * notifications.getMany runs one asset count query per matching per row, with
  * no batching. A vendor advisory carries ~18 matchings, so a page of 100 is
  * ~1800 concurrent queries against a Prisma pool of roughly 17. The overflow
  * throws P2024, which reaches the model as "an unexpected error occurred", and

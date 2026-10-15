@@ -555,7 +555,8 @@ export async function findMatchingIdsForDevice(
 /**
  * Inverse of {@link findMatchingIdsForDevice}: resolve a set of device-group
  * matchings to the ids of the assets they apply to. Coarse manufacturer/product
- * DB filter, then the in-memory VERS-range check (matchingAppliesToDevice).
+ * DB filter, then the in-memory check (identityAppliesToDevice: VERS ranges, and
+ * the manufacturer/product fallback for an unknown-version asset).
  */
 export async function findAssetIdsForMatchings(
   matchings: MatchingLike[],

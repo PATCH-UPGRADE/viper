@@ -707,7 +707,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. The end time must be after the start time. Moving scheduledAt moves scheduledEndTime by the same amount unless scheduledEndTime is sent too, and clearing scheduledAt clears it. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. The end time must be after the start time. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
       },
     })
     .output(workOrderDetailResponseSchema)
@@ -726,23 +726,10 @@ export const trackingRouter = createTRPCRouter({
           rest.scheduledAt === undefined
             ? before.scheduledAt
             : rest.scheduledAt;
-        let end =
+        const end =
           rest.scheduledEndTime === undefined
             ? before.scheduledEndTime
             : rest.scheduledEndTime;
-        // Moving the start moves the end by the same amount, unless an end is sent.
-        if (
-          rest.scheduledEndTime === undefined &&
-          rest.scheduledAt !== undefined &&
-          end
-        ) {
-          if (!start) end = null;
-          else if (before.scheduledAt) {
-            end = new Date(
-              end.getTime() + start.getTime() - before.scheduledAt.getTime(),
-            );
-          }
-        }
         if (end && !start) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -773,9 +760,6 @@ export const trackingRouter = createTRPCRouter({
           where: { id },
           data: {
             ...rest,
-            ...(end?.getTime() !== before.scheduledEndTime?.getTime() && {
-              scheduledEndTime: end,
-            }),
             ...(departmentIds !== undefined && {
               departments: { set: departmentIds.map((dId) => ({ id: dId })) },
             }),

@@ -511,7 +511,7 @@ describe("TicketEditForm", () => {
       expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     });
 
-    it("moves the shown end with the start and sends no end", async () => {
+    it("moves the end with the start", async () => {
       render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
 
       fireEvent.change(screen.getByLabelText(/scheduled for/i), {
@@ -521,7 +521,9 @@ describe("TicketEditForm", () => {
       expect(screen.getByLabelText(/scheduled end/i)).toHaveValue(
         "2026-06-02T14:30",
       );
-      expect(await saved()).not.toHaveProperty("scheduledEndTime");
+      expect((await saved()).scheduledEndTime).toEqual(
+        new Date(2026, 5, 2, 14, 30),
+      );
     });
 
     it("sends the end the user typed", async () => {

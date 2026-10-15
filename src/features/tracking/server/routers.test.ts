@@ -377,15 +377,11 @@ describe("trackingRouter.update", () => {
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
-    it("moving only the start moves the end by the same amount", async () => {
+    it("rejects a start moved to or past the stored end", async () => {
       stored();
-      await setup().update({
-        id: "t1",
-        scheduledAt: new Date("2026-06-02T13:00:00Z"),
-      });
-      expect(updateData().scheduledEndTime).toEqual(
-        new Date("2026-06-02T14:30:00Z"),
-      );
+      await expect(
+        setup().update({ id: "t1", scheduledAt: end }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
     it("writes both as given when both are sent", async () => {
@@ -394,12 +390,6 @@ describe("trackingRouter.update", () => {
       const scheduledEndTime = new Date("2026-06-02T13:45:00Z");
       await setup().update({ id: "t1", scheduledAt, scheduledEndTime });
       expect(updateData()).toMatchObject({ scheduledAt, scheduledEndTime });
-    });
-
-    it("clearing the start clears the end", async () => {
-      stored();
-      await setup().update({ id: "t1", scheduledAt: null });
-      expect(updateData().scheduledEndTime).toBeNull();
     });
 
     it("leaves the end alone when the update does not touch the times", async () => {

@@ -70,6 +70,18 @@ const buildEditState = (data: TicketDetail): EditState => ({
   scheduledEndTime: toDateTimeLocal(data.scheduledEndTime),
 });
 
+// Moving the start moves the end by the same amount.
+const shiftEnd = (form: EditState, scheduledAt: string) =>
+  form.scheduledAt && form.scheduledEndTime && scheduledAt
+    ? toDateTimeLocal(
+        new Date(
+          new Date(form.scheduledEndTime).getTime() +
+            new Date(scheduledAt).getTime() -
+            new Date(form.scheduledAt).getTime(),
+        ),
+      )
+    : form.scheduledEndTime;
+
 const editStateFingerprint = (state: EditState) =>
   JSON.stringify({
     ...state,
@@ -97,23 +109,9 @@ export const TicketEditForm = ({
   // whatever the latest server refetch produced.
   const [initial] = useState(() => buildEditState(data));
   const [form, setForm] = useState<EditState>(initial);
-  const [endEdited, setEndEdited] = useState(false);
   const update = useUpdateTicket(data.id);
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
-
-  // Moving the start moves the end by the same amount, as the server does.
-  const shiftedEnd = (scheduledAt: string) => {
-    if (!scheduledAt) return "";
-    if (!initial.scheduledAt || !initial.scheduledEndTime) {
-      return initial.scheduledEndTime;
-    }
-    const shift =
-      new Date(scheduledAt).getTime() - new Date(initial.scheduledAt).getTime();
-    return toDateTimeLocal(
-      new Date(new Date(initial.scheduledEndTime).getTime() + shift),
-    );
-  };
 
   const endError = !form.scheduledEndTime
     ? null
@@ -192,11 +190,9 @@ export const TicketEditForm = ({
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
-        ...(endEdited && {
-          scheduledEndTime: form.scheduledEndTime
-            ? new Date(form.scheduledEndTime)
-            : null,
-        }),
+        scheduledEndTime: form.scheduledEndTime
+          ? new Date(form.scheduledEndTime)
+          : null,
       },
       { onSuccess: () => onCancel() },
     );
@@ -285,9 +281,7 @@ export const TicketEditForm = ({
                 setForm((f) => ({
                   ...f,
                   scheduledAt: e.target.value,
-                  scheduledEndTime: endEdited
-                    ? f.scheduledEndTime
-                    : shiftedEnd(e.target.value),
+                  scheduledEndTime: shiftEnd(f, e.target.value),
                 }))
               }
             />
@@ -300,10 +294,9 @@ export const TicketEditForm = ({
               type="datetime-local"
               value={form.scheduledEndTime}
               aria-invalid={!!endError}
-              onChange={(e) => {
-                setEndEdited(true);
-                setForm((f) => ({ ...f, scheduledEndTime: e.target.value }));
-              }}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
+              }
             />
             {endError && <p className="text-xs text-destructive">{endError}</p>}
           </div>

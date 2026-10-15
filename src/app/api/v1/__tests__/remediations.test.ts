@@ -896,7 +896,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     const { integration: createdIntegration } = await setupMockIntegration(
       mockIntegrationPayload,
     );
-
     const createToken = await createIntegrationToken(
       createdIntegration.integrationUserId,
       ResourceType.Remediation,

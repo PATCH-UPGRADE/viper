@@ -1,6 +1,7 @@
 import type { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { matchingForGroup } from "./canonical-identity";
+import { matchingForDevice } from "./canonical-identity";
+import { deviceForSampleCpe } from "./device-groups";
 
 // Remediations matched to seed vulnerability CPEs
 const SAMPLE_REMEDIATIONS = [
@@ -41,29 +42,22 @@ export async function seedRemediations(userId: string) {
 
   const remediations = await Promise.all(
     SAMPLE_REMEDIATIONS.map(async (remediation) => {
-      const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: { has: remediation.cpe } },
-      });
-
-      if (!deviceGroup) {
-        console.warn(`⚠️  No device group found for CPE: ${remediation.cpe}`);
+      const device = await deviceForSampleCpe(remediation.cpe);
+      if (!device) {
+        console.warn(`⚠️  No sample device found for CPE: ${remediation.cpe}`);
         return null;
       }
 
-      // Link the remediation to the device group via its own matching, and to
-      // the vulnerability that affects the same group.
-      const matchingId = await matchingForGroup({
-        manufacturerId: deviceGroup.manufacturerId,
-        productId: deviceGroup.productId,
-        versionId: deviceGroup.versionId,
-      });
+      // Link the remediation to the device via its own matching, and to the
+      // vulnerability that affects the same device.
+      const matchingId = await matchingForDevice(device);
 
       const vulnerability = await prisma.vulnerability.findFirst({
         where: {
           deviceGroupMatchings: {
             some: {
-              manufacturerId: deviceGroup.manufacturerId ?? undefined,
-              productId: deviceGroup.productId,
+              manufacturerId: device.manufacturerId ?? undefined,
+              productId: device.productId,
             },
           },
         },

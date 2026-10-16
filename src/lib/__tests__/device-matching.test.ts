@@ -161,7 +161,7 @@ describe("matchingAppliesToDevice", () => {
 });
 
 describe("resolveMatches", () => {
-  const groups = [
+  const devices = [
     {
       id: "a",
       manufacturerId: "v-acme",
@@ -185,7 +185,7 @@ describe("resolveMatches", () => {
     },
   ];
 
-  it("resolves a wildcard-product matching to all of that manufacturer's groups", () => {
+  it("resolves a wildcard-product matching to all of that manufacturer's devices", () => {
     const matches = resolveMatches(
       [
         {
@@ -195,12 +195,12 @@ describe("resolveMatches", () => {
           versionRange: null,
         },
       ],
-      groups,
+      devices,
     );
     expect(matches.map((g) => g.id).sort()).toEqual(["a", "b"]);
   });
 
-  it("dedupes a group matched by more than one matching", () => {
+  it("dedupes a device matched by more than one matching", () => {
     const matches = resolveMatches(
       [
         {
@@ -208,20 +208,20 @@ describe("resolveMatches", () => {
           productId: null,
           versionId: null,
           versionRange: null,
-        }, // matches group a (and b)
+        }, // matches device a (and b)
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: "ver-213",
           versionRange: null,
-        }, // matches group a
+        }, // matches device a
       ],
-      groups,
+      devices,
     );
     expect(matches.filter((g) => g.id === "a")).toHaveLength(1);
   });
 
-  it("returns nothing when no group matches", () => {
+  it("returns nothing when no device matches", () => {
     expect(
       resolveMatches(
         [
@@ -232,7 +232,7 @@ describe("resolveMatches", () => {
             versionRange: null,
           },
         ],
-        groups,
+        devices,
       ),
     ).toEqual([]);
   });

@@ -8,16 +8,14 @@ import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
+  canonicalRefSchema,
   cpeSchema,
   createIntegrationInputSchema,
   userIncludeSelect,
   userSchema,
+  versionStatusSchema,
 } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
-import {
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-} from "../device-groups/types";
 import { scopedNoteSchema } from "../notes/schemas";
 import { remediationCardInclude } from "../remediations/types";
 
@@ -80,7 +78,18 @@ export const assetArrayInputSchema = z.object({
 export const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string().nullable(),
-  deviceGroup: deviceGroupWithUrlsSchema,
+  manufacturer: canonicalRefSchema.nullable(),
+  product: canonicalRefSchema
+    .extend({
+      deviceType: z
+        .object({ slug: z.string(), displayName: z.string() })
+        .nullable(),
+    })
+    .nullable(),
+  version: canonicalRefSchema
+    .extend({ udiDi: z.string().nullable() })
+    .nullable(),
+  versionStatus: versionStatusSchema,
   role: z.string().nullable(),
   externalMappings: z.array(
     z.object({
@@ -175,18 +184,36 @@ export const managesRelationshipSelect = {
   },
 } satisfies Prisma.Asset$managedByArgs;
 
+const canonicalRefSelect = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
+/** An asset's manufacturer, product (with its device type), and version. */
+export const assetDeviceInclude = {
+  manufacturer: canonicalRefSelect,
+  product: {
+    select: {
+      canonicalName: true,
+      canonicalDisplayName: true,
+      deviceType: { select: { slug: true, displayName: true } },
+    },
+  },
+  version: {
+    select: { canonicalName: true, canonicalDisplayName: true, udiDi: true },
+  },
+} as const satisfies Prisma.AssetInclude;
+
+export type AssetWithDevice = Prisma.AssetGetPayload<{
+  include: typeof assetDeviceInclude;
+}>;
+
 export const assetInclude = {
   user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
+  ...assetDeviceInclude,
   externalMappings: externalMappingSelect,
   managedBy: managesRelationshipSelect,
 } satisfies Prisma.AssetInclude;
 
-/**
- * Derived from the *extended* client, not `Prisma.AssetGetPayload` — the device
- * group's `url` / `sbomUrl` / ... are computed by `deviceGroupExtension`, and
- * the base payload helper resolves them to `never`.
- */
 export type AssetWithRelations = Prisma.Result<
   ExtendedPrismaClient["asset"],
   { include: typeof assetInclude },
@@ -195,7 +222,7 @@ export type AssetWithRelations = Prisma.Result<
 
 export const assetDashboardInclude = {
   user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
+  ...assetDeviceInclude,
   externalMappings: externalMappingWithSyncSelect,
   issues: {
     include: {

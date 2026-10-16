@@ -6,12 +6,10 @@ it("renders a PDF", async () => {
   const pdf = await renderAssetQrPdf({
     id: "asset_123",
     serialNumber: "SN-001",
-    deviceGroup: {
-      manufacturer: { canonicalDisplayName: "Acme" },
-      product: {
-        canonicalDisplayName: "Monitor",
-        deviceType: { displayName: "Patient Monitor" },
-      },
+    manufacturer: { canonicalDisplayName: "Acme" },
+    product: {
+      canonicalDisplayName: "Monitor",
+      deviceType: { displayName: "Patient Monitor" },
     },
   });
 

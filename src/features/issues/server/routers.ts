@@ -1,10 +1,10 @@
 import "server-only";
 import { z } from "zod";
-import { assetInclude } from "@/features/assets/types";
-import { deviceGroupSelect } from "@/features/device-groups/types";
+import { assetDeviceInclude, assetInclude } from "@/features/assets/types";
 import { vulnerabilityInclude } from "@/features/vulnerabilities/types";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceIdentitySelect } from "@/lib/device-matching";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -53,11 +53,7 @@ export const issuesRouter = createTRPCRouter({
         where: { id: { in: ids } },
         include: {
           ...(type === "assets" && {
-            asset: {
-              include: {
-                deviceGroup: deviceGroupSelect,
-              },
-            },
+            asset: { include: assetDeviceInclude },
           }),
           ...(type === "vulnerabilities" && {
             vulnerability: {
@@ -86,7 +82,7 @@ export const issuesRouter = createTRPCRouter({
 
       const asset = await prisma.asset.findUnique({
         where: { id: assetId },
-        select: { id: true, deviceGroupId: true },
+        select: deviceIdentitySelect,
       });
       const found = requireExistence(asset, "Asset");
 

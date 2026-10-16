@@ -10,9 +10,6 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
-    deviceGroup: {
-      findMany: vi.fn(),
-    },
     deviceGroupMatching: {
       findMany: vi.fn(),
     },
@@ -86,14 +83,6 @@ const RANGE_MATCHING = {
   versionRange: "vers:semver/>=1.0|<2.0",
 };
 
-const PUMP_GROUP = {
-  id: "dg-pumps",
-  manufacturerId: "mf-baxter",
-  productId: "prod-sigma",
-  versionId: null,
-  version: null,
-};
-
 const vulnerability = {
   id: "vuln-1",
   severity: "Critical",
@@ -125,7 +114,10 @@ const OVERRIDE_ISSUE = {
 
 const makeAsset = (id: string) => ({
   id,
-  deviceGroupId: "dg-pumps",
+  manufacturerId: "mf-baxter",
+  productId: "prod-sigma",
+  versionId: null,
+  version: null,
   updatedAt: new Date("2026-01-15"),
 });
 
@@ -135,7 +127,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.asset.count.mockResolvedValue(PUMPS.length);
   mockPrisma.asset.findMany.mockResolvedValue(PUMPS);
-  mockPrisma.deviceGroup.findMany.mockResolvedValue([PUMP_GROUP]);
   mockPrisma.deviceGroupMatching.findMany.mockResolvedValue([PUMP_MATCHING]);
   mockPrisma.issue.findMany.mockResolvedValue([FLEET_ISSUE, OVERRIDE_ISSUE]);
 });

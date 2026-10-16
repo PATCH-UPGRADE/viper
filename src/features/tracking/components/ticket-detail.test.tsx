@@ -111,10 +111,8 @@ const {
           ip: "10.0.0.1",
           serialNumber: null,
           role: "Workstation",
-          deviceGroup: {
-            manufacturer: { canonicalDisplayName: "Acme" },
-            product: { canonicalDisplayName: "X100" },
-          },
+          manufacturer: { canonicalDisplayName: "Acme" },
+          product: { canonicalDisplayName: "X100" },
         },
         {
           id: "asset-2",
@@ -122,7 +120,8 @@ const {
           ip: null,
           serialNumber: "63014",
           role: null,
-          deviceGroup: null,
+          manufacturer: null,
+          product: null,
         },
       ],
     })),
@@ -705,19 +704,15 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   serialNumber: null,
   role: "ICU Bay Pump",
   location: { building: "A", floor: "3", room: "302" },
-  deviceGroupId: "dg-1",
-  deviceGroup: {
-    id: "dg-1",
-    manufacturerId: "manufacturer-icu",
-    productId: "product-plum",
-    versionId: null,
-    manufacturer: { canonicalDisplayName: "ICU Medical" },
-    product: {
-      canonicalDisplayName: "Plum 360",
-      deviceType: { displayName: "Infusion Pump" },
-    },
-    version: null,
+  manufacturerId: "manufacturer-icu",
+  productId: "product-plum",
+  versionId: null,
+  manufacturer: { canonicalDisplayName: "ICU Medical" },
+  product: {
+    canonicalDisplayName: "Plum 360",
+    deviceType: { displayName: "Infusion Pump" },
   },
+  version: null,
   ...overrides,
 });
 
@@ -769,7 +764,8 @@ describe("LinkedAssetsTable", () => {
             sampleAssetTicket({
               role: null,
               location: null,
-              deviceGroup: null,
+              manufacturer: null,
+              product: null,
             }),
           ] as never
         }

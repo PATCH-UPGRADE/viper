@@ -96,9 +96,7 @@ describe("interruption calendar", () => {
   const asset = (icon: string | null) => ({
     id: "a",
     hostname: "pump",
-    deviceGroup: {
-      product: icon ? { deviceType: { displayName: "Pump", icon } } : null,
-    },
+    product: icon ? { deviceType: { displayName: "Pump", icon } } : null,
   });
   const ownerEvent = (devices: { at: Date | null; icon: string | null }[]) => ({
     id: "owner",

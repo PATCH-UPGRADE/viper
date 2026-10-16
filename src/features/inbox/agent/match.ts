@@ -14,7 +14,7 @@ import {
   addManufacturerAlias,
   addProductAlias,
   enrichAssetIdentifiers,
-  enrichDeviceGroupIdentifiers,
+  enrichVersionUdi,
   enrichVulnerabilityCvss,
 } from "../utils";
 import type { Candidates } from "./candidate-search";
@@ -282,9 +282,9 @@ export async function matchAndLinkEntities(
  * Deterministically apply a list of matching decisions to the database.
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
- * Idempotent: mappings are upserted on (owner, deviceGroupId) and new device
- * groups are resolved to their canonical (manufacturer/product/version) identity via
- * resolveDeviceGroup, so replaying does not duplicate rows.
+ * Idempotent: mappings are upserted on (owner, deviceGroupMatchingId) and new
+ * matchings are resolved to their canonical (manufacturer/product/version)
+ * identity via resolveMatchingId, so replaying does not duplicate rows.
  */
 export async function applyDecisions(
   owner: MatchOwner,
@@ -374,21 +374,16 @@ export async function applyDecisions(
           });
         };
 
-        const enrichDeviceGroup = async (
+        const enrichOwnedVersion = async (
           deviceGroupMatchingId: string,
           data: ReturnType<typeof cleanFields>,
         ) => {
-          if (!data.cpe && !data.udi) return;
+          if (!data.udi) return;
           const matching = await tx.deviceGroupMatching.findUnique({
             where: { id: deviceGroupMatchingId },
-            select: { manufacturerId: true, productId: true, versionId: true },
+            select: { versionId: true },
           });
-          if (matching) {
-            await enrichDeviceGroupIdentifiers(matching, {
-              cpe: data.cpe,
-              udi: data.udi,
-            });
-          }
+          if (matching) await enrichVersionUdi(matching.versionId, data.udi);
         };
 
         // link the device group to the notification
@@ -401,7 +396,7 @@ export async function applyDecisions(
             continue;
           }
           await upsertMapping(decision.targetId);
-          await enrichDeviceGroup(
+          await enrichOwnedVersion(
             decision.targetId,
             cleanFields(decision.fields),
           );
@@ -417,9 +412,9 @@ export async function applyDecisions(
             summary.skipped++;
             continue;
           }
-          // Manufacturer/product/version are part of a device group's identity now and
-          // can't be mutated in place; the only safe enrichment is unioning a new
-          // CPE into the existing group's cpe[] array.
+          // Manufacturer/product/version are a matching's identity and cannot
+          // change in place. An update only adds a missing version range,
+          // name aliases, and a UDI on the owned version.
           const data = cleanFields(decision.fields);
 
           const targetMatching = await tx.deviceGroupMatching.findUnique({
@@ -469,7 +464,7 @@ export async function applyDecisions(
             }
           }
           await upsertMapping(decision.targetId);
-          await enrichDeviceGroup(decision.targetId, data);
+          await enrichOwnedVersion(decision.targetId, data);
           summary.updated++;
         } else {
           // create
@@ -491,7 +486,7 @@ export async function applyDecisions(
           }
 
           await upsertMapping(matchingId);
-          await enrichDeviceGroup(matchingId, data);
+          await enrichOwnedVersion(matchingId, data);
           summary.created++;
         }
       } else if (decision.kind === "vulnerability") {

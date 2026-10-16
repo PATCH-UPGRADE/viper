@@ -5,9 +5,10 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import {
-  deviceGroupWhereForMatching,
-  matchingAppliesToDevice,
+  deviceIdentitySelect,
+  findAssetsStrictlyMatching,
 } from "@/lib/device-matching";
+import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
 import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 import prisma from "../src/lib/db";
 
@@ -48,23 +49,16 @@ function upsertManufacturer(name: string) {
   });
 }
 
-function upsertVersion(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.version.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name },
-  });
-}
-
 async function upsertMatching(spec: {
   product: string;
   version?: string;
   versionRange?: string;
 }) {
   const manufacturer = await upsertManufacturer(MANUFACTURER);
-  const product = await upsertProduct(spec.product);
-  const version = spec.version ? await upsertVersion(spec.version) : null;
+  const product = await upsertProduct(manufacturer.id, spec.product);
+  const version = spec.version
+    ? await upsertVersion(product.id, spec.version)
+    : null;
 
   const identity = {
     manufacturerId: manufacturer.id,
@@ -79,29 +73,21 @@ async function upsertMatching(spec: {
   );
 }
 
-async function upsertDeviceGroup(product: string, version: string) {
-  const manufacturer = await upsertManufacturer(MANUFACTURER);
-  const productRec = await upsertProduct(product);
-  const versionRec = await upsertVersion(version);
+type Device = Awaited<ReturnType<typeof upsertDevice>>;
 
-  const identity = {
+async function upsertDevice(product: string, version: string) {
+  const manufacturer = await upsertManufacturer(MANUFACTURER);
+  const productRec = await upsertProduct(manufacturer.id, product);
+  const versionRec = await upsertVersion(productRec.id, version);
+  return {
     manufacturerId: manufacturer.id,
     productId: productRec.id,
     versionId: versionRec.id,
     versionStatus: VersionStatus.KNOWN,
   };
-
-  return (
-    (await prisma.deviceGroup.findFirst({ where: identity })) ??
-    (await prisma.deviceGroup.create({ data: identity }))
-  );
 }
 
-async function upsertAsset(
-  spec: AssetSpec,
-  deviceGroupId: string,
-  userId: string,
-) {
+async function upsertAsset(spec: AssetSpec, device: Device, userId: string) {
   const existing = await prisma.asset.findFirst({
     where: { serialNumber: spec.serialNumber },
   });
@@ -109,7 +95,7 @@ async function upsertAsset(
   if (existing) {
     return prisma.asset.update({
       where: { id: existing.id },
-      data: { ...spec, deviceGroupId },
+      data: { ...spec, ...device },
     });
   }
 
@@ -117,7 +103,7 @@ async function upsertAsset(
     data: {
       ...spec,
       status: "Active" as AssetStatus,
-      deviceGroupId,
+      ...device,
       userId,
     },
   });
@@ -193,16 +179,17 @@ async function assetsInScopeOf(matchings: MatchingRow[]) {
   >();
 
   for (const matching of matchings) {
-    const groups = await prisma.deviceGroup.findMany({
-      where: deviceGroupWhereForMatching(matching),
-      include: {
-        version: true,
-        assets: { select: { id: true, hostname: true, serialNumber: true } },
-      },
-    });
-    for (const group of groups) {
-      if (!matchingAppliesToDevice(matching, group)) continue;
-      for (const asset of group.assets) byId.set(asset.id, asset);
+    const assets = await findAssetsStrictlyMatching([matching], (where) =>
+      prisma.asset.findMany({
+        where,
+        select: { ...deviceIdentitySelect, hostname: true, serialNumber: true },
+      }),
+    );
+    for (const asset of assets) {
+      byId.set(asset.id, {
+        hostname: asset.hostname,
+        serialNumber: asset.serialNumber,
+      });
     }
   }
 
@@ -314,8 +301,8 @@ async function seedSyngoPlazaEnvironment(userId: string) {
   const assets = [];
   for (const spec of SYNGO_PLAZA_ASSETS) {
     const { version, ...assetFields } = spec;
-    const deviceGroup = await upsertDeviceGroup(SYNGO_PLAZA_PRODUCT, version);
-    assets.push(await upsertAsset(assetFields, deviceGroup.id, userId));
+    const device = await upsertDevice(SYNGO_PLAZA_PRODUCT, version);
+    assets.push(await upsertAsset(assetFields, device, userId));
   }
 
   const vulnerability = await prisma.vulnerability.create({
@@ -481,8 +468,8 @@ async function seedDeserializationEnvironment(userId: string) {
   const assets = [];
   for (const spec of DESERIALIZATION_ASSETS) {
     const { product, version, ...assetFields } = spec;
-    const deviceGroup = await upsertDeviceGroup(product, version);
-    assets.push(await upsertAsset(assetFields, deviceGroup.id, userId));
+    const device = await upsertDevice(product, version);
+    assets.push(await upsertAsset(assetFields, device, userId));
   }
 
   const vulnerability = await prisma.vulnerability.create({

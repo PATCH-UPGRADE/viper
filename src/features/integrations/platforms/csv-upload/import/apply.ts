@@ -4,7 +4,7 @@ import { resolveDeviceType } from "@/features/device-types/server/resolve-device
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { resolveDeviceGroup } from "@/lib/router-utils";
+import { type ResolvedDevice, resolveDevice } from "@/lib/router-utils";
 import {
   addedAssetIdFor,
   CSV_UPLOAD_DISPLAY_NAME,
@@ -150,10 +150,10 @@ function prepareDeviceTypeFill(importId: string): FillDeviceType {
   };
 }
 
-async function deviceGroupFor(
+async function deviceFor(
   row: StagedRow,
   canonicalNames: CanonicalNames,
-): Promise<{ id: string; productId: string | null }> {
+): Promise<ResolvedDevice> {
   if (row.manufacturer === null || row.product === null) {
     throw new Error("Manufacturer and model are required to add a device");
   }
@@ -163,11 +163,7 @@ async function deviceGroupFor(
   const product =
     canonicalNames.products.get(productKey(row.manufacturer, row.product)) ??
     row.product;
-  return resolveDeviceGroup({
-    manufacturer,
-    product,
-    version: row.version,
-  });
+  return resolveDevice({ manufacturer, product, version: row.version });
 }
 
 async function toAssetWrite(
@@ -177,13 +173,13 @@ async function toAssetWrite(
   fillDeviceType: FillDeviceType,
 ): Promise<AssetWrite> {
   if (item.kind === "add") {
-    const deviceGroup = await deviceGroupFor(item.row, input.canonicalNames);
-    await fillDeviceType(deviceGroup.productId, item.row);
+    const device = await deviceFor(item.row, input.canonicalNames);
+    await fillDeviceType(device.productId, item.row);
     return {
       createData: {
         id: item.assetId,
         ...filledRowFields(item.row),
-        deviceGroupId: deviceGroup.id,
+        ...device,
         userId,
       },
       updateData: {},

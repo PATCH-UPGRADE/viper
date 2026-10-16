@@ -2,6 +2,8 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma, { type ExtendedPrismaClient } from "@/lib/db";
 import {
+  type DeviceIdentity,
+  deviceKey,
   matchingAppliesToDevice,
   matchingWhereForDevice,
 } from "@/lib/device-matching";
@@ -9,14 +11,6 @@ import {
   type MergeableIssue,
   mergeEffectiveIssues,
 } from "@/lib/issue-resolution";
-
-const groupIdentitySelect = {
-  id: true,
-  manufacturerId: true,
-  productId: true,
-  versionId: true,
-  version: { select: { canonicalName: true } },
-} as const;
 
 const matchingIdentitySelect = {
   id: true,
@@ -40,55 +34,55 @@ type IssueRow<I extends Prisma.IssueInclude> = IssueRows<I>[number] &
 
 export async function resolveEffectiveIssuesByAsset<
   I extends Prisma.IssueInclude,
->(
-  assets: { id: string; deviceGroupId: string }[],
-  include: I,
-): Promise<Map<string, IssueRows<I>>> {
+>(assets: DeviceIdentity[], include: I): Promise<Map<string, IssueRows<I>>> {
   const effectiveIssuesByAssetId = new Map<string, IssueRows<I>>();
   if (assets.length === 0) return effectiveIssuesByAssetId;
 
-  const deviceGroupIds = [...new Set(assets.map((a) => a.deviceGroupId))];
-  const deviceGroups = await prisma.deviceGroup.findMany({
-    where: { id: { in: deviceGroupIds } },
-    select: groupIdentitySelect,
-  });
+  const assetIds = [...new Set(assets.map((a) => a.id))];
 
-  // DeviceGroupMatching entity requires manufacture.id, so we can filter out which one has DGM
-  const groupsWithManufacturer = deviceGroups.filter(
-    (g): g is (typeof deviceGroups)[number] & { manufacturerId: string } =>
-      g.manufacturerId !== null,
-  );
+  // Many assets share one device, so each distinct device is matched once.
+  // DeviceGroupMatching requires a manufacturer, so devices without one match nothing.
+  const devices = new Map<
+    string,
+    DeviceIdentity & { manufacturerId: string }
+  >();
+  for (const asset of assets) {
+    if (asset.manufacturerId !== null) {
+      devices.set(deviceKey(asset), {
+        ...asset,
+        manufacturerId: asset.manufacturerId,
+      });
+    }
+  }
 
   const candidateMatchings =
-    groupsWithManufacturer.length === 0
+    devices.size === 0
       ? []
       : await prisma.deviceGroupMatching.findMany({
           where: {
-            OR: groupsWithManufacturer.map((g) =>
+            OR: [...devices.values()].map((d) =>
               matchingWhereForDevice({
-                manufacturerId: g.manufacturerId,
-                productId: g.productId,
+                manufacturerId: d.manufacturerId,
+                productId: d.productId,
               }),
             ),
           },
           select: matchingIdentitySelect,
         });
 
-  const matchingIdsByGroupId = new Map<string, string[]>();
-
-  // combine DeviceGroup and DeviceGroupMatching using manufacturerId, productId, and versions range
-  for (const group of groupsWithManufacturer) {
-    const applicableMatchingIds = candidateMatchings
-      .filter((matching) => matchingAppliesToDevice(matching, group))
-      .map((matching) => matching.id);
-    matchingIdsByGroupId.set(group.id, applicableMatchingIds);
+  // combine each device and DeviceGroupMatching using manufacturerId, productId, and versions range
+  const matchingIdsByDevice = new Map<string, string[]>();
+  for (const [key, device] of devices) {
+    matchingIdsByDevice.set(
+      key,
+      candidateMatchings
+        .filter((matching) => matchingAppliesToDevice(matching, device))
+        .map((matching) => matching.id),
+    );
   }
 
-  // 1 unique array of DGM ids related to found DeviceGroups
-  const allMatchingIds = [
-    ...new Set([...matchingIdsByGroupId.values()].flat()),
-  ];
-  const assetIds = assets.map((a) => a.id);
+  // 1 unique array of DGM ids related to these assets
+  const allMatchingIds = [...new Set([...matchingIdsByDevice.values()].flat())];
 
   const issues = (await prisma.issue.findMany({
     where: {
@@ -117,7 +111,7 @@ export async function resolveEffectiveIssuesByAsset<
 
   for (const asset of assets) {
     const applicableMatchingIds =
-      matchingIdsByGroupId.get(asset.deviceGroupId) ?? [];
+      matchingIdsByDevice.get(deviceKey(asset)) ?? [];
     const fleetIssues = applicableMatchingIds.flatMap(
       (matchingId) => fleetIssuesByMatchingId.get(matchingId) ?? [],
     );

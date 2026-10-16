@@ -12,6 +12,7 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
+  deleteAssetsForCpes,
   generateCPE,
   jsonHeader,
   setupMockIntegration,
@@ -223,16 +224,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
           },
         },
       });
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            hasSome: [
-              generateCPE("vuln_integration_v10"),
-              generateCPE("vuln_integration_v11"),
-            ],
-          },
-        },
-      });
+      await deleteAssetsForCpes([
+        generateCPE("vuln_integration_v10"),
+        generateCPE("vuln_integration_v11"),
+      ]);
     });
 
     expect(integrationRes.status).toBe(200);

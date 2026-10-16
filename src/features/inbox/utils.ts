@@ -1,7 +1,7 @@
 import "server-only";
 import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
-import { normalizeName } from "@/lib/router-utils";
+import { fillVersionUdi, normalizeName } from "@/lib/router-utils";
 import {
   downloadBufferFromS3,
   keyFromDownloadUrl,
@@ -186,40 +186,15 @@ export async function existingIds<T extends { id: string }>(
   return new Set(rows.map((r) => r.id));
 }
 
-// Similiar to resolveDeviceGroup except it doesn't create. From
-// Notification mentioning an identifier isn't evidence the hospital owns the device
-// creating one from notification would pollute inventory
-export async function enrichDeviceGroupIdentifiers(
-  identity: {
-    manufacturerId: string;
-    productId: string | null;
-    versionId: string | null;
-  },
-  updates: { cpe?: string | null; udi?: string | null },
+// Fills the UDI-DI of a version that the hospital owns. A notification that
+// mentions an identifier is no evidence that the hospital owns the device, so
+// this never creates a version, and skips one that no asset has.
+export async function enrichVersionUdi(
+  versionId: string | null,
+  udi: string,
 ): Promise<void> {
-  const deviceGroup = await prisma.deviceGroup.findFirst({
-    where: {
-      manufacturerId: identity.manufacturerId,
-      productId: identity.productId,
-      versionId: identity.versionId,
-    },
-  });
-  if (!deviceGroup) return;
-
-  const mergedCpes = updates.cpe
-    ? [...new Set([...deviceGroup.cpe, updates.cpe])]
-    : deviceGroup.cpe;
-  const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
-  const needsUdi = !!updates.udi && !deviceGroup.udi;
-  if (!needsCpe && !needsUdi) return;
-
-  await prisma.deviceGroup.update({
-    where: { id: deviceGroup.id },
-    data: {
-      ...(needsCpe ? { cpe: mergedCpes } : {}),
-      ...(needsUdi ? { udi: updates.udi } : {}),
-    },
-  });
+  if (!versionId) return;
+  await fillVersionUdi({ id: versionId, assets: { some: {} } }, udi);
 }
 
 export async function enrichVulnerabilityCvss(

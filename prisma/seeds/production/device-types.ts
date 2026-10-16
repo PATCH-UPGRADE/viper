@@ -4,6 +4,7 @@ import {
   FLEET_PRODUCT_DEVICE_TYPES,
 } from "@/features/device-types/device-types";
 import prisma from "@/lib/db";
+import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 
 export function requireDeviceTypeId(
   idBySlug: Map<string, string>,
@@ -33,9 +34,14 @@ export async function seedDeviceTypes() {
 /**
  * Links the known teamplay Fleet products to their device types. Always
  * overwrites Product.deviceTypeId, also a type from API input or a sync.
- * Returns the number of products.
+ * Every Fleet product is a Siemens Healthineers product, so seedManufacturers
+ * must run first. Returns the number of products.
  */
 export async function seedFleetProducts(idBySlug: Map<string, string>) {
+  const { id: manufacturerId } = await prisma.manufacturer.findUniqueOrThrow({
+    where: { canonicalName: SIEMENS_HEALTHINEERS.canonicalName },
+    select: { id: true },
+  });
   const products = Object.entries(FLEET_PRODUCT_DEVICE_TYPES);
   for (const [name, slug] of products) {
     const deviceTypeId = requireDeviceTypeId(
@@ -47,6 +53,7 @@ export async function seedFleetProducts(idBySlug: Map<string, string>) {
     const canonicalName = name.trim().toLowerCase();
     const existing = await prisma.product.findFirst({
       where: {
+        manufacturerId,
         OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
       },
     });
@@ -57,7 +64,12 @@ export async function seedFleetProducts(idBySlug: Map<string, string>) {
       });
     } else {
       await prisma.product.create({
-        data: { canonicalName, canonicalDisplayName: name, deviceTypeId },
+        data: {
+          manufacturerId,
+          canonicalName,
+          canonicalDisplayName: name,
+          deviceTypeId,
+        },
       });
     }
   }
@@ -65,18 +77,20 @@ export async function seedFleetProducts(idBySlug: Map<string, string>) {
 }
 
 /**
- * Upserts a seed product on its lowercase name. A device type id overwrites
- * the product's type, so the seed wins.
+ * Upserts a seed product on its lowercase name, inside its manufacturer. A
+ * device type id overwrites the product's type, so the seed wins.
  */
 export function upsertSeedProduct(
+  manufacturerId: string,
   name: string,
   deviceTypeId: string | null = null,
 ) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.product.upsert({
-    where: { canonicalName },
+    where: { manufacturerId_canonicalName: { manufacturerId, canonicalName } },
     update: deviceTypeId ? { deviceTypeId } : {},
     create: {
+      manufacturerId,
       canonicalName,
       canonicalDisplayName: name,
       deviceTypeId,
@@ -114,9 +128,12 @@ export const EXAMPLE_PRODUCT_DEVICE_TYPES: Record<string, string> = {
 let exampleIdBySlug: Promise<Map<string, string>> | undefined;
 
 /** Upserts a product of the scripts/seed-*.ts example data, with its type. */
-export async function upsertExampleProduct(name: string) {
+export async function upsertExampleProduct(
+  manufacturerId: string,
+  name: string,
+) {
   const slug = EXAMPLE_PRODUCT_DEVICE_TYPES[name.trim().toLowerCase()];
-  if (!slug) return upsertSeedProduct(name);
+  if (!slug) return upsertSeedProduct(manufacturerId, name);
   exampleIdBySlug ??= prisma.deviceType
     .findMany({ select: { id: true, slug: true } })
     .then((rows) => new Map(rows.map((r) => [r.slug, r.id])));
@@ -125,5 +142,5 @@ export async function upsertExampleProduct(name: string) {
     slug,
     `Example product "${name}" (run npx prisma db seed first)`,
   );
-  return upsertSeedProduct(name, deviceTypeId);
+  return upsertSeedProduct(manufacturerId, name, deviceTypeId);
 }

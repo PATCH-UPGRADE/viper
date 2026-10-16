@@ -1,6 +1,10 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import {
+  linkedRefSchema,
+  linkedRefSelect,
+} from "@/features/device-catalog/types";
+import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
 } from "@/features/integrations/core/urls";
@@ -8,7 +12,6 @@ import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
-  canonicalRefSchema,
   cpeSchema,
   createIntegrationInputSchema,
   userIncludeSelect,
@@ -78,18 +81,17 @@ export const assetArrayInputSchema = z.object({
 export const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string().nullable(),
-  manufacturer: canonicalRefSchema.nullable(),
-  product: canonicalRefSchema
+  manufacturer: linkedRefSchema.nullable(),
+  product: linkedRefSchema
     .extend({
       deviceType: z
         .object({ slug: z.string(), displayName: z.string() })
         .nullable(),
     })
     .nullable(),
-  version: canonicalRefSchema
-    .extend({ udiDi: z.string().nullable() })
-    .nullable(),
+  version: linkedRefSchema.extend({ udiDi: z.string().nullable() }).nullable(),
   versionStatus: versionStatusSchema,
+  vulnerabilitiesUrl: z.string(),
   role: z.string().nullable(),
   externalMappings: z.array(
     z.object({
@@ -184,28 +186,23 @@ export const managesRelationshipSelect = {
   },
 } satisfies Prisma.Asset$managedByArgs;
 
-const canonicalRefSelect = {
-  select: { canonicalName: true, canonicalDisplayName: true },
-} as const;
-
 /** An asset's manufacturer, product (with its device type), and version. */
 export const assetDeviceInclude = {
-  manufacturer: canonicalRefSelect,
+  manufacturer: { select: linkedRefSelect },
   product: {
     select: {
-      canonicalName: true,
-      canonicalDisplayName: true,
+      ...linkedRefSelect,
       deviceType: { select: { slug: true, displayName: true } },
     },
   },
-  version: {
-    select: { canonicalName: true, canonicalDisplayName: true, udiDi: true },
-  },
-} as const satisfies Prisma.AssetInclude;
+  version: { select: { ...linkedRefSelect, udiDi: true } },
+} as const;
 
-export type AssetWithDevice = Prisma.AssetGetPayload<{
-  include: typeof assetDeviceInclude;
-}>;
+export type AssetWithDevice = Prisma.Result<
+  ExtendedPrismaClient["asset"],
+  { include: typeof assetDeviceInclude },
+  "findUniqueOrThrow"
+>;
 
 export const assetInclude = {
   user: userIncludeSelect,

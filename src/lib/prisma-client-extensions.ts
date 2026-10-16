@@ -39,6 +39,75 @@ export const artifactExtension = Prisma.defineExtension({
   },
 });
 
+// Links from each device catalog record, and from an asset, to their endpoints.
+export const deviceCatalogExtension = Prisma.defineExtension({
+  name: "deviceCatalogUrls",
+  result: {
+    manufacturer: {
+      url: {
+        needs: { id: true },
+        compute(manufacturer) {
+          return `${getBaseUrl()}/api/v1/manufacturers/${manufacturer.id}`;
+        },
+      },
+      productsUrl: {
+        needs: { id: true },
+        compute(manufacturer) {
+          return `${getBaseUrl()}/api/v1/manufacturers/${manufacturer.id}/products`;
+        },
+      },
+    },
+    product: {
+      url: {
+        needs: { id: true },
+        compute(product) {
+          return `${getBaseUrl()}/api/v1/products/${product.id}`;
+        },
+      },
+      versionsUrl: {
+        needs: { id: true },
+        compute(product) {
+          return `${getBaseUrl()}/api/v1/products/${product.id}/versions`;
+        },
+      },
+    },
+    version: {
+      url: {
+        needs: { id: true },
+        compute(version) {
+          return `${getBaseUrl()}/api/v1/versions/${version.id}`;
+        },
+      },
+      vulnerabilitiesUrl: {
+        needs: { id: true },
+        compute(version) {
+          return `${getBaseUrl()}/api/v1/versions/${version.id}/vulnerabilities`;
+        },
+      },
+      assetsUrl: {
+        needs: { id: true },
+        compute(version) {
+          return `${getBaseUrl()}/api/v1/versions/${version.id}/assets`;
+        },
+      },
+      deviceArtifactsUrl: {
+        needs: { id: true },
+        compute(version) {
+          return `${getBaseUrl()}/api/v1/versions/${version.id}/deviceArtifacts`;
+        },
+      },
+    },
+    asset: {
+      vulnerabilitiesUrl: {
+        needs: { id: true },
+        compute(asset) {
+          return `${getBaseUrl()}/api/v1/assets/${asset.id}/vulnerabilities`;
+        },
+      },
+    },
+  },
+});
+
 // create issues on vulnerability create
 export const vulnerabilityExtension = Prisma.defineExtension((client) =>
   client.$extends({

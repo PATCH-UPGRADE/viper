@@ -103,12 +103,16 @@ const makeAssetRow = (managedBy: ManagedByRow[]) => ({
     image: null,
   },
   manufacturer: {
+    id: "mf-siemens",
     canonicalName: "siemens healthineers",
     canonicalDisplayName: "Siemens Healthineers",
+    url: "http://localhost:3000/api/v1/manufacturers/mf-siemens",
   },
   product: null,
   version: null,
   versionStatus: "KNOWN",
+  vulnerabilitiesUrl:
+    "http://localhost:3000/api/v1/assets/asset-1/vulnerabilities",
   externalMappings: [],
   managedBy,
 });

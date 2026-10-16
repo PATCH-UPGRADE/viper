@@ -73,8 +73,8 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - products.getOne — one product by id, with its device type and manufacturer. input: { id }
 - versions.getManyByProduct — list/search one product's versions. input: { id, search?, page?, pageSize? } (product id)
 - versions.getOne — one version by id, with its UDI-DI and product. input: { id }
-  An asset's manufacturer, product, and version carry their ids; send one to the
-  matching getOne for the full record.
+  An asset's manufacturer, product, and version carry their ids. For the full record,
+  send an id to manufacturers.getOne, products.getOne, or versions.getOne.
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
 - notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page.

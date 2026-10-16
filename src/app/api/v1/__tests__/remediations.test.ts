@@ -829,7 +829,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const res = await request(BASE_URL)
       .put(`/remediations/${created.id}`)
       .set(authHeader)
-      .send(payload);
+      .send({ id: created.id, restartRequired: true });
 
     expect(res.status).toBe(200);
     expect(res.body.remediation).toMatchObject({

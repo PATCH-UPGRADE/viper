@@ -67,7 +67,10 @@ export const toRemediationImpact = (
 ): RemediationImpactInput => ({
   requiresDowntime: raw.requires_downtime ?? null,
   restartRequired: raw.restart_required ?? null,
-  estimatedDowntimeSeconds: raw.estimated_downtime_seconds ?? null,
+  estimatedDowntimeSeconds:
+    (raw.estimated_downtime_seconds ?? -1) >= 0
+      ? raw.estimated_downtime_seconds
+      : null,
   disablesFeatures: raw.disables_features ?? null,
 });
 

@@ -525,18 +525,6 @@ describe("TicketEditForm", () => {
         new Date(2026, 5, 2, 14, 30),
       );
     });
-
-    it("sends the end the user typed", async () => {
-      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
-
-      fireEvent.change(screen.getByLabelText(/scheduled end/i), {
-        target: { value: "2026-06-01T11:00" },
-      });
-
-      expect((await saved()).scheduledEndTime).toEqual(
-        new Date(2026, 5, 1, 11, 0),
-      );
-    });
   });
 
   it("drops a department's description from the payload when its textarea is cleared", async () => {

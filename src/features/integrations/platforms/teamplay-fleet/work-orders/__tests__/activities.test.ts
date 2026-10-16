@@ -95,20 +95,23 @@ describe("toCanonical", () => {
     ).toBeNull();
   });
 
-  it("maps the planned end with the same offset as the start", () => {
-    expect(toCanonical(MAINTENANCE).scheduledEndTime).toBe(
-      "2026-07-22T17:32:00-05:00",
-    );
-  });
-
   it.each([
-    ["is missing", { plannedEnd: null }],
-    ["is not after the start", { plannedEnd: "2026-07-22T13:02:00" }],
-    ["has no planned start to follow", { plannedStart: null }],
-  ])("leaves the end empty when the planned end %s", (_name, change) => {
-    expect(
-      toCanonical({ ...MAINTENANCE, ...change }).scheduledEndTime,
-    ).toBeNull();
+    [
+      "maps the planned end with the start's offset",
+      {},
+      "2026-07-22T17:32:00-05:00",
+    ],
+    ["leaves it empty when there is none", { plannedEnd: null }, null],
+    [
+      "leaves it empty when it is not after the start",
+      { plannedEnd: "2026-07-22T13:02:00" },
+      null,
+    ],
+    ["leaves it empty without a planned start", { plannedStart: null }, null],
+  ])("%s", (_name, change, expected) => {
+    expect(toCanonical({ ...MAINTENANCE, ...change }).scheduledEndTime).toBe(
+      expected,
+    );
   });
 
   it("keeps our reference so the sync can reconcile a provisional mapping", () => {

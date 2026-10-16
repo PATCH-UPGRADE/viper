@@ -742,13 +742,7 @@ export const trackingRouter = createTRPCRouter({
           rest.scheduledEndTime === undefined
             ? before.scheduledEndTime
             : rest.scheduledEndTime;
-        if (end && !start) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Set a start time before an end time",
-          });
-        }
-        if (end && start && end <= start) {
+        if (end && (!start || end <= start)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "The end time must be after the start time",

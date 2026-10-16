@@ -107,13 +107,12 @@ export const TicketEditForm = ({
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
 
-  const endError = !form.scheduledEndTime
-    ? null
-    : !form.scheduledAt
-      ? "Set a start time before an end time"
-      : new Date(form.scheduledEndTime) <= new Date(form.scheduledAt)
-        ? "The end time must be after the start time"
-        : null;
+  const endError =
+    form.scheduledEndTime &&
+    (!form.scheduledAt ||
+      new Date(form.scheduledEndTime) <= new Date(form.scheduledAt))
+      ? "The end time must be after the start time"
+      : null;
 
   const isDirty = editStateFingerprint(form) !== editStateFingerprint(initial);
   useBeforeUnload(isDirty);

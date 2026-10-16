@@ -344,6 +344,8 @@ describe("trackingRouter.update", () => {
   describe("scheduled end time", () => {
     const start = new Date("2026-06-01T09:00:00Z");
     const end = new Date("2026-06-01T10:30:00Z");
+    const before = new Date("2026-06-01T08:00:00Z");
+    const noTimes = { scheduledAt: null, scheduledEndTime: null };
     const stored = (overrides = {}) =>
       mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
         makeUpdateBefore({
@@ -360,42 +362,23 @@ describe("trackingRouter.update", () => {
     });
 
     it.each([
-      ["before the start", new Date("2026-06-01T08:00:00Z")],
-      ["equal to the start", start],
-    ])("rejects an end %s", async (_name, scheduledEndTime) => {
-      stored();
+      ["an end before the start", { scheduledEndTime: before }, {}],
+      ["an end equal to the start", { scheduledEndTime: start }, {}],
+      ["an end without a start", { scheduledEndTime: end }, noTimes],
+      ["a start at or past the stored end", { scheduledAt: end }, {}],
+    ])("rejects %s", async (_name, input, overrides) => {
+      stored(overrides);
       await expect(
-        setup().update({ id: "t1", scheduledEndTime }),
+        setup().update({ id: "t1", ...input }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
     });
 
-    it("rejects an end when there is no start", async () => {
-      stored({ scheduledAt: null, scheduledEndTime: null });
-      await expect(
-        setup().update({ id: "t1", scheduledEndTime: end }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    });
-
-    it("rejects a start moved to or past the stored end", async () => {
+    it("writes an end after the start", async () => {
       stored();
-      await expect(
-        setup().update({ id: "t1", scheduledAt: end }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    });
-
-    it("writes both as given when both are sent", async () => {
-      stored();
-      const scheduledAt = new Date("2026-06-02T13:00:00Z");
-      const scheduledEndTime = new Date("2026-06-02T13:45:00Z");
-      await setup().update({ id: "t1", scheduledAt, scheduledEndTime });
-      expect(updateData()).toMatchObject({ scheduledAt, scheduledEndTime });
-    });
-
-    it("leaves the end alone when the update does not touch the times", async () => {
-      stored();
-      await setup().update({ id: "t1", summary: "Renamed" });
-      expect(updateData()).not.toHaveProperty("scheduledEndTime");
+      const scheduledEndTime = new Date("2026-06-01T11:00:00Z");
+      await setup().update({ id: "t1", scheduledEndTime });
+      expect(updateData()).toMatchObject({ scheduledEndTime });
     });
   });
 

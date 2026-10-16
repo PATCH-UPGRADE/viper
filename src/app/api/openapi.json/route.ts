@@ -18,6 +18,9 @@ export async function GET() {
       "DeviceArtifacts",
       "Artifacts",
       "DeviceTypes",
+      "Manufacturers",
+      "Products",
+      "Versions",
     ],
   });
 

@@ -19,6 +19,7 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
+import { formatSlot } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { categoryLabels, StatusChip } from "./shared";
@@ -256,6 +257,33 @@ const renderActivity = (a: Activity): React.ReactNode => {
           <span className="font-medium font-mono text-xs">
             {(data.assetLabel as string) ?? data.assetId}
           </span>
+        </>
+      );
+    case "RESCHEDULE_REQUESTED":
+    case "RESCHEDULE_CANCELLED":
+      return (
+        <>
+          {a.type === "RESCHEDULE_REQUESTED"
+            ? "Requested a reschedule to"
+            : "Cancelled the reschedule request to"}{" "}
+          {formatSlot(data.to)}
+          {data.reason ? (
+            <span className="text-muted-foreground"> — {data.reason}</span>
+          ) : null}
+        </>
+      );
+    case "RESCHEDULE_APPROVED":
+      return (
+        <>
+          Reschedule approved in VIPER. Moved to {formatSlot(data.to)}, asked
+          for by {data.requestedBy.name}.
+        </>
+      );
+    case "RESCHEDULE_DECLINED":
+      return (
+        <>
+          Reschedule declined in VIPER.
+          {data.reason ? ` ${data.reason}` : null}
         </>
       );
     case "TICKET_LINKED":

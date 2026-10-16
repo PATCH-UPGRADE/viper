@@ -13,6 +13,7 @@ import { notRejected } from "@/features/inbox/types";
 import {
   Priority,
   type Prisma,
+  RescheduleStatus,
   ResourceType,
   TicketCategory,
   TicketStatus,
@@ -66,10 +67,12 @@ import {
 } from "./activities";
 import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
 import {
+  assertCanOpen,
   getInterruptionCalendar,
   getInterruptionDetail,
   getInterruptionList,
 } from "./interruptions";
+import { applyReschedule } from "./reschedule";
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
 // on `code` rather than `instanceof`: across Next.js module boundaries the thrown
@@ -301,6 +304,15 @@ const withRowFlags = <
     hasUnreadComments: hasUnread(lastCommentAt, seenBy),
   };
 };
+
+const badRequest = (message: string) =>
+  new TRPCError({ code: "BAD_REQUEST", message });
+
+const RESCHEDULE_STATUS = {
+  approve: "APPROVED",
+  decline: "DECLINED",
+  cancel: "CANCELLED",
+} as const;
 
 export const trackingRouter = createTRPCRouter({
   getMany: protectedProcedure
@@ -1351,6 +1363,126 @@ export const trackingRouter = createTRPCRouter({
     .query(({ input, ctx }) =>
       getInterruptionDetail(ctx.auth.user.id, input.id),
     ),
+
+  requestReschedule: protectedProcedure
+    .input(
+      z.object({
+        ticketId: z.string(),
+        proposedAt: z.coerce.date(),
+        reason: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { ticketId, proposedAt, reason } = input;
+      const userId = ctx.auth.user.id;
+      await assertCanOpen(userId, ticketId);
+      if (proposedAt <= new Date()) {
+        throw badRequest("Pick a time in the future");
+      }
+      return prisma.$transaction(async (tx) => {
+        const ticket = await tx.workOrderTicket.findUniqueOrThrow({
+          where: { id: ticketId },
+          select: { scheduledAt: true },
+        });
+        if (proposedAt.getTime() === ticket.scheduledAt?.getTime()) {
+          throw badRequest("That is already the scheduled time");
+        }
+        const pending = await tx.rescheduleRequest.count({
+          where: { ticketId, status: RescheduleStatus.PENDING },
+        });
+        if (pending > 0) {
+          throw badRequest("A request is already waiting for a decision");
+        }
+        const request = await tx.rescheduleRequest.create({
+          data: {
+            ticketId,
+            requestedById: userId,
+            fromScheduledAt: ticket.scheduledAt,
+            proposedAt,
+            reason: reason || null,
+          },
+        });
+        await tx.ticketActivity.create({
+          data: {
+            ticketId,
+            userId,
+            type: "RESCHEDULE_REQUESTED",
+            data: {
+              requestId: request.id,
+              from: ticket.scheduledAt,
+              to: proposedAt,
+              reason: request.reason,
+            },
+          },
+        });
+      });
+    }),
+
+  decideReschedule: protectedProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        decision: z.enum(["approve", "decline", "cancel"]),
+        reason: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.auth.user.id;
+      const request = await prisma.rescheduleRequest.findUnique({
+        where: { id: input.requestId },
+        include: { requestedBy: { select: { id: true, name: true } } },
+      });
+      if (!request) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Request not found",
+        });
+      }
+      await assertCanOpen(userId, request.ticketId);
+      // The requester can only cancel; anyone else approves or declines.
+      const cancel = input.decision === "cancel";
+      if ((request.requestedById === userId) !== cancel) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: cancel
+            ? "Only the requester can cancel a request"
+            : "You cannot decide your own request",
+        });
+      }
+      const approve = input.decision === "approve";
+      const reason = approve ? null : input.reason || null;
+      const status = RESCHEDULE_STATUS[input.decision];
+      return prisma.$transaction(async (tx) => {
+        const { count } = await tx.rescheduleRequest.updateMany({
+          where: { id: request.id, status: RescheduleStatus.PENDING },
+          data: {
+            status,
+            decidedById: userId,
+            decidedAt: new Date(),
+          },
+        });
+        if (count !== 1) {
+          throw badRequest("This request was already decided");
+        }
+        if (approve) {
+          await applyReschedule(tx, request.ticketId, request.proposedAt);
+        }
+        await tx.ticketActivity.create({
+          data: {
+            ticketId: request.ticketId,
+            userId,
+            type: `RESCHEDULE_${status}`,
+            data: {
+              requestId: request.id,
+              from: request.fromScheduledAt,
+              to: request.proposedAt,
+              requestedBy: request.requestedBy,
+              reason,
+            },
+          },
+        });
+      });
+    }),
 
   // ─── Work orders proposed by an agent ──────────────────────────────────────
 

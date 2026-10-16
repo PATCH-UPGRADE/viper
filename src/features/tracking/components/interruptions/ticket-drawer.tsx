@@ -33,6 +33,7 @@ import {
   CategoryChip,
   StatusChip,
 } from "../ticket-detail/shared";
+import { RescheduleRequest } from "./reschedule-request";
 import { WorkOrderModal } from "./work-order-modal";
 
 export type DrawerTicket = {
@@ -110,25 +111,34 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           <p className="text-xs">As recorded on the work order</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 rounded-lg border p-3 text-sm">
-        <div>
-          <p className="text-xs text-muted-foreground">
-            Schedule (according to work order)
-          </p>
-          <p className="font-medium">{scheduleText(ticket)}</p>
+      <div className="rounded-lg border text-sm">
+        <div className="grid grid-cols-2 gap-3 p-3">
+          <div>
+            <p className="text-xs text-muted-foreground">
+              Schedule (according to work order)
+            </p>
+            <p className="font-medium">{scheduleText(ticket)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Estimated duration</p>
+            <p className="flex items-center gap-1.5 font-medium">
+              <ClockIcon className="size-4 text-muted-foreground" aria-hidden />
+              {ticket.durationEstimate
+                ? `${ticket.durationEstimate} min`
+                : "Unknown"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Per device, according to the work order
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Estimated duration</p>
-          <p className="flex items-center gap-1.5 font-medium">
-            <ClockIcon className="size-4 text-muted-foreground" aria-hidden />
-            {ticket.durationEstimate
-              ? `${ticket.durationEstimate} min`
-              : "Unknown"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Per device, according to the work order
-          </p>
-        </div>
+        <RescheduleRequest
+          ticketId={id}
+          scheduledAt={ticket.scheduledAt}
+          pending={data.reschedule}
+          related={data.relatedReschedule}
+          past={data.pastReschedules}
+        />
       </div>
       <Section title="Why this work is needed">
         <p className="whitespace-pre-wrap text-muted-foreground">

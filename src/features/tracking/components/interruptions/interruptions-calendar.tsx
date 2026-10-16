@@ -44,6 +44,7 @@ import { useTRPC } from "@/trpc/client";
 import { availabilityStyle } from "../ticket-detail/shared";
 import { DeviceBadge } from "./device-badge";
 import { InterruptionsList } from "./interruptions-list";
+import { PendingRescheduleIcon } from "./pending-reschedule-icon";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
@@ -58,6 +59,7 @@ type Item = DrawerTicket & {
   unread: boolean;
   deviceCount: number;
   icon: string | null;
+  reschedulePending: boolean;
 };
 type Block = {
   item: Item;
@@ -163,6 +165,7 @@ const TicketBlock = ({ block }: { block: Block }) => {
         <span className="flex shrink-0 items-center gap-1 text-xs font-medium">
           <DeviceBadge count={item.deviceCount} icon={item.icon} />
           <span className="truncate">{item.summary}</span>
+          {item.reschedulePending && <PendingRescheduleIcon />}
         </span>
         {block.len < 45 ? (
           <span className="sr-only">{label}</span>
@@ -188,6 +191,7 @@ const MonthChip = ({ item }: { item: Item }) => (
   <ItemButton item={item} className="truncate px-1">
     {clock(item.scheduledAt)}{" "}
     <DeviceBadge count={item.deviceCount} icon={item.icon} /> {item.summary}
+    {item.reschedulePending && <PendingRescheduleIcon />}
   </ItemButton>
 );
 

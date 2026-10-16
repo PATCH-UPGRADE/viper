@@ -52,6 +52,9 @@ model User {
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
   ticketActivities         TicketActivity[]
+
+  rescheduleRequested RescheduleRequest[] @relation("RescheduleRequestedBy")
+  rescheduleDecided   RescheduleRequest[] @relation("RescheduleDecidedBy")
   notes                    Note[]
   answeredQuestions        Question[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
@@ -1557,6 +1560,8 @@ model WorkOrderTicket {
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
 
+  rescheduleRequests RescheduleRequest[]
+
   linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
   linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")
 
@@ -1681,6 +1686,10 @@ enum TicketActivityType {
   ASSET_DETACHED
   TICKET_LINKED
   TICKET_UNLINKED
+  RESCHEDULE_REQUESTED
+  RESCHEDULE_APPROVED
+  RESCHEDULE_DECLINED
+  RESCHEDULE_CANCELLED
 }
 
 model TicketActivity {
@@ -1697,6 +1706,32 @@ model TicketActivity {
   @@index([userId])
   @@index([type, createdAt])
   @@map("ticket_activity")
+}
+
+enum RescheduleStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
+model RescheduleRequest {
+  id              String           @id @default(cuid())
+  ticketId        String
+  ticket          WorkOrderTicket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  requestedById   String
+  requestedBy     User             @relation("RescheduleRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  fromScheduledAt DateTime?
+  proposedAt      DateTime
+  reason          String?          @db.Text
+  status          RescheduleStatus @default(PENDING)
+  decidedById     String?
+  decidedBy       User?            @relation("RescheduleDecidedBy", fields: [decidedById], references: [id])
+  decidedAt       DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([ticketId, status])
+  @@map("reschedule_request")
 }
 
 model TicketComment {

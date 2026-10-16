@@ -15,13 +15,21 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",
   "assets.getOne",
   "assets.getManyByWorkflow",
+  "assets.getManyByVersion",
   "assets.getUtilization",
   "vulnerabilities.getMany",
   "vulnerabilities.getOne",
   "vulnerabilities.getManyByAsset", // TODO: VW-409
+  "vulnerabilities.getManyByVersion",
   "remediations.getMany",
   "remediations.getOne",
   "deviceTypes.getMany",
+  "manufacturers.getMany",
+  "manufacturers.getOne",
+  "products.getManyByManufacturer",
+  "products.getOne",
+  "versions.getManyByProduct",
+  "versions.getOne",
   "workflows.getManyByAsset",
   "workflows.getManyForLlm",
   "notifications.getMany",
@@ -50,13 +58,23 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
   say who owns the work, and do not schedule past its "effectiveTo" date without
   saying that the contract ends first. A null contract still means a real manager.
 - assets.getManyByWorkflow — assets used in a clinical workflow. input: { id } (workflow id)
+- assets.getManyByVersion — assets that run one product version. input: { id, search?, page?, pageSize? } (version id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
 - vulnerabilities.getManyByAsset — vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version. input: { id, search?, page?, pageSize? } (asset id)
+- vulnerabilities.getManyByVersion — vulnerabilities whose matching rules apply to one product version. input: { id, search?, page?, pageSize? } (version id)
 - remediations.getMany — list/search remediations. input: { search?, page?, pageSize? }
 - remediations.getOne — one remediation by id. input: { id }
 - deviceTypes.getMany — every device type with its assetCount, the hospital's number of assets of that type (decommissioned ones are not counted). untypedAssetCount is the assets with no device type; while it is above 0, a count is only a minimum. input: {}
+- manufacturers.getMany — list/search device manufacturers. input: { search?, page?, pageSize? } — search matches a name or an alias.
+- manufacturers.getOne — one manufacturer by id. input: { id }
+- products.getManyByManufacturer — list/search one manufacturer's products, each with its device type. input: { id, search?, page?, pageSize? } (manufacturer id)
+- products.getOne — one product by id, with its device type and manufacturer. input: { id }
+- versions.getManyByProduct — list/search one product's versions. input: { id, search?, page?, pageSize? } (product id)
+- versions.getOne — one version by id, with its UDI-DI and product. input: { id }
+  An asset's manufacturer, product, and version carry their ids; send one to the
+  matching getOne for the full record.
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
 - notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page.
@@ -132,6 +150,7 @@ function linkifyAsset(asset: Record<string, any>): void {
   if (typeof id !== "string") return;
   const hasUtilization = asset.utilization != null;
   delete asset.utilization;
+  delete asset.vulnerabilitiesUrl;
   addLinks(asset, {
     workflows: {
       procedure: "workflows.getManyByAsset",
@@ -169,6 +188,16 @@ function linkifyWorkflow(workflow: Record<string, any>): void {
   });
 }
 
+/** The REST URLs that the Prisma result extensions add to catalog records. */
+const API_URL_KEYS = [
+  "url",
+  "productsUrl",
+  "versionsUrl",
+  "vulnerabilitiesUrl",
+  "assetsUrl",
+  "deviceArtifactsUrl",
+] as const;
+
 /**
  * Manufacturer, Product, Version, and Vendor are canonical reference records.
  * Their audit columns and internal flags never change an answer, and the same
@@ -186,10 +215,37 @@ const CANONICAL_NOISE_KEYS = [
   "versScheme",
   "createdAt",
   "updatedAt",
+  ...API_URL_KEYS,
 ] as const;
 
+/**
+ * Turn a catalog record's list URLs into `_links`, then trim it. The REST URLs
+ * are for API clients: the model cannot follow them.
+ */
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
 function trimCanonicalRecord(record: Record<string, any>): void {
+  const id = record.id;
+  if (typeof id === "string") {
+    if ("productsUrl" in record)
+      addLinks(record, {
+        products: {
+          procedure: "products.getManyByManufacturer",
+          input: { id },
+        },
+      });
+    if ("versionsUrl" in record)
+      addLinks(record, {
+        versions: { procedure: "versions.getManyByProduct", input: { id } },
+      });
+    if ("assetsUrl" in record)
+      addLinks(record, {
+        assets: { procedure: "assets.getManyByVersion", input: { id } },
+        vulnerabilities: {
+          procedure: "vulnerabilities.getManyByVersion",
+          input: { id },
+        },
+      });
+  }
   for (const key of CANONICAL_NOISE_KEYS) delete record[key];
 }
 
@@ -381,7 +437,7 @@ export function makeQueryPlatformDataTool(
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device type counts, clinical workflows, inbox notifications, work orders) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset to its vulnerabilities or workflows).
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device type counts, manufacturers, products, and versions, clinical workflows, inbox notifications, work orders) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset to its vulnerabilities or workflows).
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

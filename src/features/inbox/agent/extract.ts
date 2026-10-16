@@ -127,7 +127,7 @@ export async function extractEntities(
     model: MODEL,
     useResponsesApi: true,
     reasoning: { effort: "none" },
-    maxTokens: 3072,
+    maxTokens: 4096,
   }).withStructuredOutput(extractSchema, { method: "functionCalling" });
 
   const result = await model.invoke([

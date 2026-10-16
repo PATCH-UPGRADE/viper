@@ -26,6 +26,9 @@ const DOMAIN_PHRASES: Record<string, string> = {
   vulnerabilities: "vulnerabilities",
   remediations: "remediations",
   deviceTypes: "device type counts",
+  manufacturers: "manufacturers",
+  products: "products",
+  versions: "versions",
   workflows: "clinical workflows",
   notifications: "notifications",
   tracking: "work orders",
@@ -388,6 +391,69 @@ describe("addNavigationLinks — canonical record trimming", () => {
     }
   });
 
+  it("turns a manufacturer's REST URLs into a products link", () => {
+    const result = addNavigationLinks({
+      ...manufacturer(),
+      url: "http://localhost:3000/api/v1/manufacturers/mfr_1",
+      productsUrl: "http://localhost:3000/api/v1/manufacturers/mfr_1/products",
+    }) as Record<string, unknown>;
+
+    expect(result).not.toHaveProperty("url");
+    expect(result).not.toHaveProperty("productsUrl");
+    expect(result._links).toEqual({
+      products: {
+        procedure: "products.getManyByManufacturer",
+        input: { id: "mfr_1" },
+      },
+    });
+  });
+
+  it("turns a product's REST URLs into a versions link", () => {
+    const result = addNavigationLinks({
+      id: "prod_1",
+      canonicalName: "sigma spectrum",
+      canonicalDisplayName: "Sigma Spectrum",
+      url: "http://localhost:3000/api/v1/products/prod_1",
+      versionsUrl: "http://localhost:3000/api/v1/products/prod_1/versions",
+    }) as Record<string, unknown>;
+
+    expect(result).not.toHaveProperty("versionsUrl");
+    expect(result._links).toEqual({
+      versions: {
+        procedure: "versions.getManyByProduct",
+        input: { id: "prod_1" },
+      },
+    });
+  });
+
+  it("turns a version's REST URLs into assets and vulnerabilities links", () => {
+    const result = addNavigationLinks({
+      id: "ver_1",
+      canonicalName: "8.0",
+      canonicalDisplayName: "8.0",
+      url: "u",
+      vulnerabilitiesUrl: "u",
+      assetsUrl: "u",
+      deviceArtifactsUrl: "u",
+    }) as Record<string, unknown>;
+
+    expect(result).toEqual({
+      id: "ver_1",
+      canonicalName: "8.0",
+      canonicalDisplayName: "8.0",
+      _links: {
+        assets: {
+          procedure: "assets.getManyByVersion",
+          input: { id: "ver_1" },
+        },
+        vulnerabilities: {
+          procedure: "vulnerabilities.getManyByVersion",
+          input: { id: "ver_1" },
+        },
+      },
+    });
+  });
+
   it("leaves an object that is not a canonical record alone", () => {
     // An asset also has createdAt, but it is not a lookup record.
     const asset = { id: "a_1", hostname: "icu-01", createdAt: "2026-01-01" };
@@ -400,14 +466,22 @@ describe("addNavigationLinks — canonical record trimming", () => {
 
 describe("addNavigationLinks — existing behaviour is preserved", () => {
   it("still linkifies assets", () => {
-    const asset = { id: "a_1", hostname: "icu-01", utilization: { "0": 10 } };
+    const asset = {
+      id: "a_1",
+      hostname: "icu-01",
+      utilization: { "0": 10 },
+      vulnerabilitiesUrl:
+        "http://localhost:3000/api/v1/assets/a_1/vulnerabilities",
+    };
 
     const result = addNavigationLinks(asset) as {
       utilization?: unknown;
+      vulnerabilitiesUrl?: unknown;
       _links: Record<string, { procedure: string }>;
     };
 
     expect(result.utilization).toBeUndefined();
+    expect(result.vulnerabilitiesUrl).toBeUndefined();
     expect(result._links.workflows.procedure).toBe("workflows.getManyByAsset");
     expect(result._links.vulnerabilities).toEqual({
       procedure: "vulnerabilities.getManyByAsset",

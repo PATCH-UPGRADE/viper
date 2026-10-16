@@ -163,7 +163,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       );
     }),
 
-  // GET /api/versions/{id}/vulnerabilities - Vulnerabilities that affect a version
+  // GET /api/versions/{id}/vulnerabilities - Vulnerabilities whose matchings
+  // apply to one product version
   getManyByVersion: protectedProcedure
     .input(paginationInputSchema.extend({ id: z.string() }))
     .meta({

@@ -896,13 +896,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     const { integration: createdIntegration } = await setupMockIntegration(
       mockIntegrationPayload,
     );
-    onTestFinished(async () => {
-      await prisma.remediation.deleteMany({
-        where: {
-          description: { contains: "mock", mode: "insensitive" as const },
-        },
-      });
-    });
     const createToken = await createIntegrationToken(
       createdIntegration.integrationUserId,
       ResourceType.Remediation,
@@ -921,7 +914,15 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(res.body.createdItemsCount).toBe(1);
 
     const mapping = await prisma.externalRemediationMapping.findFirstOrThrow({
-      where: { externalId: item.externalId },
+      where: {
+        integrationId: createdIntegration.id,
+        externalId: item.externalId,
+      },
+    });
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: mapping.itemId } })
+        .catch(() => {});
     });
     const found = await prisma.remediation.findUniqueOrThrow({
       where: { id: mapping.itemId },

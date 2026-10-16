@@ -5,6 +5,8 @@ import { paginationInputSchema } from "@/lib/pagination";
 import {
   createArtifactWrappers,
   fetchPaginated,
+  findMatchingIdsForDevice,
+  findVersionIdentity,
   processIntegrationToken,
   resolveMatchingIdFromCpe,
   transformArtifactWrapper,
@@ -75,6 +77,42 @@ export const deviceArtifactsRouter = createTRPCRouter({
         include: deviceArtifactInclude,
       });
 
+      return {
+        ...result,
+        items: result.items.map(transformArtifactWrapper),
+      };
+    }),
+
+  // GET /api/versions/{id}/deviceArtifacts - DeviceArtifacts whose matchings
+  // apply to one product version
+  getManyByVersion: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/versions/{id}/deviceArtifacts",
+        tags: ["DeviceArtifacts", "Versions"],
+        summary: "List DeviceArtifacts by Version",
+        description:
+          "Get the DeviceArtifacts whose matching rules apply to one product version.",
+      },
+    })
+    .output(paginatedDeviceArtifactResponseSchema)
+    .query(async ({ input }) => {
+      const version = requireExistence(
+        await findVersionIdentity(input.id),
+        "Version",
+      );
+      const matchingIds = await findMatchingIdsForDevice(version);
+      const idFilter = {
+        deviceGroupMatchings: { some: { id: { in: matchingIds } } },
+      };
+      const result = await fetchPaginated(prisma.deviceArtifact, input, {
+        where: input.search
+          ? { AND: [createSearchFilter(input.search), idFilter] }
+          : idFilter,
+        include: deviceArtifactInclude,
+      });
       return {
         ...result,
         items: result.items.map(transformArtifactWrapper),

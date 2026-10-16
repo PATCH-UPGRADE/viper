@@ -549,6 +549,32 @@ function identityAppliesToDevice(
 }
 
 /**
+ * The device identity of a version: its product's manufacturer, its product,
+ * and the version itself. Null for an unknown id.
+ */
+export async function findVersionIdentity(
+  versionId: string,
+): Promise<DeviceIdentity | null> {
+  const version = await prisma.version.findUnique({
+    where: { id: versionId },
+    select: {
+      id: true,
+      canonicalName: true,
+      productId: true,
+      product: { select: { manufacturerId: true } },
+    },
+  });
+  if (!version) return null;
+  return {
+    id: version.id,
+    manufacturerId: version.product.manufacturerId,
+    productId: version.productId,
+    versionId: version.id,
+    version: { canonicalName: version.canonicalName },
+  };
+}
+
+/**
  * Find the ids of DeviceGroupMatchings that apply to the given device
  * (same manufacturer/product, with version exact/range, or manufacturer/product fallback
  * for an unknown-version device). Used to list a device's artifacts and to

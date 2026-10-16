@@ -125,6 +125,38 @@ export const assetsRouter = createTRPCRouter({
       };
     }),
 
+  // GET /api/versions/{id}/assets - Assets that run one product version
+  getManyByVersion: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/versions/{id}/assets",
+        tags: ["Assets", "Versions"],
+        summary: "List Assets by Version",
+        description: "Get the assets that run one product version.",
+      },
+    })
+    .output(paginatedAssetResponseSchema)
+    .query(async ({ input }) => {
+      const version = await prisma.version.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+      requireExistence(version, "Version");
+      const result = await fetchPaginated(prisma.asset, input, {
+        where: {
+          versionId: input.id,
+          ...createSearchFilter(input.search),
+        },
+        include: assetInclude,
+      });
+      return {
+        ...result,
+        items: await attachNotes("ASSET", result.items),
+      };
+    }),
+
   // Assets used in a clinical workflow — either linked directly to one of its
   // nodes, or matched by a node's device-group matching.
   getManyByWorkflow: protectedProcedure

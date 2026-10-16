@@ -2,8 +2,8 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma, { type ExtendedPrismaClient } from "@/lib/db";
 import {
-  matchingAppliesToDeviceGroup,
-  matchingWhereForDeviceGroup,
+  matchingAppliesToDevice,
+  matchingWhereForDevice,
 } from "@/lib/device-matching";
 import {
   type MergeableIssue,
@@ -65,7 +65,7 @@ export async function resolveEffectiveIssuesByAsset<
       : await prisma.deviceGroupMatching.findMany({
           where: {
             OR: groupsWithManufacturer.map((g) =>
-              matchingWhereForDeviceGroup({
+              matchingWhereForDevice({
                 manufacturerId: g.manufacturerId,
                 productId: g.productId,
               }),
@@ -79,7 +79,7 @@ export async function resolveEffectiveIssuesByAsset<
   // combine DeviceGroup and DeviceGroupMatching using manufacturerId, productId, and versions range
   for (const group of groupsWithManufacturer) {
     const applicableMatchingIds = candidateMatchings
-      .filter((matching) => matchingAppliesToDeviceGroup(matching, group))
+      .filter((matching) => matchingAppliesToDevice(matching, group))
       .map((matching) => matching.id);
     matchingIdsByGroupId.set(group.id, applicableMatchingIds);
   }

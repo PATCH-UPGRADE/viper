@@ -29,7 +29,7 @@ function upsertManufacturer(name: string) {
   return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+    create: { canonicalName, canonicalDisplayName: name },
   });
 }
 
@@ -38,7 +38,7 @@ function upsertVersion(name: string) {
   return prisma.version.upsert({
     where: { canonicalName },
     update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+    create: { canonicalName, canonicalDisplayName: name },
   });
 }
 // ---------------------------------------------------------------------------

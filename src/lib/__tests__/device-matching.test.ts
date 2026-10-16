@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
   parseVers,
   resolveMatches,
   versSatisfies,
@@ -51,8 +51,8 @@ describe("versSatisfies", () => {
   });
 });
 
-describe("matchingAppliesToDeviceGroup", () => {
-  // device group identity uses canonical FK ids; version carries its string.
+describe("matchingAppliesToDevice", () => {
+  // device identity uses canonical FK ids; version carries its string.
   const dg = {
     id: "dg1",
     manufacturerId: "v-acme",
@@ -63,7 +63,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is false when the manufacturer differs", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-other",
           productId: null,
@@ -77,7 +77,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true for a wildcard-product matching (manufacturer only)", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: null,
@@ -91,7 +91,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true when manufacturer+product match and there's no version constraint", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -105,7 +105,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true for an exact versionId match", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -119,7 +119,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is false for a versionId mismatch", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -133,7 +133,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true when the version falls in a VERS range", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -147,7 +147,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is false when the version is outside the VERS range", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",

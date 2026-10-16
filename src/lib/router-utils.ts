@@ -10,11 +10,11 @@ import {
 import prisma, { type TransactionClient } from "@/lib/db";
 import { requireExistence } from "@/trpc/middleware";
 import {
-  type DeviceGroupIdentity,
+  type DeviceIdentity,
   deviceGroupWhereForMatching,
   type MatchingLike,
-  matchingAppliesToDeviceGroup,
-  matchingWhereForDeviceGroup,
+  matchingAppliesToDevice,
+  matchingWhereForDevice,
   resolveMatches,
 } from "./device-matching";
 import {
@@ -121,10 +121,7 @@ export function isUniqueViolation(error: unknown): boolean {
  * unique race throws P2002, which would poison an enclosing interactive
  * transaction. Instead we catch P2002 and re-read the winner's row.
  */
-export async function resolveManufacturer(
-  name: string,
-  opts: { hasCpe?: boolean } = {},
-) {
+export async function resolveManufacturer(name: string) {
   const canonicalName = normalizeName(name);
   const find = () =>
     prisma.manufacturer.findFirst({
@@ -134,11 +131,7 @@ export async function resolveManufacturer(
   if (existing) return existing;
   try {
     return await prisma.manufacturer.create({
-      data: {
-        canonicalName,
-        canonicalDisplayName: name,
-        hasCpe: opts.hasCpe ?? false,
-      },
+      data: { canonicalName, canonicalDisplayName: name },
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -187,10 +180,7 @@ export async function resolveVendor(
   }
 }
 
-export async function resolveProduct(
-  name: string,
-  opts: { hasCpe?: boolean } = {},
-) {
+export async function resolveProduct(name: string) {
   const canonicalName = normalizeName(name);
   const find = () =>
     prisma.product.findFirst({
@@ -200,11 +190,7 @@ export async function resolveProduct(
   if (existing) return existing;
   try {
     return await prisma.product.create({
-      data: {
-        canonicalName,
-        canonicalDisplayName: name,
-        hasCpe: opts.hasCpe ?? false,
-      },
+      data: { canonicalName, canonicalDisplayName: name },
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -217,7 +203,7 @@ export async function resolveProduct(
 
 export async function resolveVersion(
   name: string,
-  opts: { hasCpe?: boolean; versScheme?: VersScheme | null } = {},
+  opts: { versScheme?: VersScheme | null } = {},
 ) {
   const canonicalName = normalizeName(name);
   const find = () => prisma.version.findFirst({ where: { canonicalName } });
@@ -228,7 +214,6 @@ export async function resolveVersion(
       data: {
         canonicalName,
         canonicalDisplayName: name,
-        hasCpe: opts.hasCpe ?? false,
         versScheme: opts.versScheme ?? undefined,
       },
     });
@@ -254,8 +239,6 @@ export interface DeviceGroupIdentityInput {
   udi?: string | null;
   /** CPE strings to attach to the group's `cpe` array (unioned). */
   cpes?: string[];
-  /** true when this identity is sourced from a CPE (sets hasCpe on canonicals). */
-  hasCpe?: boolean;
 }
 
 /**
@@ -277,13 +260,12 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
     versScheme = null,
     udi,
     cpes = [],
-    hasCpe = false,
   } = identity;
 
-  const manufacturerRow = await resolveManufacturer(manufacturer, { hasCpe });
-  const productRow = await resolveProduct(product, { hasCpe });
+  const manufacturerRow = await resolveManufacturer(manufacturer);
+  const productRow = await resolveProduct(product);
   const versionRow = version
-    ? await resolveVersion(version, { hasCpe, versScheme })
+    ? await resolveVersion(version, { versScheme })
     : null;
   const status =
     versionStatus ?? (versionRow ? VersionStatus.KNOWN : VersionStatus.UNKNOWN);
@@ -369,15 +351,13 @@ export function parseCpe(cpe: string): {
 
 /**
  * Resolve a device group from a CPE string: parse it into a manufacturer/product/
- * version identity, attach the CPE to the group's `cpe` array, and mark the
- * canonical rows as CPE-backed.
+ * version identity, and attach the CPE to the group's `cpe` array.
  */
 export async function cpeToDeviceGroup(cpe: string) {
   const { versionStatus, ...parsed } = parseCpe(cpe);
   return resolveDeviceGroup({
     ...parsed,
     cpes: [cpe],
-    hasCpe: true,
     versionStatus,
   });
 }
@@ -398,13 +378,11 @@ type MatchingResolveInput = {
   product?: string | null;
   version?: string | null;
   versionRange?: string | null;
-  hasCpe?: boolean;
 };
 
 /**
  * Find-or-create a shared DeviceGroupMatching for a manufacturer/product/version
- * identity (resolved to canonical rows). Identities come from CPEs, so
- * canonicals are marked CPE-backed.
+ * identity (resolved to canonical rows).
  *
  * The identity is unique (device_group_matching_identity_key), so a concurrent
  * create that loses the race throws P2002; we re-read the winner's row. Runs on
@@ -413,16 +391,9 @@ type MatchingResolveInput = {
 export async function resolveMatchingId(
   input: MatchingResolveInput,
 ): Promise<string> {
-  const hasCpe = input.hasCpe ?? true;
-  const manufacturerRow = await resolveManufacturer(input.manufacturer, {
-    hasCpe,
-  });
-  const productRow = input.product
-    ? await resolveProduct(input.product, { hasCpe })
-    : null;
-  const versionRow = input.version
-    ? await resolveVersion(input.version, { hasCpe })
-    : null;
+  const manufacturerRow = await resolveManufacturer(input.manufacturer);
+  const productRow = input.product ? await resolveProduct(input.product) : null;
+  const versionRow = input.version ? await resolveVersion(input.version) : null;
 
   const where = {
     manufacturerId: manufacturerRow.id,
@@ -475,10 +446,10 @@ export async function cpesToMatchingConnect(cpes: string[]) {
  * wildcard) are loaded, then confirmed in memory (handles version + VERS ranges).
  */
 export async function findVulnerabilitiesMatchingDeviceGroups(
-  deviceGroups: DeviceGroupIdentity[],
+  deviceGroups: DeviceIdentity[],
 ) {
   const groups = deviceGroups.filter(
-    (g): g is DeviceGroupIdentity & { manufacturerId: string } =>
+    (g): g is DeviceIdentity & { manufacturerId: string } =>
       g.manufacturerId !== null,
   );
   if (groups.length === 0) return [];
@@ -486,7 +457,7 @@ export async function findVulnerabilitiesMatchingDeviceGroups(
   const matchings = await prisma.deviceGroupMatching.findMany({
     where: {
       OR: groups.map((g) =>
-        matchingWhereForDeviceGroup({
+        matchingWhereForDevice({
           manufacturerId: g.manufacturerId,
           productId: g.productId,
         }),
@@ -521,9 +492,9 @@ const matchingIdentitySelect = {
 // fall back to manufacturer (+product) — per the spec's "same manufacturer/product" rule.
 function identityAppliesToGroup(
   matching: MatchingLike,
-  group: DeviceGroupIdentity,
+  group: DeviceIdentity,
 ): boolean {
-  if (matchingAppliesToDeviceGroup(matching, group)) return true;
+  if (matchingAppliesToDevice(matching, group)) return true;
   if (
     group.versionId === null &&
     group.manufacturerId === matching.manufacturerId
@@ -542,11 +513,11 @@ function identityAppliesToGroup(
  * identify which of an artifact's matchings represent the device itself.
  */
 export async function findMatchingIdsForDeviceGroup(
-  group: DeviceGroupIdentity,
+  group: DeviceIdentity,
 ): Promise<string[]> {
   if (!group.manufacturerId) return [];
   const candidates = await prisma.deviceGroupMatching.findMany({
-    where: matchingWhereForDeviceGroup({
+    where: matchingWhereForDevice({
       manufacturerId: group.manufacturerId,
       productId: group.productId,
     }),
@@ -560,7 +531,7 @@ export async function findMatchingIdsForDeviceGroup(
 /**
  * Inverse of {@link findMatchingIdsForDeviceGroup}: resolve a set of device-group
  * matchings to the concrete device-group ids they apply to. Coarse manufacturer/product
- * DB filter, then the in-memory VERS-range check (matchingAppliesToDeviceGroup).
+ * DB filter, then the in-memory VERS-range check (matchingAppliesToDevice).
  */
 export async function findDeviceGroupIdsForMatchings(
   matchings: MatchingLike[],
@@ -599,7 +570,7 @@ export async function resolvedDeviceGroupAssetCount(
     },
   });
   return candidates
-    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
+    .filter((dg) => matchingAppliesToDevice(matching, dg))
     .reduce((sum, dg) => sum + dg._count.assets, 0);
 }
 

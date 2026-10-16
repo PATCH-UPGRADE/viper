@@ -224,6 +224,7 @@ const makeUpdateBefore = (overrides: Record<string, any> = {}): any => ({
   category: "PATCH",
   priority: "Unsorted",
   scheduledAt: null,
+  scheduledEndTime: null,
   assigneeId: null,
   assignee: null,
   departments: [],
@@ -338,6 +339,47 @@ describe("trackingRouter.update", () => {
 
     const arg = mockPrisma.workOrderTicket.update.mock.calls[0][0];
     expect(arg.data.scheduledAt).toBeNull();
+  });
+
+  describe("scheduled end time", () => {
+    const start = new Date("2026-06-01T09:00:00Z");
+    const end = new Date("2026-06-01T10:30:00Z");
+    const before = new Date("2026-06-01T08:00:00Z");
+    const noTimes = { scheduledAt: null, scheduledEndTime: null };
+    const stored = (overrides = {}) =>
+      mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+        makeUpdateBefore({
+          scheduledAt: start,
+          scheduledEndTime: end,
+          ...overrides,
+        }),
+      );
+    const updateData = () =>
+      mockPrisma.workOrderTicket.update.mock.calls[0][0].data;
+
+    beforeEach(() => {
+      mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
+    });
+
+    it.each([
+      ["an end before the start", { scheduledEndTime: before }, {}],
+      ["an end equal to the start", { scheduledEndTime: start }, {}],
+      ["an end without a start", { scheduledEndTime: end }, noTimes],
+      ["a start at or past the stored end", { scheduledAt: end }, {}],
+    ])("rejects %s", async (_name, input, overrides) => {
+      stored(overrides);
+      await expect(
+        setup().update({ id: "t1", ...input }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+    });
+
+    it("writes an end after the start", async () => {
+      stored();
+      const scheduledEndTime = new Date("2026-06-01T11:00:00Z");
+      await setup().update({ id: "t1", scheduledEndTime });
+      expect(updateData()).toMatchObject({ scheduledEndTime });
+    });
   });
 
   it("rejects an empty summary", async () => {

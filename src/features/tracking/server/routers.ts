@@ -719,7 +719,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. The end time must be after the start time. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
       },
     })
     .output(workOrderDetailResponseSchema)
@@ -731,6 +731,21 @@ export const trackingRouter = createTRPCRouter({
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Ticket not found",
+          });
+        }
+
+        const start =
+          rest.scheduledAt === undefined
+            ? before.scheduledAt
+            : rest.scheduledAt;
+        const end =
+          rest.scheduledEndTime === undefined
+            ? before.scheduledEndTime
+            : rest.scheduledEndTime;
+        if (end && (!start || end <= start)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "The end time must be after the start time",
           });
         }
 

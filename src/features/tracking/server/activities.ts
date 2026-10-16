@@ -30,6 +30,7 @@ type BeforeTicket = {
   category: TicketCategory;
   priority: Priority;
   scheduledAt: Date | null;
+  scheduledEndTime: Date | null;
   assigneeId: string | null;
   assignee: AssigneeSnapshot;
   departments: DepartmentSnapshot[];
@@ -67,6 +68,7 @@ export async function snapshotBeforeUpdate(
       category: true,
       priority: true,
       scheduledAt: true,
+      scheduledEndTime: true,
       assigneeId: true,
       assignee: { select: { id: true, name: true } },
       departments: {

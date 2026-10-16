@@ -753,4 +753,185 @@ describe("Remediations Endpoint (/remediations)", () => {
       afterCreate.deviceGroupMatchings[0].id,
     );
   });
+  const bedsideMonitorImpact = {
+    mechanism: "REMOTE_DEPLOYMENT",
+    estimatedDurationSeconds: 1800,
+    requiresDowntime: false,
+    reversible: true,
+    verificationRequired: true,
+    verificationNotes: "Run the monitor self-test",
+    impacts: [
+      {
+        phase: "DURING_APPLY",
+        feature: "nurse call button",
+        effect: "UNAVAILABLE",
+        clinicalWorkflowImpact: true,
+      },
+    ],
+  };
+
+  const createWithImpact = async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, ...bedsideMonitorImpact });
+    expect(res.status).toBe(200);
+    const id: string = res.body.remediation.id;
+    onTestFinished(async () => {
+      await prisma.remediation.delete({ where: { id } }).catch(() => {});
+    });
+    return res.body.remediation;
+  };
+  it("POST /remediations - Stores impact fields and feature rows", async () => {
+    const created = await createWithImpact();
+    const res = await request(BASE_URL)
+      .get(`/remediations/${created.id}`)
+      .set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      mechanism: "REMOTE_DEPLOYMENT",
+      estimatedDurationSeconds: 1800,
+      requiresDowntime: false,
+      reversible: true,
+      verificationRequired: true,
+      verificationNotes: "Run the monitor self-test",
+      restartRequired: null,
+    });
+    expect(res.body.impacts).toEqual([
+      expect.objectContaining({
+        phase: "DURING_APPLY",
+        feature: "nurse call button",
+        effect: "UNAVAILABLE",
+        clinicalWorkflowImpact: true,
+        notes: null,
+      }),
+    ]);
+  });
+
+  it("POST /remediations - A remediation with no impact reports every field as not stated", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send(payload);
+    expect(res.status).toBe(200);
+    const created = res.body.remediation;
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: created.id } })
+        .catch(() => {});
+    });
+    expect(created.mechanism).toBeNull();
+    expect(created.requiresDowntime).toBeNull();
+    expect(created.impacts).toEqual([]);
+  });
+  it("PUT /remediations/{id} - Update one impact field and leaves the rest", async () => {
+    const created = await createWithImpact();
+    const res = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, restartRequired: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.remediation).toMatchObject({
+      restartRequired: true,
+      mechanism: "REMOTE_DEPLOYMENT",
+      estimatedDurationSeconds: 1800,
+    });
+    expect(res.body.remediation.impacts).toHaveLength(1);
+  });
+  it("PUT /remediations/{id} - An explicit null clears an impact field", async () => {
+    const created = await createWithImpact();
+    const res = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, verificationNotes: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.remediation.verificationNotes).toBeNull();
+    expect(res.body.remediation.verificationRequired).toBe(true);
+  });
+  it("PUT /remediations/{id} - impacts replaces every row, [] clears them", async () => {
+    const created = await createWithImpact();
+    const replaced = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({
+        id: created.id,
+        impacts: [
+          {
+            phase: "AFTER_APPLY",
+            feature: "alarm beeping",
+            effect: "CHANGED",
+            notes: "Off by default; re-enable in settings.",
+          },
+        ],
+      });
+
+    expect(replaced.status).toBe(200);
+    expect(replaced.body.remediation.impacts).toEqual([
+      expect.objectContaining({
+        phase: "AFTER_APPLY",
+        feature: "alarm beeping",
+      }),
+    ]);
+    const cleared = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, impacts: [] });
+
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.remediation.impacts).toEqual([]);
+  });
+  it("POST /remediations - Rejects an unknown mechanism", async () => {
+    const res = await request(BASE_URL)
+      .post(`/remediations`)
+      .set(authHeader)
+      .send({ ...payload, mechanism: "CARRIER" });
+    expect(res.status).toBe(400);
+    expect(res.body.issues).toContainEqual(
+      expect.objectContaining({ path: ["mechanism"] }),
+    );
+  });
+  it("integration upload stores impact from a partner", async () => {
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Remediation,
+    );
+    const item = {
+      ...remediationIntegrationPayload.items[0],
+      externalId: "mockRemediation-impact",
+      ...bedsideMonitorImpact,
+    };
+    const res = await request(BASE_URL)
+      .post(`/remediations/integrationUpload/${createToken}`)
+      .set(jsonHeader)
+      .send({ ...remediationIntegrationPayload, items: [item], totalCount: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.createdItemsCount).toBe(1);
+
+    const mapping = await prisma.externalRemediationMapping.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        externalId: item.externalId,
+      },
+    });
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: mapping.itemId } })
+        .catch(() => {});
+    });
+    const found = await prisma.remediation.findUniqueOrThrow({
+      where: { id: mapping.itemId },
+      include: { impacts: true },
+    });
+
+    expect(found.mechanism).toBe("REMOTE_DEPLOYMENT");
+    expect(found.reversible).toBe(true);
+    expect(found.impacts).toHaveLength(1);
+    expect(found.impacts[0].feature).toBe("nurse call button");
+  });
 });

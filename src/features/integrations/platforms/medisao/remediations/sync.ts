@@ -1,5 +1,6 @@
 import "server-only";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { impactScalarData } from "@/features/remediations/impact";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveMatchingId } from "@/lib/router-utils";
@@ -113,7 +114,7 @@ async function ingestRemediations(
         const fields = {
           description: describeRemediation(item),
           narrative: item.narrative,
-          sourceImpact: item.sourceImpact,
+          ...impactScalarData(item.impact, "stated"),
           // `connect` is idempotent, so on re-sync a matching or vulnerability
           // already attached stays attached exactly once, and a link a user
           // added survives.

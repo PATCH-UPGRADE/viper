@@ -35,6 +35,7 @@ import {
   protectedProcedure,
 } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
+import { impactRowsUpdate, impactScalarData } from "../impact";
 import {
   integrationRemediationInputSchema,
   paginatedRemediationResponseSchema,
@@ -360,7 +361,8 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { artifacts, cpes, vulnerabilityIds, ...dataInput } = input;
+      const { artifacts, cpes, vulnerabilityIds, impacts, ...dataInput } =
+        input;
       const userId = ctx.auth.user.id;
       const vulnerabilities = await vulnerabilityConnect(
         vulnerabilityIds ?? [],
@@ -377,6 +379,7 @@ export const remediationsRouter = createTRPCRouter({
         const remediation = await tx.remediation.create({
           data: {
             ...dataInput,
+            impacts: { create: impacts ?? [] },
             deviceGroupMatchings: { connect: matchingConnect },
             vulnerabilities: { connect: vulnerabilities },
             userId,
@@ -545,7 +548,7 @@ export const remediationsRouter = createTRPCRouter({
       // Verify ownership and get current data
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      const { id, artifacts = [], ...updateData } = input;
+      const { id, artifacts = [], impacts, ...updateData } = input;
 
       const vulnerabilities = updateData.vulnerabilityIds
         ? await vulnerabilityConnect(updateData.vulnerabilityIds)
@@ -563,10 +566,14 @@ export const remediationsRouter = createTRPCRouter({
           ...(updateData.description !== undefined && {
             description: updateData.description,
           }),
+          ...impactScalarData(updateData, "replace"),
           ...(vulnerabilities && {
             vulnerabilities: { set: vulnerabilities },
           }),
         };
+
+        const impactRows = impactRowsUpdate(impacts, "replace");
+        if (impactRows) data.impacts = impactRows;
 
         // Replace matchings when CPEs are provided.
         if (updateData.cpes) {
@@ -595,6 +602,7 @@ export const remediationsRouter = createTRPCRouter({
           include: remediationInclude,
         });
       });
+
       return {
         remediation: transformArtifactWrapper(result),
         uploadInstructions,

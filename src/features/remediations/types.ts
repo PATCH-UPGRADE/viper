@@ -24,7 +24,7 @@ import {
 } from "./impact";
 import {
   remediationReleaseFieldsSchema,
-  remediationReleaseResponseSchema
+  remediationReleaseResponseSchema,
 } from "./release";
 
 const canonicalRefInclude = {

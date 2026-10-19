@@ -36,6 +36,7 @@ import {
 } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import { impactRowsUpdate, impactScalarData } from "../impact";
+import { releaseScalarData } from "../release";
 import {
   integrationRemediationInputSchema,
   paginatedRemediationResponseSchema,

@@ -1,6 +1,6 @@
 ### What and why 
 
-<!-- Breifly: what does this PR do, and why? -->
+<!-- Briefly: what does this PR do, and why? -->
 
 Jira ticket: VW-
 

@@ -45,16 +45,16 @@ model User {
   csvImports        CsvImport[]
 
   departmentId             String?
-  department               Department?                      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  workOrderTicketsCreated  WorkOrderTicket[]                @relation("WorkOrderTicketCreator")
-  workOrderTicketsAssigned WorkOrderTicket[]                @relation("WorkOrderTicketAssignee")
+  department               Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated  WorkOrderTicket[] @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned WorkOrderTicket[] @relation("WorkOrderTicketAssignee")
   ticketComments           TicketComment[]
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
   ticketActivities         TicketActivity[]
 
-  rescheduleRequested RescheduleRequest[] @relation("RescheduleRequestedBy")
-  rescheduleDecided   RescheduleRequest[] @relation("RescheduleDecidedBy")
+  rescheduleRequested      RescheduleRequest[]              @relation("RescheduleRequestedBy")
+  rescheduleDecided        RescheduleRequest[]              @relation("RescheduleDecidedBy")
   notes                    Note[]
   answeredQuestions        Question[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
@@ -1084,7 +1084,7 @@ model EntityFilterMatch {
 
 enum RemediationMechanism {
   REMOTE_DEPLOYMENT
-  ON_SITE         
+  ON_SITE
   REMOVABLE_MEDIA // USB stick, DVD, SD card
   OTHER
 }
@@ -1100,6 +1100,14 @@ enum ImpactEffect {
   UNAVAILABLE // does not work
   DEGRADED // works, with limits
   CHANGED // works differently, e.g. a moved menu, UI updates
+}
+
+// what kind of fix a remediation is
+enum RemediationCategory {
+  SOFTWARE_UPDATE
+  HARDWARE_PATCH
+  FIREWALL_RULE
+  OTHER
 }
 
 model Remediation {
@@ -1122,7 +1130,7 @@ model Remediation {
   alohaStatus AlohaStatus?
   alohaLog    Json         @default("{}")
 
-  category                 String?
+  category                 RemediationCategory?
   mechanism                RemediationMechanism?
   requiresDowntime         Boolean?
   restartRequired          Boolean?
@@ -1131,11 +1139,15 @@ model Remediation {
   disablesFeatures         Boolean?
   reversible               Boolean?
   verificationRequired     Boolean?
-  verificationNotes        String?   @db.Text 
+  verificationNotes        String?               @db.Text
   impacts                  RemediationImpact[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isSecurityUpdate          Boolean?
+  isManufacturerRemediation Boolean  @default(false) // official vendor update, not TA4 submission
+
+  createdAt   DateTime  @default(now()) // when our system first saw it
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime? // when manufacturer releated it
 
   externalMappings         ExternalRemediationMapping[]
   // raw TA4 submissions that produced this remediation

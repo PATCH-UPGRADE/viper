@@ -32,6 +32,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-text: var(--primary-text);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -98,6 +99,8 @@
   --popover-foreground: oklch(0.3211 0 0);
   --primary: oklch(0.6397 0.172 36.4421);
   --primary-foreground: oklch(1 0 0);
+  /* --primary passes the WCAG AA contrast ratio (4.5:1) only as large text. Use this for small primary-colored text. */
+  --primary-text: oklch(0.55 0.172 36.4421);
   --secondary: oklch(0.967 0.0029 264.5419);
   --secondary-foreground: oklch(0.425461 0.0263 256.8018);
   --muted: oklch(0.9846 0.0017 247.8389);
@@ -158,6 +161,7 @@
   --popover-foreground: oklch(0.9219 0 0);
   --primary: oklch(0.6397 0.172 36.4421);
   --primary-foreground: oklch(1 0 0);
+  --primary-text: oklch(0.76 0.172 36.4421);
   --secondary: oklch(0.3095 0.0266 266.7132);
   --secondary-foreground: oklch(0.9219 0 0);
   --muted: oklch(0.3095 0.0266 266.7132);

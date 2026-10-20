@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { Prisma, SourceChannel } from "@/generated/prisma";
+import { type Prisma, SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { canonicalNameWhere } from "@/lib/router-utils";
 import { sourceContentHash } from "@/lib/source-hash";

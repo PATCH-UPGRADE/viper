@@ -6,7 +6,7 @@ import {
 } from "@/generated/prisma";
 import {
   deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
 } from "@/lib/device-matching";
 import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 import prisma from "../src/lib/db";
@@ -44,7 +44,7 @@ function upsertManufacturer(name: string) {
   return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+    create: { canonicalName, canonicalDisplayName: name },
   });
 }
 
@@ -53,7 +53,7 @@ function upsertVersion(name: string) {
   return prisma.version.upsert({
     where: { canonicalName },
     update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+    create: { canonicalName, canonicalDisplayName: name },
   });
 }
 
@@ -201,7 +201,7 @@ async function assetsInScopeOf(matchings: MatchingRow[]) {
       },
     });
     for (const group of groups) {
-      if (!matchingAppliesToDeviceGroup(matching, group)) continue;
+      if (!matchingAppliesToDevice(matching, group)) continue;
       for (const asset of group.assets) byId.set(asset.id, asset);
     }
   }

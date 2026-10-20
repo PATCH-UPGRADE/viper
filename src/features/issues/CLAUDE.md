@@ -19,7 +19,7 @@ An issue affects an asset when either:
 
 1. it is asset-level and points at the asset, or
 2. it is matching-level and its matching applies to the asset's device group
-   (`matchingAppliesToDeviceGroup` — strict version matching: an
+   (`matchingAppliesToDevice` — strict version matching: an
    unknown-version device group does NOT match version-constrained rules),
    and no asset-level issue for the same vulnerability exists on that asset.
 

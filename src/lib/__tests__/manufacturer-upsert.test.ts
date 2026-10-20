@@ -12,7 +12,6 @@ import {
 const siemensHealthineers: ManufacturerEntry = {
   canonicalName: "siemens healthineers",
   canonicalDisplayName: "Siemens Healthineers",
-  hasCpe: false,
   nameMappings: ["siemens", "siemens healthcare"],
 };
 
@@ -142,7 +141,6 @@ describe("planManufacturerUpserts", () => {
     const siemensAg: ManufacturerEntry = {
       canonicalName: "siemens ag",
       canonicalDisplayName: "Siemens AG",
-      hasCpe: false,
       nameMappings: ["siemens"],
     };
 
@@ -173,7 +171,6 @@ describe("planManufacturerUpserts", () => {
     const siemensAg: ManufacturerEntry = {
       canonicalName: "siemens ag",
       canonicalDisplayName: "Siemens AG",
-      hasCpe: false,
       nameMappings: ["siemens"],
     };
 

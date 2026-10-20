@@ -163,7 +163,6 @@ describe("syncAssets", () => {
       manufacturer: "Siemens Healthineers",
       product: "syngo WebSpace",
       version: "VA11A",
-      hasCpe: false,
     });
     expect(out.createData).toMatchObject({
       deviceGroupId: "dg-1",

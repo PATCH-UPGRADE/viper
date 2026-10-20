@@ -99,7 +99,6 @@ async function ingestFleetAssets(
           manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
           product: item.productName,
           version: item.softwareVersion,
-          hasCpe: false,
         });
         const { productId } = deviceGroup;
         if (productId && item.modality && !checkedProductIds.has(productId)) {

@@ -29,7 +29,6 @@ describe("manufacturerFileSchema", () => {
   const validEntry = {
     canonicalName: "acme medical",
     canonicalDisplayName: "Acme Medical",
-    hasCpe: false,
     nameMappings: ["acme"],
   };
 

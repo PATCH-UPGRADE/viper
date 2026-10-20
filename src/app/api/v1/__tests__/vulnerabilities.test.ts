@@ -320,3 +320,56 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 });
+
+describe("Vulnerabilities Endpoint version input", () => {
+  const stamp = Date.now();
+  const device = (version: unknown) => ({
+    manufacturer: { name: "vitest" },
+    product: { name: `range_${stamp}` },
+    version,
+  });
+  const create = (devices: unknown[]) =>
+    request(BASE_URL).post("/vulnerabilities").set(authHeader).send({
+      sarif: {},
+      description: "Mock -- version input",
+      devices,
+    });
+  const cleanUp = (id: string) =>
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/vulnerabilities/${id}`).set(authHeader);
+    });
+
+  it("POST /vulnerabilities - stores a VERS range on the matching", async () => {
+    const res = await create([device({ range: "vers:semver/>=8.0|<8.2" })]);
+    cleanUp(res.body.id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroupMatchings).toHaveLength(1);
+    expect(res.body.deviceGroupMatchings[0]).toMatchObject({
+      version: null,
+      versionRange: "vers:semver/>=8.0|<8.2",
+    });
+  });
+
+  it("POST /vulnerabilities - vers:all/* is a product-level matching", async () => {
+    const res = await create([device({ range: "vers:all/*" })]);
+    cleanUp(res.body.id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroupMatchings[0]).toMatchObject({
+      version: null,
+      versionRange: null,
+    });
+  });
+
+  it.each([
+    ["no version", undefined],
+    ["a range that is not VERS", { range: ">=8.0" }],
+    ["a range that does not parse", { range: "vers:semver" }],
+    ["a version status", { status: "UNKNOWN" }],
+  ])("POST /vulnerabilities - %s is a 400", async (_label, version) => {
+    const res = await create([device(version)]);
+
+    expect(res.status).toBe(400);
+  });
+});

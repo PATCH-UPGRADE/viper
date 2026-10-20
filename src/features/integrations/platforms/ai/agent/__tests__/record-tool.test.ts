@@ -96,6 +96,7 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     device: {
       manufacturer: { name: "Philips" },
       product: { name: "IntelliVue MX800" },
+      version: { status: "UNKNOWN" },
     },
     role: "Patient monitor",
     location: { building: "Main", floor: "3", room: "ICU-4" },
@@ -141,6 +142,7 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     device: {
       manufacturer: { name: "Philips" },
       product: { name: "IntelliVue MX800" },
+      version: { range: "vers:all/*" },
     },
     role: "Patient monitor",
     description: "Service manual for the MX800.",

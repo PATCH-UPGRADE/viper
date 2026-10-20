@@ -47,17 +47,26 @@ const catalogRefSchema = z.union([
 ]);
 
 /**
- * A device as its manufacturer, product, and version. An id must exist. A name
- * that does not exist is created inside its parent.
+ * The devices that a vulnerability, remediation, or device artifact applies to.
+ * An id must exist. A name that does not exist is created inside its parent.
+ * The version is required, so "every version" is an explicit range.
  */
 export const deviceInputSchema = z.object({
   manufacturer: catalogRefSchema,
-  product: catalogRefSchema
-    .optional()
-    .describe("Omit for every product of the manufacturer."),
-  version: catalogRefSchema
-    .optional()
-    .describe("Omit for every version of the product. Needs a product."),
+  product: catalogRefSchema,
+  version: z
+    .union([
+      catalogRefSchema,
+      z.strictObject({
+        range: z
+          .string()
+          .trim()
+          .regex(/^vers:/, "A range is a VERS string that starts with vers:"),
+      }),
+    ])
+    .describe(
+      'One version, or { range } with a VERS string, for example "vers:semver/>=8.0|<8.2". Use { "range": "vers:all/*" } for every version.',
+    ),
 });
 export type DeviceInput = z.infer<typeof deviceInputSchema>;
 
@@ -65,15 +74,16 @@ export type DeviceInput = z.infer<typeof deviceInputSchema>;
  * An asset's device. Its version can be a status instead, which says why the
  * asset has no version, so a version and a status cannot both be sent.
  */
-export const assetDeviceInputSchema = deviceInputSchema.extend({
+export const assetDeviceInputSchema = z.object({
+  manufacturer: catalogRefSchema,
+  product: catalogRefSchema.optional(),
   version: z
     .union([
       catalogRefSchema,
       z.strictObject({ status: z.enum(["UNKNOWN", "UNSURE"]) }),
     ])
-    .optional()
     .describe(
-      "The asset's version, or { status } when the version is not known. Omit for UNKNOWN. A version needs a product.",
+      "The asset's version, or { status } when the version is not known. A version needs a product.",
     ),
 });
 export type AssetDeviceInput = z.infer<typeof assetDeviceInputSchema>;

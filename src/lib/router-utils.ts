@@ -17,6 +17,7 @@ import {
   type MatchingLike,
   matchingAppliesToDevice,
   matchingWhereForDevice,
+  parseVers,
   strictAssetWhereForMatching,
   versSatisfies,
 } from "./device-matching";
@@ -315,7 +316,7 @@ export async function resolveDeviceInput(
   device: DeviceInput | AssetDeviceInput,
 ): Promise<ResolvedDeviceIds> {
   const version =
-    device.version && !("status" in device.version) ? device.version : null;
+    "id" in device.version || "name" in device.version ? device.version : null;
   if (version && !device.product) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -480,7 +481,7 @@ async function findOrCreateMatching(where: MatchingLike): Promise<string> {
 
 /**
  * Resolve device inputs to their shared matchings and return a Prisma `connect`
- * array. A device with no version matches every version of its product.
+ * array.
  */
 export async function devicesToMatchingConnect(devices: DeviceInput[]) {
   const ids = await Promise.all(devices.map(resolveMatchingIdForDevice));
@@ -493,8 +494,25 @@ export async function resolveMatchingIdForDevice(
 ): Promise<string> {
   return findOrCreateMatching({
     ...(await resolveDeviceInput(device)),
-    versionRange: null,
+    versionRange: matchingVersionRange(device.version),
   });
+}
+
+/**
+ * The versionRange to store for a device input. A range that matches every
+ * version is stored as no range: that is the same matching that a product-level
+ * rule from the inbox has, so the two do not become duplicate rows.
+ */
+function matchingVersionRange(version: DeviceInput["version"]): string | null {
+  if (!("range" in version)) return null;
+  const parsed = parseVers(version.range);
+  if (!parsed) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid VERS range: ${version.range}`,
+    });
+  }
+  return parsed.matchesAll ? null : version.range;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
+  ALL_VERSIONS,
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
@@ -59,7 +60,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     vendor: "mockDeviceArtifactIntegrationVendor",
     items: [
       {
-        device: namedDevice("mock", "dev_art_integration_v10"),
+        device: namedDevice("mock", "dev_art_integration_v10", ALL_VERSIONS),
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock -- run apt update",
@@ -73,7 +74,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         ],
       },
       {
-        device: namedDevice("mock", "dev_art_integration_v11"),
+        device: namedDevice("mock", "dev_art_integration_v11", ALL_VERSIONS),
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock - Turn it off and on again",

@@ -49,7 +49,7 @@ export const remediationInputSchema = z.object({
     .array(deviceInputSchema)
     .optional()
     .describe(
-      "The devices that the remediation applies to. A device with no version applies to every version of its product.",
+      "The devices that the remediation applies to. Each one names its version, a VERS range, or every version with vers:all/*.",
     ),
   vulnerabilityIds: z.array(z.string()).optional(),
   vulnerabilityId: removedVulnerabilityIdSchema,

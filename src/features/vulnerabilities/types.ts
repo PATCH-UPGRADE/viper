@@ -46,7 +46,7 @@ export const vulnerabilityInputSchema = z.object({
     .array(deviceInputSchema)
     .min(1, "At least one device is required")
     .describe(
-      "The affected devices. A device with no version affects every version of its product.",
+      "The affected devices. Each one names its version, a VERS range, or every version with vers:all/*.",
     ),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cveId: z.string().min(1).nullish(),

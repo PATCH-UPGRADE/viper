@@ -20,7 +20,8 @@
             "devices": [
                 {
                     "manufacturer": { "name": "Tester" },
-                    "product": { "name": "Dummy" }
+                    "product": { "name": "Dummy" },
+                    "version": { "range": "vers:all/*" }
                 }
             ],
             "vulnerabilityIds": ["cmkojdbok001sy95b18ad1q4t"],

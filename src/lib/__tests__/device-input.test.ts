@@ -43,8 +43,28 @@ describe("deviceInputSchema", () => {
       deviceInputSchema.safeParse({
         manufacturer: { name: "Baxter" },
         product: { id: "p-1" },
+        version: { range: "vers:semver/>=8.0" },
       }).success,
     ).toBe(true);
+  });
+
+  it("requires the version, so every version is an explicit range", () => {
+    expect(
+      deviceInputSchema.safeParse({
+        manufacturer: { name: "Baxter" },
+        product: { name: "Sigma" },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a range that is not a VERS string", () => {
+    expect(
+      deviceInputSchema.safeParse({
+        manufacturer: { name: "Baxter" },
+        product: { name: "Sigma" },
+        version: { range: ">=8.0" },
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects a part with both an id and a name", () => {
@@ -118,6 +138,7 @@ describe("resolveDeviceInput", () => {
       resolveDeviceInput({
         manufacturer: { id: "m-1" },
         product: { name: "Sigma Spectrum" },
+        version: { range: "vers:all/*" },
       }),
     ).resolves.toEqual({
       manufacturerId: "m-1",
@@ -155,6 +176,7 @@ describe("resolveDeviceInput", () => {
       resolveDeviceInput({
         manufacturer: { id: "m-1" },
         product: { id: "p-2" },
+        version: { range: "vers:all/*" },
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
@@ -233,8 +255,16 @@ describe("devicesToMatchingConnect", () => {
     mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-1" });
 
     const connect = await devicesToMatchingConnect([
-      { manufacturer: { id: "m-1" }, product: { id: "p-1" } },
-      { manufacturer: { name: "Acme" }, product: { name: "X1" } },
+      {
+        manufacturer: { id: "m-1" },
+        product: { id: "p-1" },
+        version: { range: "vers:all/*" },
+      },
+      {
+        manufacturer: { name: "Acme" },
+        product: { name: "X1" },
+        version: { range: "vers:all/*" },
+      },
     ]);
 
     expect(connect).toEqual([{ id: "dgm-1" }]);
@@ -246,5 +276,38 @@ describe("devicesToMatchingConnect", () => {
         versionRange: null,
       },
     });
+  });
+
+  it("stores a VERS range on the matching", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-2" });
+
+    await devicesToMatchingConnect([
+      {
+        manufacturer: { id: "m-1" },
+        product: { id: "p-1" },
+        version: { range: "vers:semver/>=8.0|<8.2" },
+      },
+    ]);
+
+    expect(mockPrisma.deviceGroupMatching.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        productId: "p-1",
+        versionId: null,
+        versionRange: "vers:semver/>=8.0|<8.2",
+      },
+    });
+  });
+
+  it("is a 400 for a range that does not parse", async () => {
+    await expect(
+      devicesToMatchingConnect([
+        {
+          manufacturer: { id: "m-1" },
+          product: { id: "p-1" },
+          version: { range: "vers:semver" },
+        },
+      ]),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

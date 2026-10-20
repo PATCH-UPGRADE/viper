@@ -17,31 +17,51 @@ export const AUTH_TOKEN = `Bearer ${process.env.API_KEY}`;
 
 type CanonicalName = { canonicalName: string } | null | undefined;
 
-/** A device input that names each part by its name. */
+type TestVersion =
+  | { name: string }
+  | { range: string }
+  | { status: "UNKNOWN" | "UNSURE" };
+
+/** A device input that names its manufacturer and product by name. */
 export type TestDevice = {
   manufacturer: { name: string };
   product?: { name: string };
-  version?: { name: string };
+  version?: TestVersion;
 };
 
+/** A version name, or a range or status as it is. */
 export const namedDevice = (
   manufacturer: string,
   product?: string,
-  version?: string,
+  version?: string | TestVersion,
 ): TestDevice => ({
   manufacturer: { name: manufacturer },
   ...(product ? { product: { name: product } } : {}),
-  ...(version ? { version: { name: version } } : {}),
+  ...(version
+    ? { version: typeof version === "string" ? { name: version } : version }
+    : {}),
 });
 
-export const generateDevice = (suffix: string) =>
-  namedDevice("vendor", "product", suffix);
+export const generateDevice = (suffix: string) => ({
+  manufacturer: { name: "vendor" },
+  product: { name: "product" },
+  version: { name: suffix },
+});
+
+/** Every version, for a vulnerability, remediation, or device artifact. */
+export const ALL_VERSIONS = { range: "vers:all/*" } as const;
+
+/** No version, for an asset. */
+export const VERSION_UNKNOWN = { status: "UNKNOWN" } as const;
 
 function namesFromDevice(device: TestDevice) {
   return {
     manufacturer: normalizeName(device.manufacturer.name),
     product: device.product ? normalizeName(device.product.name) : null,
-    version: device.version ? normalizeName(device.version.name) : null,
+    version:
+      device.version && "name" in device.version
+        ? normalizeName(device.version.name)
+        : null,
   };
 }
 

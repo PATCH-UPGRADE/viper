@@ -19,6 +19,7 @@ import {
   jsonHeader,
   namedDevice,
   setupMockIntegration,
+  VERSION_UNKNOWN,
 } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
@@ -56,7 +57,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.244",
         networkSegment: "Mock Medical Imaging VLAN",
-        device: namedDevice("mock", "asset_integration_v10"),
+        device: namedDevice("mock", "asset_integration_v10", VERSION_UNKNOWN),
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-mock-00001.hospital.local",
@@ -74,7 +75,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.245",
         networkSegment: "Mock Medical Imaging VLAN",
-        device: namedDevice("mock", "asset_integration_v11"),
+        device: namedDevice("mock", "asset_integration_v11", VERSION_UNKNOWN),
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-mock-00002.hospital.local",
@@ -1007,7 +1008,7 @@ describe("Assets Endpoint version status input", () => {
   it("POST /assets - the old top-level versionStatus is a 400", async () => {
     const res = await createAsset({
       ip: "10.0.7.2",
-      device: namedDevice("vitest", product),
+      device: namedDevice("vitest", product, VERSION_UNKNOWN),
       versionStatus: "UNSURE",
     });
 

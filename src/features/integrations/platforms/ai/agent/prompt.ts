@@ -7,7 +7,7 @@ const SHARED_FIELD_GUIDANCE = `- externalId: the id that the source API gives th
 - If the items have no id of their own in the source, do not record any items. Call ${REPORT_NO_STABLE_ID_TOOL} with the reason, then stop.
 - upstreamApi: the API URL for this one item, if the source has one.
 - webUrl: the URL where a person can view this item, if the source has one.
-- Device fields: an object such as { "manufacturer": { "name": "Philips" }, "product": { "name": "IntelliVue MX800" }, "version": { "name": "B.02" } }, built from the vendor, product, and version in the source. Leave out a product or a version that you do not know. A version needs a product.
+- Device fields: an object such as { "manufacturer": { "name": "Philips" }, "product": { "name": "IntelliVue MX800" }, "version": { "name": "B.02" } }, built from the vendor, product, and version in the source. version is always required. For an asset whose version you do not know, use { "status": "UNKNOWN" }, and leave out a product that you do not know. For a vulnerability, remediation, or device artifact, product is required, and version can be { "range": "vers:semver/>=2.0|<2.3" } for a range in the source, or { "range": "vers:all/*" } when the source names no version.
 - Leave out an optional field that the source does not give. Do not guess values.`;
 
 const RESOURCE_GUIDANCE: Record<CrawlerResource, string> = {

@@ -138,7 +138,10 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
   },
   [ResourceType.DeviceArtifact]: {
     externalId: "art-3",
-    cpe: "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*",
+    device: {
+      manufacturer: { name: "Philips" },
+      product: { name: "IntelliVue MX800" },
+    },
     role: "Patient monitor",
     description: "Service manual for the MX800.",
     artifacts: [{ name: "mx800-manual.pdf", artifactType: "Documentation" }],

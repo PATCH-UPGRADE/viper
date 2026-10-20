@@ -24,7 +24,7 @@ const RESOURCE_GUIDANCE: Record<CrawlerResource, string> = {
 - Put the products that the remediation applies to in devices.
 - description is a short summary. narrative holds the longer steps, if the source has them.`,
   [ResourceType.DeviceArtifact]: `You collect device artifacts: firmware, manuals, SBOMs, and other files for a device.
-- cpe is required: the device that the artifact is for.
+- device is required: the device that the artifact is for.
 - role and description are required.
 - artifacts is required, with at least one entry. Set artifactType, and set downloadUrl when the source links to it.`,
 };

@@ -590,15 +590,18 @@ export async function cpesToMatchingConnect(cpes: string[]) {
  * array. A device with no version matches every version of its product.
  */
 export async function devicesToMatchingConnect(devices: DeviceInput[]) {
-  const ids = await Promise.all(
-    devices.map(async (device) =>
-      findOrCreateMatching({
-        ...(await resolveDeviceInput(device)),
-        versionRange: null,
-      }),
-    ),
-  );
+  const ids = await Promise.all(devices.map(resolveMatchingIdForDevice));
   return [...new Set(ids)].map((id) => ({ id }));
+}
+
+/** Resolve one device input to its shared matching id. */
+export async function resolveMatchingIdForDevice(
+  device: DeviceInput,
+): Promise<string> {
+  return findOrCreateMatching({
+    ...(await resolveDeviceInput(device)),
+    versionRange: null,
+  });
 }
 
 /**

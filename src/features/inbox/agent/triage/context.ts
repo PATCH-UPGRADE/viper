@@ -9,11 +9,11 @@ import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
   type MatchingLike,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
 } from "@/lib/device-matching";
 import {
-  deviceGroupLabel,
   deviceGroupMatchingLabel,
+  deviceLabel,
   type NoteTargetLabels,
   type RemediationForMarkdown,
   remediationToMarkdown,
@@ -158,7 +158,7 @@ export async function gatherTriageContext(
       : [];
 
   const groups = candidateGroups.filter((g) =>
-    matchings.some((m: MatchingLike) => matchingAppliesToDeviceGroup(m, g)),
+    matchings.some((m: MatchingLike) => matchingAppliesToDevice(m, g)),
   );
 
   const seenAssets = new Set<string>();
@@ -201,7 +201,7 @@ export async function gatherTriageContext(
         asset.hostname ?? asset.ip ?? asset.id,
       ]),
     ),
-    groupLabel: new Map(groups.map((g) => [g.id, deviceGroupLabel(g)])),
+    groupLabel: new Map(groups.map((g) => [g.id, deviceLabel(g)])),
     matchingLabel: new Map(
       matchings.map((m) => [m.id, deviceGroupMatchingLabel(m)]),
     ),
@@ -238,7 +238,7 @@ export async function gatherTriageContext(
   // One line per matching (the entity an agent links against), with the device
   // groups and assets it actually resolves to. Only rendered under includeIds.
   const matchingSummaries: MatchingSummary[] = matchings.map((m) => {
-    const resolved = groups.filter((g) => matchingAppliesToDeviceGroup(m, g));
+    const resolved = groups.filter((g) => matchingAppliesToDevice(m, g));
     return {
       id: m.id,
       label: deviceGroupMatchingLabel(m),
@@ -371,14 +371,12 @@ function plainEnum(value: string, labels: Record<string, string>): string {
 
 /** The device group label, with the product's device type when it has one. */
 export function careAreaGroupLabel(
-  g: Parameters<typeof deviceGroupLabel>[0] & {
+  g: Parameters<typeof deviceLabel>[0] & {
     product?: { deviceType?: { displayName: string } | null } | null;
   },
 ): string {
   const deviceType = g.product?.deviceType?.displayName;
-  return deviceType
-    ? `${deviceGroupLabel(g)} (${deviceType})`
-    : deviceGroupLabel(g);
+  return deviceType ? `${deviceLabel(g)} (${deviceType})` : deviceLabel(g);
 }
 
 function careAreaLocation(raw: unknown): string {
@@ -459,7 +457,7 @@ export function renderTriagePrompt(args: RenderArgs): string {
         args.groups
           .map(
             (g) =>
-              `- **${deviceGroupLabel(g)}** — ${g.assets.length} asset${g.assets.length === 1 ? "" : "s"}`,
+              `- **${deviceLabel(g)}** — ${g.assets.length} asset${g.assets.length === 1 ? "" : "s"}`,
           )
           .join("\n"),
     );

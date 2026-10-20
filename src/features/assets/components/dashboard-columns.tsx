@@ -20,7 +20,7 @@ import {
 } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
@@ -107,7 +107,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {deviceGroupLabel(row.original.deviceGroup)}
+            {deviceLabel(row.original.deviceGroup)}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

@@ -7,7 +7,7 @@ import { SubmissionState } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
 } from "@/lib/device-matching";
 import { keepFileableTargets, validatePayloadForModule } from "./payload";
 import { resolveWorkOrderTargets } from "./targets";
@@ -70,7 +70,7 @@ export async function assetsForMatchings(
 
   return candidates.filter((asset) =>
     matchings.some((matching) =>
-      matchingAppliesToDeviceGroup(matching, asset.deviceGroup),
+      matchingAppliesToDevice(matching, asset.deviceGroup),
     ),
   );
 }

@@ -10,7 +10,6 @@ const normalizedName = z
 export const manufacturerEntrySchema = z.object({
   canonicalName: normalizedName,
   canonicalDisplayName: z.string().min(1),
-  hasCpe: z.boolean(),
   nameMappings: z.array(normalizedName),
 });
 
@@ -28,42 +27,36 @@ export type ManufacturerEntry = z.infer<typeof manufacturerEntrySchema>;
 export const SIEMENS_HEALTHINEERS: ManufacturerEntry = {
   canonicalName: "siemens healthineers",
   canonicalDisplayName: "Siemens Healthineers",
-  hasCpe: false,
   nameMappings: ["siemens", "siemens healthcare", "siemens medical solutions"],
 };
 
 export const GE_HEALTHCARE: ManufacturerEntry = {
   canonicalName: "ge healthcare",
   canonicalDisplayName: "GE HealthCare",
-  hasCpe: false,
   nameMappings: ["gehealthcare", "ge medical systems"],
 };
 
 export const PHILIPS: ManufacturerEntry = {
   canonicalName: "philips",
   canonicalDisplayName: "Philips",
-  hasCpe: true,
   nameMappings: ["philips healthcare", "royal philips", "koninklijke philips"],
 };
 
 export const MEDTRONIC: ManufacturerEntry = {
   canonicalName: "medtronic",
   canonicalDisplayName: "Medtronic",
-  hasCpe: true,
   nameMappings: ["medtronic plc"],
 };
 
 export const BD: ManufacturerEntry = {
   canonicalName: "bd",
   canonicalDisplayName: "BD",
-  hasCpe: true,
   nameMappings: ["becton dickinson", "becton, dickinson and company"],
 };
 
 export const BAXTER: ManufacturerEntry = {
   canonicalName: "baxter",
   canonicalDisplayName: "Baxter",
-  hasCpe: true,
   nameMappings: ["baxter international", "baxter healthcare"],
 };
 

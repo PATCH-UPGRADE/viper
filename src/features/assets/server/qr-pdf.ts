@@ -7,7 +7,7 @@ import {
 } from "pdf-lib";
 import QRCode from "qrcode";
 import type { Prisma } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import { getBaseUrl } from "@/lib/url-utils";
 import { deviceTypeLabelSelect, getAssetTitle } from "../utils";
 
@@ -118,7 +118,7 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   drawText(getAssetTitle(asset), 18, bold, DARK);
   y -= 22;
 
-  drawText(deviceGroupLabel(asset.deviceGroup), 12, font, GRAY);
+  drawText(deviceLabel(asset.deviceGroup), 12, font, GRAY);
   y -= 24;
 
   drawDivider();

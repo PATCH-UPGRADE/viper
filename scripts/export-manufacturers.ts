@@ -14,7 +14,6 @@ async function main() {
     select: {
       canonicalName: true,
       canonicalDisplayName: true,
-      hasCpe: true,
       nameMappings: true,
     },
     orderBy: { canonicalName: "asc" },

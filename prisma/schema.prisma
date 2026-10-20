@@ -1319,8 +1319,6 @@ enum TriggerEnum {
   Artifact_Updated
   DeviceArtifact_Created
   DeviceArtifact_Updated
-  DeviceGroup_Created
-  DeviceGroup_Updated
   Remediation_Created
   Remediation_Updated
   Vulnerability_Created

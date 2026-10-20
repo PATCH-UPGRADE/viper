@@ -1,14 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  BugIcon,
-  ComputerIcon,
-  CpuIcon,
-  FileIcon,
-  PlusIcon,
-  WrenchIcon,
-} from "lucide-react";
+import { BugIcon, CpuIcon, FileIcon, PlusIcon, WrenchIcon } from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { AuthenticationFields } from "@/components/auth-form";
@@ -50,13 +43,6 @@ import { cn } from "@/lib/utils";
 import { type WebhookFormValues, webhookInputSchema } from "../types";
 import { columns } from "./columns";
 
-// Nothing fires these triggers. Saved webhooks can still list them, so they
-// keep a label but cannot be chosen.
-const RETIRED_TRIGGERS = new Set<string>([
-  TriggerEnum.DeviceGroup_Created,
-  TriggerEnum.DeviceGroup_Updated,
-]);
-
 export const triggerDescriptions = {
   [TriggerEnum.Artifact_Created]: (
     <>
@@ -87,22 +73,6 @@ export const triggerDescriptions = {
       <CpuIcon size={15} />{" "}
       <span>
         A <b>Device Artifact</b> is updated
-      </span>
-    </>
-  ),
-  [TriggerEnum.DeviceGroup_Created]: (
-    <>
-      <ComputerIcon size={15} />{" "}
-      <span>
-        A <b>Device Group</b> is created
-      </span>
-    </>
-  ),
-  [TriggerEnum.DeviceGroup_Updated]: (
-    <>
-      <ComputerIcon size={15} />{" "}
-      <span>
-        A <b>Device Group</b> is updated
       </span>
     </>
   ),
@@ -268,9 +238,8 @@ export const WebhookCreateModal = ({
                     <FormLabel>Send a notification when:</FormLabel>
                     <FormControl>
                       <div className="border-1 bg-muted p-4 flex flex-col gap-2">
-                        {Object.entries(triggerDescriptions)
-                          .filter(([key]) => !RETIRED_TRIGGERS.has(key))
-                          .map(([key, value], index) => (
+                        {Object.entries(triggerDescriptions).map(
+                          ([key, value], index) => (
                             <label
                               key={index}
                               className="flex gap-x-1 text-sm cursor-pointer"
@@ -289,7 +258,8 @@ export const WebhookCreateModal = ({
                                 {value}
                               </span>
                             </label>
-                          ))}
+                          ),
+                        )}
                       </div>
                     </FormControl>
                     <FormMessage />

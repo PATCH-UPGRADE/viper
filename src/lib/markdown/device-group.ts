@@ -31,7 +31,7 @@ export function deviceToMarkdown(device: DeviceDisplay): string {
 
 /** A loosely-typed device identity (as extracted from a notification, etc.). */
 export interface ExtractedDeviceIdentity {
-  cpe?: string[] | string | null;
+  udi?: string | null;
   manufacturer?: string | null;
   modelName?: string | null;
   version?: string | null;
@@ -39,16 +39,13 @@ export interface ExtractedDeviceIdentity {
 }
 
 /**
- * Inline identifier line for a device identity (CPE + manufacturer + model +
+ * Inline identifier line for a device identity (UDI + manufacturer + model +
  * version + versionRange), e.g.
- * "cpe=… | manufacturer=Acme | modelName=Pump | version=2.1 | versionRange=?".
+ * "udi=? | manufacturer=Acme | modelName=Pump | version=2.1 | versionRange=?".
  * Missing fields render as "?".
  */
 export function deviceIdentityInline(fields: ExtractedDeviceIdentity): string {
-  const cpe = Array.isArray(fields.cpe)
-    ? fields.cpe.join(", ") || "(none)"
-    : (fields.cpe ?? "?");
-  return `cpe=${cpe} | manufacturer=${fields.manufacturer ?? "?"} | modelName=${fields.modelName ?? "?"} | version=${fields.version ?? "?"} | versionRange=${fields.versionRange ?? "?"}`;
+  return `udi=${fields.udi ?? "?"} | manufacturer=${fields.manufacturer ?? "?"} | modelName=${fields.modelName ?? "?"} | version=${fields.version ?? "?"} | versionRange=${fields.versionRange ?? "?"}`;
 }
 
 type DeviceGroupMatchingDisplay = {

@@ -42,7 +42,6 @@ const candidates: Candidates = {
   deviceGroups: [
     {
       extracted: {
-        cpe: null,
         manufacturer: "Acme",
         modelName: "X1",
         version: null,

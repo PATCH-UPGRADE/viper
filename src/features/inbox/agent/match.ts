@@ -31,7 +31,6 @@ const MODEL = "gpt-6-luna";
 // Fields the LLM may set when creating/updating a device group. Kept flat and
 // optional so the schema stays a top-level object (tool-schema requirement).
 const detailsFieldsSchema = z.object({
-  cpe: z.string().nullish(),
   udi: z.string().nullish(),
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
@@ -224,7 +223,6 @@ function cleanFields(fields: Decision["fields"]): {
   modelName?: string;
   version?: string;
   versionRange?: string;
-  cpe?: string;
   udi?: string;
   cveId?: string;
   description?: string;
@@ -241,7 +239,6 @@ function cleanFields(fields: Decision["fields"]): {
     "version",
     "versionRange",
     "cveId",
-    "cpe",
     "udi",
     "description",
     "cvssScore",

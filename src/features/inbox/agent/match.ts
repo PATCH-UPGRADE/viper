@@ -491,7 +491,6 @@ export async function applyDecisions(
             product: data.modelName,
             version: data.version,
             versionRange: data.versionRange,
-            hasCpe: false,
           });
 
           if (rejectedDeviceGroupMatchingIds.has(matchingId)) {

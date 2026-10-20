@@ -385,7 +385,6 @@ describe("the ingest mapping", () => {
       product: "ViperDevice",
       version: null,
       versionRange: "vers:semver/<=6.0.2",
-      hasCpe: false,
     });
     expect(createData.deviceGroupMatchings).toEqual({
       connect: [{ id: "matching-1" }],

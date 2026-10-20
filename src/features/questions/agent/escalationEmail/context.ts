@@ -4,7 +4,7 @@ import type { QuestionAudience } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
 } from "@/lib/device-matching";
 import { effectiveAudience } from "./process_output";
 import type {
@@ -44,7 +44,7 @@ async function resolveIssueDevice(
         matching.product?.canonicalDisplayName ??
         `All ${manufacturerName} devices`,
       assetIds: candidates
-        .filter((group) => matchingAppliesToDeviceGroup(matching, group))
+        .filter((group) => matchingAppliesToDevice(matching, group))
         .flatMap((group) => group.assets.map((asset) => asset.id)),
     };
   }

@@ -13,7 +13,6 @@ import { requireExistence } from "@/trpc/middleware";
 import {
   assetWhereForMatching,
   type DeviceIdentity,
-  deviceIdentitySelect,
   deviceKey,
   type MatchingLike,
   matchingAppliesToDevice,
@@ -572,62 +571,62 @@ export async function findMatchingIdsForDevice(
 }
 
 /**
- * Inverse of {@link findMatchingIdsForDevice}: resolve a set of device-group
- * matchings to the ids of the assets they apply to. Coarse manufacturer/product
- * DB filter, then the in-memory check (identityAppliesToDevice: VERS ranges, and
- * the manufacturer/product fallback for an unknown-version asset).
+ * Prisma `where` for the assets that any of the matchings applies to, by
+ * matchingAppliesToDevice. It holds no asset ids: a product's VERS range becomes
+ * the product's versions that satisfy it, so the query grows with the number of
+ * versions, not the number of assets. `loose` also accepts an asset with no
+ * version on the matching's manufacturer and product (identityAppliesToDevice).
+ * With no matchings, the `where` matches no asset.
  */
-export async function findAssetIdsForMatchings(
+export async function assetWhereForMatchings(
   matchings: MatchingLike[],
-): Promise<string[]> {
-  if (matchings.length === 0) return [];
-  const candidates = await prisma.asset.findMany({
-    where: { OR: matchings.map(assetWhereForMatching) },
-    select: deviceIdentitySelect,
-  });
-  return candidates
-    .filter((asset) => matchings.some((m) => identityAppliesToDevice(m, asset)))
-    .map((asset) => asset.id);
+  { loose = false }: { loose?: boolean } = {},
+): Promise<Prisma.AssetWhereInput> {
+  const clauses = await Promise.all(
+    matchings.map(async (matching) => {
+      const { productId, versionId, versionRange } = matching;
+      const out: Prisma.AssetWhereInput[] = [];
+      if (
+        productId !== null &&
+        versionId === null &&
+        versionRange !== null &&
+        // A range that matches every version also matches no version.
+        !versSatisfies(null, versionRange)
+      ) {
+        const versions = await prisma.version.findMany({
+          where: { productId },
+          select: { id: true, canonicalName: true },
+        });
+        const inRange = versions
+          .filter((v) => versSatisfies(v.canonicalName, versionRange))
+          .map((v) => v.id);
+        if (inRange.length > 0)
+          out.push({
+            ...assetWhereForMatching(matching),
+            versionId: { in: inRange },
+          });
+      } else {
+        out.push(strictAssetWhereForMatching(matching));
+      }
+      if (
+        loose &&
+        productId !== null &&
+        (versionId !== null || versionRange !== null)
+      )
+        out.push({ ...assetWhereForMatching(matching), versionId: null });
+      return out;
+    }),
+  );
+  return { OR: clauses.flat() };
 }
 
-/**
- * How many assets a matching resolves to, by matchingAppliesToDevice.
- * Notifications call this once per matching per row, so it never loads one row
- * per asset: only a product's VERS range needs the versions, counted by version.
- */
+/** How many assets a matching resolves to, by matchingAppliesToDevice. */
 export async function resolvedAssetCount(
   matching: MatchingLike,
 ): Promise<number> {
-  const { versionRange } = matching;
-  const needsRangeCheck =
-    matching.productId !== null &&
-    matching.versionId === null &&
-    versionRange !== null;
-  if (!needsRangeCheck) {
-    return prisma.asset.count({ where: strictAssetWhereForMatching(matching) });
-  }
-
-  const byVersion = await prisma.asset.groupBy({
-    by: ["versionId"],
-    where: assetWhereForMatching(matching),
-    _count: { _all: true },
+  return prisma.asset.count({
+    where: await assetWhereForMatchings([matching]),
   });
-  const versionIds = byVersion.flatMap((g) =>
-    g.versionId ? [g.versionId] : [],
-  );
-  const versions = await prisma.version.findMany({
-    where: { id: { in: versionIds } },
-    select: { id: true, canonicalName: true },
-  });
-  const versionName = new Map(versions.map((v) => [v.id, v.canonicalName]));
-  return byVersion
-    .filter((g) =>
-      versSatisfies(
-        g.versionId ? (versionName.get(g.versionId) ?? null) : null,
-        versionRange,
-      ),
-    )
-    .reduce((sum, g) => sum + g._count._all, 0);
 }
 
 export async function fetchPaginated<

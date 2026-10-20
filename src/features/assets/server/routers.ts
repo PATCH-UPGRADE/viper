@@ -27,9 +27,9 @@ import {
 } from "@/lib/pagination";
 import {
   assertVersionStatusAllowed,
+  assetWhereForMatchings,
   cpeToDevice,
   fetchPaginated,
-  findAssetIdsForMatchings,
   findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
   type ResolvedDevice,
@@ -142,18 +142,15 @@ export const assetsRouter = createTRPCRouter({
           versionRange: true,
         },
       });
-      const matchedAssetIds = await findAssetIdsForMatchings(matchings);
+      const matchedWhere = await assetWhereForMatchings(matchings, {
+        loose: true,
+      });
 
       // Find assets that are directly linked by a node
       // and assets that are indirectly linked via a node's matching
       const assets = await prisma.asset.findMany({
         where: {
-          OR: [
-            { nodes: { some: { workflowId } } },
-            ...(matchedAssetIds.length
-              ? [{ id: { in: matchedAssetIds } }]
-              : []),
-          ],
+          OR: [{ nodes: { some: { workflowId } } }, matchedWhere],
         },
         include: assetInclude,
         orderBy: { updatedAt: "desc" },
@@ -363,9 +360,9 @@ export const assetsRouter = createTRPCRouter({
             versionRange: true,
           },
         });
-        const matchedAssetIds = await findAssetIdsForMatchings(matchings);
-        if (matchedAssetIds.length)
-          orConditions.push({ id: { in: matchedAssetIds } });
+        orConditions.push(
+          await assetWhereForMatchings(matchings, { loose: true }),
+        );
       }
 
       // No resolvable filters => nothing matches.

@@ -14,7 +14,6 @@ import { AUTOMATION_USER_ID } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import {
   deviceIdentitySelect,
-  findAssetsStrictlyMatching,
   matchingAppliesToDevice,
   unknownVersionAssetWhere,
 } from "@/lib/device-matching";
@@ -24,10 +23,7 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import {
-  findAssetIdsForMatchings,
-  resolvedAssetCount,
-} from "@/lib/router-utils";
+import { assetWhereForMatchings, resolvedAssetCount } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   fieldCorrectionInclude,
@@ -93,16 +89,6 @@ async function unknownVersionAssetCount(
   const where = unknownVersionAssetWhere(matching);
   if (!where) return 0;
   return prisma.asset.count({ where });
-}
-
-/** Ids of the assets a matching resolves to (for paginated asset queries). */
-async function resolveMatchedAssetIds(
-  matching: MatchingIdentity,
-): Promise<string[]> {
-  const assets = await findAssetsStrictlyMatching([matching], (where) =>
-    prisma.asset.findMany({ where, select: deviceIdentitySelect }),
-  );
-  return assets.map((asset) => asset.id);
 }
 
 /**
@@ -455,11 +441,13 @@ export const notificationsRouter = createTRPCRouter({
         return createPaginatedResponse<ResolvedDeviceGroupAsset>([], emptyMeta);
       }
 
-      const [matchedIds, unknownCount] = await Promise.all([
-        resolveMatchedAssetIds(ctx.deviceGroupMatching),
+      const matchedWhere = await assetWhereForMatchings([
+        ctx.deviceGroupMatching,
+      ]);
+      const [totalAssetCount, unknownCount] = await Promise.all([
+        prisma.asset.count({ where: matchedWhere }),
         unknownVersionAssetCount(ctx.deviceGroupMatching),
       ]);
-      const totalAssetCount = matchedIds.length;
 
       const buckets = computeMatchingBuckets({
         matchingStatusByVuln: ctx.matchingStatusByVuln,
@@ -483,10 +471,7 @@ export const notificationsRouter = createTRPCRouter({
             : undefined;
 
       const matched: Prisma.AssetWhereInput = {
-        AND: [
-          { id: { in: matchedIds } },
-          ...(idFilter ? [{ id: idFilter }] : []),
-        ],
+        AND: [matchedWhere, ...(idFilter ? [{ id: idFilter }] : [])],
       };
       const where: Prisma.AssetWhereInput =
         bucket === "UNDER_INVESTIGATION" && unknownWhere
@@ -573,11 +558,12 @@ export const notificationsRouter = createTRPCRouter({
         .filter((m) => m.confidence !== "Rejected")
         .map((m) => m.deviceGroupMatching);
 
-      const assetIds = await findAssetIdsForMatchings(matchings);
-      if (assetIds.length === 0) {
+      if (matchings.length === 0) {
         return { assets: [], totalAssetCount: 0 };
       }
-      return fetchUtilizationGrids({ id: { in: assetIds } });
+      return fetchUtilizationGrids(
+        await assetWhereForMatchings(matchings, { loose: true }),
+      );
     }),
 
   markRead: protectedProcedure

@@ -14,7 +14,7 @@ import {
   resolveMatches,
 } from "@/lib/device-matching";
 import { deviceLabel } from "@/lib/markdown/device-group";
-import { findAssetIdsForMatchings } from "@/lib/router-utils";
+import { assetWhereForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 /** Each overview card shows at most this many rows. */
@@ -32,7 +32,9 @@ const ORDER_BY_URGENCY = [
 async function notificationAssetCount(
   matchings: MatchingLike[],
 ): Promise<number> {
-  return (await findAssetIdsForMatchings(matchings)).length;
+  return prisma.asset.count({
+    where: await assetWhereForMatchings(matchings, { loose: true }),
+  });
 }
 
 /** One manufacturer/product/version that assets have, plus how many. */

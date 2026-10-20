@@ -8,8 +8,7 @@ export function normalizeVersion(v?: string | null): string | null {
   return v;
 }
 
-// Mirror of router-utils' CPE-token → versionStatus mapping so seeded assets
-// carry the same semantics as ones resolved from CPEs at runtime:
+// The versionStatus of a sample CPE's version token:
 // "-" => NOT_APPLICABLE, "*"/empty => UNKNOWN, any value => KNOWN.
 export function cpeVersionStatus(
   cpe: string,

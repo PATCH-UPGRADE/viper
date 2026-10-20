@@ -1,12 +1,6 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import prisma from "@/lib/db";
-import { UNKNOWN_CPE_NAME } from "@/lib/router-utils";
-
-// parseCpe gives every CPE with no product token the product name
-// UNKNOWN_CPE_NAME. That one Product row is shared by every manufacturer, so a
-// type on it types unrelated devices.
-const notSharedUnknownProduct = { canonicalName: { not: UNKNOWN_CPE_NAME } };
 
 /**
  * Map the deviceType slugs of an API request to DeviceType ids. Throws
@@ -66,7 +60,7 @@ export async function fillProductDeviceType(
   deviceTypeId: string,
 ): Promise<void> {
   await prisma.product.updateMany({
-    where: { id: productId, deviceTypeId: null, ...notSharedUnknownProduct },
+    where: { id: productId, deviceTypeId: null },
     data: { deviceTypeId },
   });
 }

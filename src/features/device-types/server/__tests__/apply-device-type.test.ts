@@ -62,7 +62,7 @@ describe("prepareDeviceTypeSlugs", () => {
     await apply("p-1", "infusion-pump");
 
     expect(db.product.updateMany).toHaveBeenCalledWith({
-      where: { id: "p-1", deviceTypeId: null, canonicalName: { not: "-" } },
+      where: { id: "p-1", deviceTypeId: null },
       data: { deviceTypeId: "dt-pump" },
     });
   });
@@ -94,11 +94,11 @@ describe("prepareDeviceTypeSlugs", () => {
 });
 
 describe("fillProductDeviceType", () => {
-  it("sets only an empty type, and never on the shared unknown product", async () => {
+  it("sets only an empty type", async () => {
     await fillProductDeviceType("p-1", "dt-pump");
 
     expect(db.product.updateMany).toHaveBeenCalledWith({
-      where: { id: "p-1", deviceTypeId: null, canonicalName: { not: "-" } },
+      where: { id: "p-1", deviceTypeId: null },
       data: { deviceTypeId: "dt-pump" },
     });
   });

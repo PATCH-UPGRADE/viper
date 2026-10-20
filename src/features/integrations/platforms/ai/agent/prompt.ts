@@ -8,7 +8,6 @@ const SHARED_FIELD_GUIDANCE = `- externalId: the id that the source API gives th
 - upstreamApi: the API URL for this one item, if the source has one.
 - webUrl: the URL where a person can view this item, if the source has one.
 - Device fields: an object such as { "manufacturer": { "name": "Philips" }, "product": { "name": "IntelliVue MX800" }, "version": { "name": "B.02" } }, built from the vendor, product, and version in the source. Leave out a product or a version that you do not know. A version needs a product.
-- CPE fields: CPE 2.3 strings, for example "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*". Build them from the vendor, product, and version in the source. Use "*" for a part that you do not know.
 - Leave out an optional field that the source does not give. Do not guess values.`;
 
 const RESOURCE_GUIDANCE: Record<CrawlerResource, string> = {

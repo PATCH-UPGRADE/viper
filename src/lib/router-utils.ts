@@ -421,87 +421,6 @@ export async function fillVersionUdi(
   }
 }
 
-const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
-
-/** The manufacturer and product name that parseCpe gives an unknown token. */
-export const UNKNOWN_CPE_NAME = "-";
-
-/**
- * Map a CPE 2.3 version token to an asset `versionStatus`:
- * - "-"        => NOT_APPLICABLE (the CPE's NA marker)
- * - "*"/empty  => UNKNOWN        (the CPE's ANY marker / unspecified)
- * - any value  => KNOWN
- */
-function cpeVersionStatus(versionRaw: string): VersionStatus {
-  if (versionRaw === "-") return VersionStatus.NOT_APPLICABLE;
-  if (versionRaw === "" || versionRaw === "*") return VersionStatus.UNKNOWN;
-  return VersionStatus.KNOWN;
-}
-
-/**
- * Parse a CPE 2.3 string into a manufacturer/product/version identity.
- * Format: cpe:2.3:<part>:<vendor>:<product>:<version>:...
- * Unknown tokens ("-", "*", empty) map to "-" for manufacturer/product and null for
- * version; `versionStatus` preserves the NA-vs-ANY distinction for the version.
- */
-export function parseCpe(cpe: string): {
-  manufacturer: string;
-  product: string;
-  version: string | null;
-  versionStatus: VersionStatus;
-} {
-  const parts = cpe.split(":");
-  const manufacturerRaw = parts[3] ?? UNKNOWN_CPE_NAME;
-  const productRaw = parts[4] ?? UNKNOWN_CPE_NAME;
-  const versionRaw = parts[5] ?? "";
-  const norm = (value: string, fallback: string) =>
-    CPE_UNKNOWN_TOKENS.has(value) ? fallback : value;
-  return {
-    manufacturer: norm(manufacturerRaw, UNKNOWN_CPE_NAME),
-    product: norm(productRaw, UNKNOWN_CPE_NAME),
-    version: CPE_UNKNOWN_TOKENS.has(versionRaw) ? null : versionRaw,
-    versionStatus: cpeVersionStatus(versionRaw),
-  };
-}
-
-/**
- * A `versionStatus` says why an asset has no version, so a request that gives
- * both a version and a status is a 400.
- */
-export function assertVersionStatusAllowed(
-  version: string | null | undefined,
-  versionStatus: VersionStatus | undefined,
-): void {
-  if (version && versionStatus) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "versionStatus applies only to an asset with no version. Omit it when you give a version.",
-    });
-  }
-}
-
-/**
- * Resolve the device ids for a CPE string. A `version` replaces the CPE's
- * version and makes the status KNOWN. A `versionStatus` replaces the status
- * that the CPE implies.
- */
-export async function cpeToDevice(
-  cpe: string,
-  overrides: { version?: string; versionStatus?: VersionStatus } = {},
-) {
-  const parsed = parseCpe(cpe);
-  const version = overrides.version ?? parsed.version;
-  assertVersionStatusAllowed(version, overrides.versionStatus);
-  return resolveDevice({
-    ...parsed,
-    version,
-    versionStatus: overrides.version
-      ? VersionStatus.KNOWN
-      : (overrides.versionStatus ?? parsed.versionStatus),
-  });
-}
-
 // ============================================================================
 // DeviceGroupMatching resolution + matching queries
 // ============================================================================
@@ -561,28 +480,6 @@ async function findOrCreateMatching(where: MatchingLike): Promise<string> {
     }
     throw error;
   }
-}
-
-/**
- * Resolve a CPE string to a single shared DeviceGroupMatching id (the "identity"
- * of a device artifact — the device it emulates/describes).
- */
-export async function resolveMatchingIdFromCpe(cpe: string): Promise<string> {
-  const { manufacturer, product, version } = parseCpe(cpe);
-  return resolveMatchingId({ manufacturer, product, version });
-}
-
-/**
- * Resolve a list of CPE strings to shared DeviceGroupMatching rows and return a
- * Prisma `connect` array. This is how the CPE-based upload endpoints
- * connect vulnerabilities/remediations to devices without exposing the
- * match-object input shape.
- */
-export async function cpesToMatchingConnect(cpes: string[]) {
-  const ids = await Promise.all(
-    [...new Set(cpes)].map(resolveMatchingIdFromCpe),
-  );
-  return [...new Set(ids)].map((id) => ({ id }));
 }
 
 /**

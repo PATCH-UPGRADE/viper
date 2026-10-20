@@ -197,7 +197,19 @@ export function MatchingAssetTable({
           versionStatus={asset.versionStatus}
           options={options}
           onAnswer={(answer) =>
-            answerVersion.mutateAsync({ id: asset.id, ...answer })
+            answerVersion.mutateAsync({
+              id: asset.id,
+              device: {
+                manufacturer: { id: asset.manufacturerId ?? "" },
+                ...(asset.productId
+                  ? { product: { id: asset.productId } }
+                  : {}),
+                version:
+                  "version" in answer
+                    ? { name: answer.version }
+                    : { status: answer.versionStatus },
+              },
+            })
           }
           isPending={answerVersion.isPending}
         />

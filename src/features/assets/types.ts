@@ -12,8 +12,8 @@ import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
+  assetDeviceInputSchema,
   createIntegrationInputSchema,
-  deviceInputSchema,
   userIncludeSelect,
   userSchema,
   versionStatusSchema,
@@ -38,14 +38,22 @@ export const assetUtilizationSchema = z.array(
   z.record(utilizationHourKeySchema, z.number().int()),
 );
 
+// Zod drops unknown keys, so without this a client that still sends the old
+// field gets a 200 and an asset whose status is silently UNKNOWN.
+const removedVersionStatusSchema = z
+  .never({ error: "versionStatus moved to device.version.status." })
+  .optional()
+  .describe("Removed. Use device.version.status.");
+
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
-  device: deviceInputSchema
+  device: assetDeviceInputSchema
     .nullish()
     .describe(
       "The asset's manufacturer, product, and version. Without it, the asset has no device.",
     ),
+  versionStatus: removedVersionStatusSchema,
   role: z
     .string()
     .min(1)
@@ -67,12 +75,6 @@ export const assetInputSchema = z.object({
   location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
   utilization: assetUtilizationSchema.nullish(),
-  versionStatus: z
-    .enum(["UNKNOWN", "UNSURE"])
-    .optional()
-    .describe(
-      "Why the asset has no version. Only for a device with no version: next to device.version it is a 400.",
-    ),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({

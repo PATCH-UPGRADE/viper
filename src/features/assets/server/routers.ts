@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   assetNameSearchTerms,
@@ -16,7 +15,6 @@ import {
   type Prisma,
   ResourceType,
   Severity,
-  type VersionStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceIdentitySelect } from "@/lib/device-matching";
@@ -485,13 +483,12 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const {
         device: deviceInput,
-        versionStatus,
         utilization,
         deviceType,
         ...dataInput
       } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
-      const device = await deviceInputToAsset(deviceInput, versionStatus);
+      const device = await deviceInputToAsset(deviceInput);
       await applyDeviceType(device.productId, deviceType);
       return prisma.asset.create({
         data: {
@@ -524,9 +521,7 @@ export const assetsRouter = createTRPCRouter({
       );
       // resolve all devices in parallel
       const devices = await Promise.all(
-        input.assets.map(({ device, versionStatus }) =>
-          deviceInputToAsset(device, versionStatus),
-        ),
+        input.assets.map(({ device }) => deviceInputToAsset(device)),
       );
       for (const [index, { deviceType }] of input.assets.entries()) {
         await applyDeviceType(devices[index].productId, deviceType);
@@ -537,7 +532,6 @@ export const assetsRouter = createTRPCRouter({
         input.assets.map((asset, index) => {
           const {
             device: _device,
-            versionStatus: _versionStatus,
             utilization,
             deviceType: _deviceType,
             ...dataInput
@@ -670,36 +664,20 @@ export const assetsRouter = createTRPCRouter({
         id,
         device: deviceInput,
         utilization,
-        versionStatus,
         deviceType,
         ...updateData
       } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
       const current = await prisma.asset.findUniqueOrThrow({
         where: { id },
-        select: { productId: true, versionId: true },
+        select: { productId: true },
       });
 
-      let device:
-        | Awaited<ReturnType<typeof deviceInputToAsset>>
-        | { versionStatus: VersionStatus }
-        | undefined;
-      if (deviceInput !== undefined) {
-        device = await deviceInputToAsset(deviceInput, versionStatus);
-      } else if (versionStatus) {
-        // The stored version stays, so a status next to it is the same 400.
-        if (current.versionId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "versionStatus applies only to an asset with no version. Send a device with no version to clear it.",
-          });
-        }
-        device = { versionStatus };
-      }
-      const productId =
-        device && "productId" in device ? device.productId : current.productId;
-      await applyDeviceType(productId, deviceType);
+      const device =
+        deviceInput === undefined
+          ? undefined
+          : await deviceInputToAsset(deviceInput);
+      await applyDeviceType(device?.productId ?? current.productId, deviceType);
       return prisma.asset.update({
         where: { id },
         data: {

@@ -17,7 +17,9 @@ vi.mock("../tokens", () => ({ consumeUserToken: vi.fn() }));
 
 const { deviceInputToAsset, devicesToMatchingConnect, resolveDeviceInput } =
   await import("../router-utils");
-const { deviceInputSchema } = await import("../schemas");
+const { assetDeviceInputSchema, deviceInputSchema } = await import(
+  "../schemas"
+);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,6 +58,36 @@ describe("deviceInputSchema", () => {
   it("requires the manufacturer", () => {
     expect(
       deviceInputSchema.safeParse({ product: { name: "Sigma" } }).success,
+    ).toBe(false);
+  });
+});
+
+describe("assetDeviceInputSchema", () => {
+  it("takes a version status in place of a version", () => {
+    expect(
+      assetDeviceInputSchema.safeParse({
+        manufacturer: { name: "Baxter" },
+        version: { status: "UNSURE" },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a version together with a status", () => {
+    expect(
+      assetDeviceInputSchema.safeParse({
+        manufacturer: { name: "Baxter" },
+        product: { name: "Sigma" },
+        version: { name: "8.0", status: "UNKNOWN" },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a status that only matchings can have", () => {
+    expect(
+      assetDeviceInputSchema.safeParse({
+        manufacturer: { name: "Baxter" },
+        version: { status: "KNOWN" },
+      }).success,
     ).toBe(false);
   });
 });
@@ -163,26 +195,27 @@ describe("deviceInputToAsset", () => {
     ).resolves.toMatchObject({ versionId: "v-1", versionStatus: "KNOWN" });
   });
 
-  it("takes a versionStatus for a device with no version", async () => {
+  it("takes a version status in place of a version", async () => {
     await expect(
-      deviceInputToAsset(
-        { manufacturer: { id: "m-1" }, product: { id: "p-1" } },
-        "UNSURE",
-      ),
+      deviceInputToAsset({
+        manufacturer: { id: "m-1" },
+        product: { id: "p-1" },
+        version: { status: "UNSURE" },
+      }),
     ).resolves.toMatchObject({ versionId: null, versionStatus: "UNSURE" });
   });
 
-  it("is a 400 for a version together with a versionStatus", async () => {
+  it("takes a version status without a product", async () => {
     await expect(
-      deviceInputToAsset(
-        {
-          manufacturer: { id: "m-1" },
-          product: { id: "p-1" },
-          version: { id: "v-1" },
-        },
-        "UNKNOWN",
-      ),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      deviceInputToAsset({
+        manufacturer: { id: "m-1" },
+        version: { status: "UNKNOWN" },
+      }),
+    ).resolves.toMatchObject({
+      productId: null,
+      versionId: null,
+      versionStatus: "UNKNOWN",
+    });
   });
 
   it("leaves the device empty without a device input", async () => {

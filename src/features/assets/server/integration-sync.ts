@@ -30,7 +30,6 @@ export function processAssetIntegrationSync(
       transformInputItem: async (item, userId) => {
         const {
           device: deviceInput,
-          versionStatus,
           externalId: _externalId,
           utilization,
           upstreamApi: _upstreamApi,
@@ -38,7 +37,7 @@ export function processAssetIntegrationSync(
           deviceType,
           ...itemData
         } = item;
-        const device = await deviceInputToAsset(deviceInput, versionStatus);
+        const device = await deviceInputToAsset(deviceInput);
         await applyDeviceType(device.productId, deviceType);
 
         const uniqueFields = [

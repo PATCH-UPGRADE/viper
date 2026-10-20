@@ -61,6 +61,23 @@ export const deviceInputSchema = z.object({
 });
 export type DeviceInput = z.infer<typeof deviceInputSchema>;
 
+/**
+ * An asset's device. Its version can be a status instead, which says why the
+ * asset has no version, so a version and a status cannot both be sent.
+ */
+export const assetDeviceInputSchema = deviceInputSchema.extend({
+  version: z
+    .union([
+      catalogRefSchema,
+      z.strictObject({ status: z.enum(["UNKNOWN", "UNSURE"]) }),
+    ])
+    .optional()
+    .describe(
+      "The asset's version, or { status } when the version is not known. Omit for UNKNOWN. A version needs a product.",
+    ),
+});
+export type AssetDeviceInput = z.infer<typeof assetDeviceInputSchema>;
+
 export const versionStatusSchema = z.enum(Object.values(VersionStatus));
 export const versSchemeSchema = z.enum(Object.values(VersScheme));
 

@@ -25,7 +25,7 @@ import {
   createPaginatedResponse,
   type PaginationInput,
 } from "./pagination";
-import type { DeviceInput } from "./schemas";
+import type { AssetDeviceInput, DeviceInput } from "./schemas";
 import { consumeUserToken } from "./tokens";
 
 // ============================================================================
@@ -312,9 +312,11 @@ export type ResolvedDeviceIds = {
  * parent.
  */
 export async function resolveDeviceInput(
-  device: DeviceInput,
+  device: DeviceInput | AssetDeviceInput,
 ): Promise<ResolvedDeviceIds> {
-  if (device.version && !device.product) {
+  const version =
+    device.version && !("status" in device.version) ? device.version : null;
+  if (version && !device.product) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "device.version needs device.product.",
@@ -357,19 +359,19 @@ export async function resolveDeviceInput(
   }
 
   let versionId: string | null = null;
-  if (device.version && productId) {
-    if ("id" in device.version) {
-      const version = requireExistence(
+  if (version && productId) {
+    if ("id" in version) {
+      const row = requireExistence(
         await prisma.version.findUnique({
-          where: { id: device.version.id },
+          where: { id: version.id },
           select: { id: true, productId: true },
         }),
         "Version",
       );
-      if (version.productId !== productId) throw notUnder("version", "product");
-      versionId = version.id;
+      if (row.productId !== productId) throw notUnder("version", "product");
+      versionId = row.id;
     } else {
-      versionId = (await resolveVersion(device.version.name, productId)).id;
+      versionId = (await resolveVersion(version.name, productId)).id;
     }
   }
 
@@ -377,29 +379,23 @@ export async function resolveDeviceInput(
 }
 
 /**
- * The device fields to write on an asset. `versionStatus` says why an asset has
- * no version, so it is a 400 next to a version. Without a device, the asset has
- * no manufacturer, product, or version.
+ * The device fields to write on an asset. Without a device, the asset has no
+ * manufacturer, product, or version.
  */
 export async function deviceInputToAsset(
-  device: DeviceInput | null | undefined,
-  versionStatus?: VersionStatus,
+  device: AssetDeviceInput | null | undefined,
 ) {
-  if (device?.version && versionStatus) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "versionStatus applies only to an asset with no version. Omit it when you give device.version.",
-    });
-  }
   const ids = device
     ? await resolveDeviceInput(device)
     : { manufacturerId: null, productId: null, versionId: null };
+  const status =
+    device?.version && "status" in device.version
+      ? device.version.status
+      : undefined;
   return {
     ...ids,
     versionStatus:
-      versionStatus ??
-      (ids.versionId ? VersionStatus.KNOWN : VersionStatus.UNKNOWN),
+      status ?? (ids.versionId ? VersionStatus.KNOWN : VersionStatus.UNKNOWN),
   };
 }
 

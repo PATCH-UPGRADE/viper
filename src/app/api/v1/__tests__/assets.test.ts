@@ -986,28 +986,40 @@ describe("Assets Endpoint (/assets)", () => {
   });
 });
 
-describe("Assets Endpoint versionStatus input", () => {
+describe("Assets Endpoint version status input", () => {
   const stamp = Date.now();
   const product = `status_${stamp}`;
   const createAsset = (body: Record<string, unknown>) =>
     request(BASE_URL).post("/assets").set(authHeader).send(body);
 
-  it("POST /assets - a device version with a versionStatus is a 400", async () => {
+  it("POST /assets - a version with a status is a 400", async () => {
     const res = await createAsset({
       ip: "10.0.7.1",
-      device: namedDevice("vitest", product, "2.0"),
-      versionStatus: "UNKNOWN",
+      device: {
+        ...namedDevice("vitest", product),
+        version: { name: "2.0", status: "UNKNOWN" },
+      },
     });
 
     expect(res.status).toBe(400);
   });
 
-  it("POST /assets - takes a versionStatus when there is no version", async () => {
+  it("POST /assets - the old top-level versionStatus is a 400", async () => {
     const res = await createAsset({
-      ip: "10.0.7.3",
+      ip: "10.0.7.2",
       device: namedDevice("vitest", product),
       versionStatus: "UNSURE",
     });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /assets - takes a version status in place of a version", async () => {
+    const unsure = {
+      ...namedDevice("vitest", product),
+      version: { status: "UNSURE" },
+    };
+    const res = await createAsset({ ip: "10.0.7.3", device: unsure });
     onTestFinished(async () => {
       await request(BASE_URL).delete(`/assets/${res.body.id}`).set(authHeader);
     });
@@ -1016,15 +1028,6 @@ describe("Assets Endpoint versionStatus input", () => {
     expect(res.body.version).toBeNull();
     expect(res.body.versionStatus).toBe("UNSURE");
 
-    const withVersion = await request(BASE_URL)
-      .patch(`/assets/${res.body.id}`)
-      .set(authHeader)
-      .send({
-        device: namedDevice("vitest", product, "2.0"),
-        versionStatus: "UNKNOWN",
-      });
-    expect(withVersion.status).toBe(400);
-
     const versioned = await request(BASE_URL)
       .patch(`/assets/${res.body.id}`)
       .set(authHeader)
@@ -1032,11 +1035,18 @@ describe("Assets Endpoint versionStatus input", () => {
     expect(versioned.status).toBe(200);
     expect(versioned.body.versionStatus).toBe("KNOWN");
 
-    const statusOnly = await request(BASE_URL)
+    const cleared = await request(BASE_URL)
       .patch(`/assets/${res.body.id}`)
       .set(authHeader)
-      .send({ versionStatus: "UNKNOWN" });
-    expect(statusOnly.status).toBe(400);
+      .send({
+        device: {
+          ...namedDevice("vitest", product),
+          version: { status: "UNKNOWN" },
+        },
+      });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.version).toBeNull();
+    expect(cleared.body.versionStatus).toBe("UNKNOWN");
   });
 
   it("POST /assets - without a device, the asset has no device", async () => {

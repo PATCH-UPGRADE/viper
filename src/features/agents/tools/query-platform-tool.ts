@@ -70,6 +70,8 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - manufacturers.getMany — list/search device manufacturers. input: { search?, page?, pageSize? } — search matches a name or an alias.
 - manufacturers.getOne — one manufacturer by id. input: { id }
 - products.getManyByManufacturer — list/search one manufacturer's products, each with its device type. input: { id, search?, page?, pageSize? } (manufacturer id)
+  id is required: no call searches products across manufacturers. To find a product
+  by name, search assets.getMany, or find its manufacturer with manufacturers.getMany first.
 - products.getOne — one product by id, with its device type and manufacturer. input: { id }
 - versions.getManyByProduct — list/search one product's versions. input: { id, search?, page?, pageSize? } (product id)
 - versions.getOne — one version by id, with its UDI-DI and product. input: { id }

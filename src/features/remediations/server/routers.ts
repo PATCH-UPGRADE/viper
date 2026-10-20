@@ -567,6 +567,7 @@ export const remediationsRouter = createTRPCRouter({
           ...(updateData.description !== undefined && {
             description: updateData.description,
           }),
+          ...releaseScalarData(updateData, "replace"),
           ...impactScalarData(updateData, "replace"),
           ...(vulnerabilities && {
             vulnerabilities: { set: vulnerabilities },

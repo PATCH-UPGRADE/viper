@@ -64,6 +64,8 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
 - vulnerabilities.getManyByAsset — vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version. input: { id, search?, page?, pageSize? } (asset id)
 - vulnerabilities.getManyByVersion — vulnerabilities whose matching rules apply to one product version. input: { id, search?, page?, pageSize? } (version id)
+  For the vulnerabilities of several assets on the same version, call this once with
+  their version.id, not vulnerabilities.getManyByAsset for each asset.
 - remediations.getMany — list/search remediations. input: { search?, page?, pageSize? }
 - remediations.getOne — one remediation by id. input: { id }
 - deviceTypes.getMany — every device type with its assetCount, the hospital's number of assets of that type (decommissioned ones are not counted). untypedAssetCount is the assets with no device type; while it is above 0, a count is only a minimum. input: {}

@@ -20,6 +20,7 @@ import {
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
+import { isSecurityRelated } from "@/features/remediations/release";
 
 describe("Remediations Endpoint (/remediations)", () => {
   const payload = {
@@ -933,5 +934,90 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(found.reversible).toBe(true);
     expect(found.impacts).toHaveLength(1);
     expect(found.impacts[0].feature).toBe("nurse call button");
+  });
+
+  const releaseFields = {
+    category: "SOFTWARE_UPDATE",
+    publishedAt: "2026-10-19T14:30:00.000Z",
+    isSecurityUpdate: true,
+  };
+
+  const createWithRelease = async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, ...releaseFields });
+    expect(res.status).toBe(200);
+    const id: string = res.body.remediation.id;
+    onTestFinished(async () => {
+      await prisma.remediation.delete({ where: { id } }).catch(() => {});
+    });
+    return res.body.remediation;
+  };
+
+  it("POST /remediations - Stores the release fields", async () => {
+    const created = await createWithRelease();
+    expect(created).toMatchObject({
+      category: "SOFTWARE_UPDATE",
+      publishedAt: "2026-10-19T14:30:00.000Z",
+      isSecurityUpdate: true,
+    });
+  });
+  it("POST /remediations - A remediation with no release fields reports them as not stated", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send(payload);
+    expect(res.status).toBe(200);
+    const created = res.body.remediation;
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: created.id } })
+        .catch(() => {});
+    });
+    expect(created.category).toBeNull();
+    expect(created.publishedAt).toBeNull();
+    expect(created.isSecurityUpdate).toBeNull();
+  });
+  it("PUT /remediations/{id} - An omitted release field is left alone, null clears", async () => {
+    const created = await createWithRelease();
+    const res = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, publishedAt: null });
+    expect(res.status).toBe(200);
+    expect(res.body.remediation.publishedAt).toBeNull();
+    expect(res.body.remediation.category).toBe("SOFTWARE_UPDATE");
+    expect(res.body.remediation.isSecurityUpdate).toBe(true);
+  });
+
+  it("POST /remediations - Rejects an unknown category", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, category: "NOT_A_CATEGORY" });
+    expect(res.status).toBe(200);
+    expect(res.body.issues).toContainEqual(
+      expect.objectContaining({ path: ["category"] }),
+    );
+  });
+
+  it("POST /remediations - A TA4 submission is not a manufacturer remediation", async () => {
+    const created = await createWithRelease();
+    expect(created.isManufacturerRemediation).toBe(false);
+  });
+
+  it("POST /remediations - Ignores isManufacturerRemediation in the body", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, isManufacturerRemediation: true });
+    expect(res.status).toBe(200);
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: res.body.remediation.id } })
+        .catch(() => {});
+    });
+    expect(res.body.remediation.isManufacturerRemediation).toBe(false);
   });
 });

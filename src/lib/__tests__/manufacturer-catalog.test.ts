@@ -20,7 +20,7 @@ describe("CURATED_MANUFACTURERS", () => {
     expect(new Set(everyClaimedName).size).toBe(everyClaimedName.length);
   });
 
-  it("maps the CPE vendor token 'siemens' to Siemens Healthineers", () => {
+  it("maps the name 'siemens' to Siemens Healthineers", () => {
     expect(SIEMENS_HEALTHINEERS.nameMappings).toContain("siemens");
   });
 });

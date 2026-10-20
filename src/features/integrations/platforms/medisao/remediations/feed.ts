@@ -109,7 +109,7 @@ export const toCanonical = (
   impact: toRemediationImpact(raw),
   release: {
     category: toRemediationCategory(raw),
-    publishedAt: asDate(raw.published_at),
+    publishedAt: asDate(raw.published_at)?.toISOString() ?? null,
   },
   updatedAt: raw.updated_at,
   raw,

@@ -6,8 +6,9 @@ export const remediationReleaseFieldsSchema = z.object({
     .enum(RemediationCategory)
     .nullish()
     .describe("What kind of fix it is"),
-  publishedAt: z.coerce
-    .date()
+  publishedAt: z.iso
+    .datetime({ offset: true })
+    .pipe(z.coerce.date())
     .nullish()
     .describe("When the manufacturer released it"),
   isSecurityUpdate: z

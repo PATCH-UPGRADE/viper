@@ -1147,7 +1147,7 @@ model Remediation {
 
   createdAt   DateTime  @default(now()) // when our system first saw it
   updatedAt   DateTime  @updatedAt
-  publishedAt DateTime? // when manufacturer releated it
+  publishedAt DateTime? // when manufacturer released it
 
   externalMappings         ExternalRemediationMapping[]
   // raw TA4 submissions that produced this remediation

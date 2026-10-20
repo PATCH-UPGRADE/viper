@@ -131,7 +131,7 @@ describe("toCanonical", () => {
   });
 
   it("reads when the manufacturer published it", () => {
-    expect(item.release.publishedAt).toEqual("2026-08-27T17:21:33.274367Z");
+    expect(item.release.publishedAt).toEqual(new Date("2026-08-27T17:21:33.274Z"));
   });
 
   it("reads a firmware_patch as a hardware patch", () => {

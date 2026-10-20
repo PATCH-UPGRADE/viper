@@ -1,10 +1,19 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL, deleteAssetsForCpes } from "./test-config";
+import {
+  authHeader,
+  BASE_URL,
+  deleteAssetsForDevices,
+  namedDevice,
+} from "./test-config";
 
 const stamp = Date.now();
-const cpe = `cpe:2.3:h:vitest_catalog_${stamp}:infuser_${stamp}:2.1`;
+const device = namedDevice(
+  `vitest_catalog_${stamp}`,
+  `infuser_${stamp}`,
+  "2.1",
+);
 const missingId = "missing-catalog-id";
 
 type Ref = { id: string; url: string };
@@ -22,13 +31,13 @@ beforeAll(async () => {
   const res = await request(BASE_URL)
     .post("/assets")
     .set(authHeader)
-    .send({ ip: "10.0.9.1", cpe });
+    .send({ ip: "10.0.9.1", device });
   expect(res.status).toBe(200);
   asset = res.body;
 });
 
 afterAll(async () => {
-  await deleteAssetsForCpes([cpe]);
+  await deleteAssetsForDevices([device]);
   if (!asset) return;
   await prisma.version.deleteMany({ where: { id: asset.version.id } });
   await prisma.product.deleteMany({ where: { id: asset.product.id } });

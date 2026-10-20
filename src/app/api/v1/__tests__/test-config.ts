@@ -45,6 +45,67 @@ export function expectDeviceFromCpe(
   expect(asset.version?.canonicalName ?? null).toBe(names.version);
 }
 
+/** A device input that names each part by its name. */
+export type TestDevice = {
+  manufacturer: { name: string };
+  product?: { name: string };
+  version?: { name: string };
+};
+
+export const namedDevice = (
+  manufacturer: string,
+  product?: string,
+  version?: string,
+): TestDevice => ({
+  manufacturer: { name: manufacturer },
+  ...(product ? { product: { name: product } } : {}),
+  ...(version ? { version: { name: version } } : {}),
+});
+
+export const generateDevice = (suffix: string) =>
+  namedDevice("vendor", "product", suffix);
+
+function namesFromDevice(device: TestDevice) {
+  return {
+    manufacturer: normalizeName(device.manufacturer.name),
+    product: device.product ? normalizeName(device.product.name) : null,
+    version: device.version ? normalizeName(device.version.name) : null,
+  };
+}
+
+/** Checks that an asset has the manufacturer, product, and version a device input names. */
+export function expectDevice(
+  asset: {
+    manufacturer?: CanonicalName;
+    product?: CanonicalName;
+    version?: CanonicalName;
+  },
+  device: TestDevice,
+) {
+  const names = namesFromDevice(device);
+  expect(asset.manufacturer?.canonicalName).toBe(names.manufacturer);
+  expect(asset.product?.canonicalName ?? null).toBe(names.product);
+  expect(asset.version?.canonicalName ?? null).toBe(names.version);
+}
+
+/** Deletes the assets that have the manufacturer, product, and version a device input names. */
+export async function deleteAssetsForDevices(devices: TestDevice[]) {
+  for (const device of devices) {
+    const names = namesFromDevice(device);
+    await prisma.asset.deleteMany({
+      where: {
+        manufacturer: { canonicalName: names.manufacturer },
+        product: names.product
+          ? { canonicalName: names.product }
+          : { is: null },
+        version: names.version
+          ? { canonicalName: names.version }
+          : { is: null },
+      },
+    });
+  }
+}
+
 /** Deletes the assets that have the manufacturer, product, and version a CPE names. */
 export async function deleteAssetsForCpes(cpes: string[]) {
   for (const cpe of cpes) {

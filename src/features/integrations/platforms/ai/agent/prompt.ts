@@ -7,13 +7,14 @@ const SHARED_FIELD_GUIDANCE = `- externalId: the id that the source API gives th
 - If the items have no id of their own in the source, do not record any items. Call ${REPORT_NO_STABLE_ID_TOOL} with the reason, then stop.
 - upstreamApi: the API URL for this one item, if the source has one.
 - webUrl: the URL where a person can view this item, if the source has one.
+- Device fields: an object such as { "manufacturer": { "name": "Philips" }, "product": { "name": "IntelliVue MX800" }, "version": { "name": "B.02" } }, built from the vendor, product, and version in the source. Leave out a product or a version that you do not know. A version needs a product.
 - CPE fields: CPE 2.3 strings, for example "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*". Build them from the vendor, product, and version in the source. Use "*" for a part that you do not know.
 - Leave out an optional field that the source does not give. Do not guess values.`;
 
 const RESOURCE_GUIDANCE: Record<CrawlerResource, string> = {
   [ResourceType.Asset]: `You collect assets: networked devices on the hospital network.
 - ip is required. Skip a device that has no IP address.
-- Put the vendor, product, and version of the device in cpe.
+- Put the vendor, product, and version of the device in device.
 - hostname, macAddress, and serialNumber identify the device. Give each one that the source has.`,
   [ResourceType.Vulnerability]: `You collect vulnerabilities.
 - cpes is required: one CPE for each affected product. Skip a vulnerability that names no affected product.

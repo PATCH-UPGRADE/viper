@@ -1,7 +1,7 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL } from "./test-config";
+import { authHeader, BASE_URL, namedDevice } from "./test-config";
 
 describe("Device Types Endpoint (/deviceTypes)", () => {
   it("GET /deviceTypes - Without auth, should be 401", async () => {
@@ -19,7 +19,7 @@ describe("Device Types Endpoint (/deviceTypes)", () => {
       await prisma.deviceType.delete({ where: { id: deviceType.id } });
     });
 
-    const cpe = `cpe:2.3:h:vitest:device_type_count_${stamp}:1.0`;
+    const device = namedDevice("vitest", `device_type_count_${stamp}`, "1.0");
     for (const [index, status] of [
       "Active",
       "Maintenance",
@@ -31,7 +31,7 @@ describe("Device Types Endpoint (/deviceTypes)", () => {
         .set(authHeader)
         .send({
           ip: `10.0.1.${10 + index}`,
-          cpe,
+          device,
           deviceType: deviceType.slug,
           status,
         });

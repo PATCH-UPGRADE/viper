@@ -12,8 +12,8 @@ import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
-  cpeSchema,
   createIntegrationInputSchema,
+  deviceInputSchema,
   userIncludeSelect,
   userSchema,
   versionStatusSchema,
@@ -41,7 +41,11 @@ export const assetUtilizationSchema = z.array(
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
-  cpe: cpeSchema.nullish(),
+  device: deviceInputSchema
+    .nullish()
+    .describe(
+      "The asset's manufacturer, product, and version. Without it, the asset has no device.",
+    ),
   role: z
     .string()
     .min(1)
@@ -63,8 +67,12 @@ export const assetInputSchema = z.object({
   location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
   utilization: assetUtilizationSchema.nullish(),
-  version: z.string().trim().min(1).max(64).optional(),
-  versionStatus: z.enum(["UNKNOWN", "UNSURE"]).optional(),
+  versionStatus: z
+    .enum(["UNKNOWN", "UNSURE"])
+    .optional()
+    .describe(
+      "Why the asset has no version. Only for a device with no version: next to device.version it is a 400.",
+    ),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({

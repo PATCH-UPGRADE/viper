@@ -14,6 +14,7 @@ import {
   createIntegrationToken,
   deleteAssetsForCpes,
   generateCPE,
+  generateDevice,
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
@@ -31,7 +32,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
   const assetPayload = {
     ip: "192.168.1.100",
-    cpe: generateCPE("vuln_v1"),
+    device: generateDevice("vuln_v1"),
     role: "Primary Server",
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };

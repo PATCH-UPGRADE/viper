@@ -145,7 +145,6 @@ describe("toCanonical", () => {
       ...LIVE_REMEDIATION,
       mechanism: "something_new",
     });
-    console.log("parsed ", parsed);
     expect(
       toCanonical(parsed, "https://dev.example.test", "chan-1").release
         .category,

@@ -20,7 +20,6 @@ import {
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
-import { isSecurityRelated } from "@/features/remediations/release";
 
 describe("Remediations Endpoint (/remediations)", () => {
   const payload = {

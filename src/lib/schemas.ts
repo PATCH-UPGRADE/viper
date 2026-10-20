@@ -48,6 +48,27 @@ export const cpeSchema = z
   .string()
   .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
 
+/** A manufacturer, product, or version, named by its id or by its name. */
+const catalogRefSchema = z.union([
+  z.strictObject({ id: z.string().min(1) }),
+  z.strictObject({ name: z.string().trim().min(1) }),
+]);
+
+/**
+ * A device as its manufacturer, product, and version. An id must exist. A name
+ * that does not exist is created inside its parent.
+ */
+export const deviceInputSchema = z.object({
+  manufacturer: catalogRefSchema,
+  product: catalogRefSchema
+    .optional()
+    .describe("Omit for every product of the manufacturer."),
+  version: catalogRefSchema
+    .optional()
+    .describe("Omit for every version of the product. Needs a product."),
+});
+export type DeviceInput = z.infer<typeof deviceInputSchema>;
+
 export const versionStatusSchema = z.enum(Object.values(VersionStatus));
 export const versSchemeSchema = z.enum(Object.values(VersScheme));
 

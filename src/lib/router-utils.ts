@@ -25,6 +25,7 @@ import {
   createPaginatedResponse,
   type PaginationInput,
 } from "./pagination";
+import type { DeviceInput } from "./schemas";
 import { consumeUserToken } from "./tokens";
 
 // ============================================================================
@@ -298,6 +299,110 @@ export async function resolveDevice(
   };
 }
 
+/** The canonical ids that a device input names. */
+export type ResolvedDeviceIds = {
+  manufacturerId: string;
+  productId: string | null;
+  versionId: string | null;
+};
+
+/**
+ * Resolve a device input to its canonical ids. An unknown id is a 404, and an
+ * id under another parent is a 400. A name is found or created inside its
+ * parent.
+ */
+export async function resolveDeviceInput(
+  device: DeviceInput,
+): Promise<ResolvedDeviceIds> {
+  if (device.version && !device.product) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "device.version needs device.product.",
+    });
+  }
+  const notUnder = (child: string, parent: string) =>
+    new TRPCError({
+      code: "BAD_REQUEST",
+      message: `The ${child} does not belong to the ${parent}.`,
+    });
+
+  const manufacturer =
+    "id" in device.manufacturer
+      ? requireExistence(
+          await prisma.manufacturer.findUnique({
+            where: { id: device.manufacturer.id },
+            select: { id: true },
+          }),
+          "Manufacturer",
+        )
+      : await resolveManufacturer(device.manufacturer.name);
+
+  let productId: string | null = null;
+  if (device.product) {
+    if ("id" in device.product) {
+      const product = requireExistence(
+        await prisma.product.findUnique({
+          where: { id: device.product.id },
+          select: { id: true, manufacturerId: true },
+        }),
+        "Product",
+      );
+      if (product.manufacturerId !== manufacturer.id)
+        throw notUnder("product", "manufacturer");
+      productId = product.id;
+    } else {
+      productId = (await resolveProduct(device.product.name, manufacturer.id))
+        .id;
+    }
+  }
+
+  let versionId: string | null = null;
+  if (device.version && productId) {
+    if ("id" in device.version) {
+      const version = requireExistence(
+        await prisma.version.findUnique({
+          where: { id: device.version.id },
+          select: { id: true, productId: true },
+        }),
+        "Version",
+      );
+      if (version.productId !== productId) throw notUnder("version", "product");
+      versionId = version.id;
+    } else {
+      versionId = (await resolveVersion(device.version.name, productId)).id;
+    }
+  }
+
+  return { manufacturerId: manufacturer.id, productId, versionId };
+}
+
+/**
+ * The device fields to write on an asset. `versionStatus` says why an asset has
+ * no version, so it is a 400 next to a version. Without a device, the asset has
+ * no manufacturer, product, or version.
+ */
+export async function deviceInputToAsset(
+  device: DeviceInput | null | undefined,
+  versionStatus?: VersionStatus,
+) {
+  if (device?.version && versionStatus) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "versionStatus applies only to an asset with no version. Omit it when you give device.version.",
+    });
+  }
+  const ids = device
+    ? await resolveDeviceInput(device)
+    : { manufacturerId: null, productId: null, versionId: null };
+  return {
+    ...ids,
+    versionStatus:
+      versionStatus ??
+      (ids.versionId ? VersionStatus.KNOWN : VersionStatus.UNKNOWN),
+  };
+}
+
 /**
  * Sets the UDI-DI of the version that `where` selects, if it has none. udiDi is
  * unique: when another version already holds this UDI, that version keeps it.
@@ -411,10 +516,6 @@ type MatchingResolveInput = {
 /**
  * Find-or-create a shared DeviceGroupMatching for a manufacturer/product/version
  * identity (resolved to canonical rows).
- *
- * The identity is unique (device_group_matching_identity_key), so a concurrent
- * create that loses the race throws P2002; we re-read the winner's row. Runs on
- * the autocommit client for the same reason as resolveManufacturer.
  */
 export async function resolveMatchingId(
   input: MatchingResolveInput,
@@ -430,13 +531,22 @@ export async function resolveMatchingId(
       ? await resolveVersion(input.version, productRow.id)
       : null;
 
-  const where = {
+  return findOrCreateMatching({
     manufacturerId: manufacturerRow.id,
     productId: productRow?.id ?? null,
     versionId: versionRow?.id ?? null,
     versionRange: input.versionRange ?? null,
-  };
+  });
+}
 
+/**
+ * Find-or-create the shared matching for these canonical ids.
+ *
+ * The identity is unique (device_group_matching_identity_key), so a concurrent
+ * create that loses the race throws P2002; we re-read the winner's row. Runs on
+ * the autocommit client for the same reason as resolveManufacturer.
+ */
+async function findOrCreateMatching(where: MatchingLike): Promise<string> {
   const find = () => prisma.deviceGroupMatching.findFirst({ where });
   const existing = await find();
   if (existing) return existing.id;
@@ -471,6 +581,22 @@ export async function resolveMatchingIdFromCpe(cpe: string): Promise<string> {
 export async function cpesToMatchingConnect(cpes: string[]) {
   const ids = await Promise.all(
     [...new Set(cpes)].map(resolveMatchingIdFromCpe),
+  );
+  return [...new Set(ids)].map((id) => ({ id }));
+}
+
+/**
+ * Resolve device inputs to their shared matchings and return a Prisma `connect`
+ * array. A device with no version matches every version of its product.
+ */
+export async function devicesToMatchingConnect(devices: DeviceInput[]) {
+  const ids = await Promise.all(
+    devices.map(async (device) =>
+      findOrCreateMatching({
+        ...(await resolveDeviceInput(device)),
+        versionRange: null,
+      }),
+    ),
   );
   return [...new Set(ids)].map((id) => ({ id }));
 }

@@ -11,7 +11,7 @@ import {
 } from "@/lib/device-matching";
 import { type PaginationInput, paginationInputSchema } from "@/lib/pagination";
 import {
-  cpesToMatchingConnect,
+  devicesToMatchingConnect,
   fetchPaginated,
   findVersionIdentity,
   findVulnerabilitiesMatchingDevices,
@@ -223,8 +223,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { cpes, ...dataInput } = input;
-      const connect = await cpesToMatchingConnect(cpes);
+      const { devices, ...dataInput } = input;
+      const connect = await devicesToMatchingConnect(devices);
 
       return prisma.vulnerability.create({
         data: {
@@ -253,13 +253,15 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // resolve shared matchings up-front (each runs its own transaction)
       const connects = await Promise.all(
-        input.vulnerabilities.map((vuln) => cpesToMatchingConnect(vuln.cpes)),
+        input.vulnerabilities.map((vuln) =>
+          devicesToMatchingConnect(vuln.devices),
+        ),
       );
 
       // create all vulns in a transaction
       return prisma.$transaction(
         input.vulnerabilities.map((vuln, index) => {
-          const { cpes: _cpes, ...dataInput } = vuln;
+          const { devices: _devices, ...dataInput } = vuln;
           return prisma.vulnerability.create({
             data: {
               ...dataInput,
@@ -341,16 +343,16 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
-      const { cpes, ...dataInput } = input.data;
+      const { devices, ...dataInput } = input.data;
 
       return prisma.vulnerability.update({
         where: { id: input.id },
         data: {
           ...dataInput,
-          ...(cpes
+          ...(devices
             ? {
                 deviceGroupMatchings: {
-                  set: await cpesToMatchingConnect(cpes),
+                  set: await devicesToMatchingConnect(devices),
                 },
               }
             : {}),

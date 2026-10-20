@@ -16,15 +16,15 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
-  deleteAssetsForCpes,
-  generateCPE,
+  deleteAssetsForDevices,
+  generateDevice,
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
 
 describe("Remediations Endpoint (/remediations)", () => {
   const payload = {
-    cpes: [generateCPE("rem_v1")],
+    devices: [generateDevice("rem_v1")],
     description: "Mock -- Firmware update to fix vulnerability",
     narrative: "Apply the latest firmware patch to resolve the issue.",
     upstreamApi: "https://vendor.example.com/patches",
@@ -40,7 +40,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   const vulnerabilityPayload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("rem_vuln_v1")],
+    devices: [generateDevice("rem_vuln_v1")],
     exploitUri: "https://exploit-db.com/5678",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Critical vulnerability requiring remediation",
@@ -178,11 +178,11 @@ describe("Remediations Endpoint (/remediations)", () => {
     const remediationId = createRes.body.id;
 
     // The remediation carries its own device-group matchings (resolved from the
-    // uploaded CPEs).
+    // uploaded devices).
     expect(
       createRes.body.deviceGroupMatchings.some(
         (m: { version: { canonicalName: string } | null }) =>
-          m.version?.canonicalName === payload.cpes[0].split(":")[5],
+          m.version?.canonicalName === payload.devices[0].version?.name,
       ),
     ).toBe(true);
 
@@ -265,7 +265,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("POST /remediations - Create with vulnerability references", async () => {
     // First create two vulnerabilities
-    const newCpe = generateCPE("rem_with_vuln_ref_v1");
+    const newDevice = generateDevice("rem_with_vuln_ref_v1");
     const vulnerabilityIds: string[] = [];
     for (let i = 0; i < 2; i++) {
       const vulnRes = await request(BASE_URL)
@@ -273,7 +273,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         .set(authHeader)
         .send({
           ...vulnerabilityPayload,
-          cpes: [newCpe],
+          devices: [newDevice],
         });
       expect(vulnRes.status).toBe(200);
       vulnerabilityIds.push(vulnRes.body.id);
@@ -338,7 +338,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.vulnerability
         .deleteMany({ where: { id: { in: vulnerabilityIds } } })
         .catch(() => {});
-      await deleteAssetsForCpes([newCpe]).catch(() => {});
+      await deleteAssetsForDevices([newDevice]).catch(() => {});
     });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }
@@ -651,7 +651,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 
-  it("integration re-sync without cpes preserves existing deviceGroupMatchings", async () => {
+  it("integration re-sync without devices preserves existing deviceGroupMatchings", async () => {
     const { integration } = await setupMockIntegration(mockIntegrationPayload);
 
     const token = await createIntegrationToken(
@@ -660,7 +660,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     );
 
     const externalId = "mockRemediation-preserve-matchings";
-    const cpe = generateCPE("rem_preserve_matchings_v1");
+    const device = generateDevice("rem_preserve_matchings_v1");
 
     const basePayload = {
       vendor: "mockRemediationIntegrationVendor",
@@ -685,7 +685,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       ],
     };
 
-    // Sync 1: item carries a CPE -> remediation created with one matching.
+    // Sync 1: item carries a device -> remediation created with one matching.
     const firstSync = await request(BASE_URL)
       .post(`/remediations/integrationUpload/${token}`)
       .set(jsonHeader)
@@ -695,7 +695,7 @@ describe("Remediations Endpoint (/remediations)", () => {
           {
             ...itemBase,
             description: "Mock -- preserve matchings, initial",
-            cpes: [cpe],
+            devices: [device],
           },
         ],
       });
@@ -719,11 +719,11 @@ describe("Remediations Endpoint (/remediations)", () => {
     });
     expect(afterCreate.deviceGroupMatchings.length).toBe(1);
     expect(afterCreate.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      cpe.split(":")[5],
+      device.version?.name,
     );
 
-    // Sync 2: same externalId, NO cpes -> the existing matching must survive
-    // (omitting cpes must not clear it). Integration tokens are single-use, so
+    // Sync 2: same externalId, NO devices -> the existing matching must survive
+    // (omitting devices must not clear it). Integration tokens are single-use, so
     // mint a fresh one for the re-sync.
     const secondToken = await createIntegrationToken(
       integration.integrationUserId,

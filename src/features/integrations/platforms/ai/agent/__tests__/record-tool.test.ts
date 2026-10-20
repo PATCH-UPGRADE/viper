@@ -93,7 +93,10 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     hostname: "icu-mon-04",
     macAddress: "00:1B:44:11:3A:B7",
     serialNumber: "SN-44821",
-    cpe: "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*",
+    device: {
+      manufacturer: { name: "Philips" },
+      product: { name: "IntelliVue MX800" },
+    },
     role: "Patient monitor",
     location: { building: "Main", floor: "3", room: "ICU-4" },
     status: "Active",
@@ -102,7 +105,13 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
   [ResourceType.Vulnerability]: {
     externalId: "vuln-77",
     cveId: "CVE-2024-12345",
-    cpes: ["cpe:2.3:a:baxter:sigma_spectrum:8.00.01:*:*:*:*:*:*:*"],
+    devices: [
+      {
+        manufacturer: { name: "Baxter" },
+        product: { name: "Sigma Spectrum" },
+        version: { name: "8.00.01" },
+      },
+    ],
     description: "Hard-coded credentials in the pump web service.",
     severity: "High",
     cvssScore: 8.1,
@@ -112,7 +121,13 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     externalId: "rem-12",
     description: "Update pump firmware to 8.02.",
     narrative: "Apply the vendor patch during the maintenance window.",
-    cpes: ["cpe:2.3:a:baxter:sigma_spectrum:8.00.01:*:*:*:*:*:*:*"],
+    devices: [
+      {
+        manufacturer: { name: "Baxter" },
+        product: { name: "Sigma Spectrum" },
+        version: { name: "8.00.01" },
+      },
+    ],
     artifacts: [
       {
         name: "sigma-8.02.bin",

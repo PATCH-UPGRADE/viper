@@ -12,7 +12,7 @@ const URI = "https://nvgd.example.com/api/devices";
 
 describe.each([
   [ResourceType.Asset, "ip is required"],
-  [ResourceType.Vulnerability, "cpes is required"],
+  [ResourceType.Vulnerability, "devices is required"],
   [ResourceType.Remediation, "artifacts is required"],
   [ResourceType.DeviceArtifact, "cpe is required"],
 ] as const)("crawler prompt for %s", (resource, requiredField) => {

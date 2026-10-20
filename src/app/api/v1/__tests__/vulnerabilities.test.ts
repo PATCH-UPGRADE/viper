@@ -12,8 +12,7 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
-  deleteAssetsForCpes,
-  generateCPE,
+  deleteAssetsForDevices,
   generateDevice,
   jsonHeader,
   setupMockIntegration,
@@ -22,7 +21,7 @@ import {
 describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   const payload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("vuln_v1")],
+    devices: [generateDevice("vuln_v1")],
     exploitUri: "https://exploit-db.com/1234",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Buffer overflow in device X",
@@ -56,7 +55,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     items: [
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: [generateCPE("vuln_integration_v10")],
+        devices: [generateDevice("vuln_integration_v10")],
         exploitUri: "https://mock-exploit-db.com/vuln-001",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
@@ -66,7 +65,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       },
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: [generateCPE("vuln_integration_v11")],
+        devices: [generateDevice("vuln_integration_v11")],
         exploitUri: "https://mock-exploit-db.com/vuln-002",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
@@ -167,13 +166,12 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     );
 
     // Check that the single object in the array has the correct match values
-    // (resolved from the uploaded CPE: cpe:2.3:<part>:<vendor>:<product>:<version>)
-    const [, , , cpeManufacturer, cpeProduct, cpeVersion] =
-      payload.cpes[0].split(":");
+    // (resolved from the uploaded device input)
+    const [device] = payload.devices;
     const matching = detailRes.body.deviceGroupMatchings[0];
-    expect(matching.manufacturer.canonicalName).toBe(cpeManufacturer);
-    expect(matching.product?.canonicalName).toBe(cpeProduct);
-    expect(matching.version?.canonicalName).toBe(cpeVersion);
+    expect(matching.manufacturer.canonicalName).toBe(device.manufacturer.name);
+    expect(matching.product?.canonicalName).toBe(device.product?.name);
+    expect(matching.version?.canonicalName).toBe(device.version?.name);
 
     const deleteRes = await request(BASE_URL)
       .delete(`/vulnerabilities/${vulnerabilityId}`)
@@ -225,9 +223,9 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
           },
         },
       });
-      await deleteAssetsForCpes([
-        generateCPE("vuln_integration_v10"),
-        generateCPE("vuln_integration_v11"),
+      await deleteAssetsForDevices([
+        generateDevice("vuln_integration_v10"),
+        generateDevice("vuln_integration_v11"),
       ]);
     });
 
@@ -264,10 +262,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln1.exploitUri).toBe(vulnPayload1.exploitUri);
     expect(foundVuln1.sarif).toStrictEqual(vulnPayload1.sarif);
     expect(foundVuln1.deviceGroupMatchings.length).toBe(
-      vulnPayload1.cpes.length,
+      vulnPayload1.devices.length,
     );
     expect(foundVuln1.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      vulnPayload1.cpes[0].split(":")[5],
+      vulnPayload1.devices[0].version?.name,
     );
 
     const vulnPayload2 = vulnerabilityIntegrationPayload.items[1];
@@ -297,10 +295,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln2.exploitUri).toBe(vulnPayload2.exploitUri);
     expect(foundVuln2.sarif).toStrictEqual(vulnPayload2.sarif);
     expect(foundVuln2.deviceGroupMatchings.length).toBe(
-      vulnPayload2.cpes.length,
+      vulnPayload2.devices.length,
     );
     expect(foundVuln2.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      vulnPayload2.cpes[0].split(":")[5],
+      vulnPayload2.devices[0].version?.name,
     );
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {

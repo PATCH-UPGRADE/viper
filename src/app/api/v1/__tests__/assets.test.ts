@@ -985,6 +985,54 @@ describe("Assets Endpoint (/assets)", () => {
   });
 });
 
+describe("Assets Endpoint versionStatus input", () => {
+  const stamp = Date.now();
+  const createAsset = (body: Record<string, unknown>) =>
+    request(BASE_URL).post("/assets").set(authHeader).send(body);
+
+  it("POST /assets - a CPE version with a versionStatus is a 400", async () => {
+    const res = await createAsset({
+      ip: "10.0.7.1",
+      cpe: `cpe:2.3:h:vitest:status_${stamp}:2.0`,
+      versionStatus: "UNKNOWN",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /assets - a version with a versionStatus is a 400", async () => {
+    const res = await createAsset({
+      ip: "10.0.7.2",
+      cpe: `cpe:2.3:h:vitest:status_${stamp}:*`,
+      version: "2.0",
+      versionStatus: "UNSURE",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /assets - takes a versionStatus when there is no version", async () => {
+    const res = await createAsset({
+      ip: "10.0.7.3",
+      cpe: `cpe:2.3:h:vitest:status_${stamp}:*`,
+      versionStatus: "UNSURE",
+    });
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/assets/${res.body.id}`).set(authHeader);
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBeNull();
+    expect(res.body.versionStatus).toBe("UNSURE");
+
+    const update = await request(BASE_URL)
+      .patch(`/assets/${res.body.id}`)
+      .set(authHeader)
+      .send({ version: "2.0", versionStatus: "UNKNOWN" });
+    expect(update.status).toBe(400);
+  });
+});
+
 describe("Assets Endpoint deviceType input", () => {
   const createDeviceType = async () => {
     const deviceType = await prisma.deviceType.create({

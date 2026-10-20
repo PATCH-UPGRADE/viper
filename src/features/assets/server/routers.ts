@@ -26,6 +26,7 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
+  assertVersionStatusAllowed,
   cpeToDevice,
   fetchPaginated,
   findAssetIdsForMatchings,
@@ -662,6 +663,7 @@ export const assetsRouter = createTRPCRouter({
         },
       });
 
+      assertVersionStatusAllowed(version, versionStatus);
       let device: ResolvedDevice | undefined;
       if (cpe) {
         device = await cpeToDevice(cpe, { version, versionStatus });

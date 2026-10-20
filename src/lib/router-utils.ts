@@ -361,6 +361,23 @@ export function parseCpe(cpe: string): {
 }
 
 /**
+ * A `versionStatus` says why an asset has no version, so a request that gives
+ * both a version and a status is a 400.
+ */
+export function assertVersionStatusAllowed(
+  version: string | null | undefined,
+  versionStatus: VersionStatus | undefined,
+): void {
+  if (version && versionStatus) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "versionStatus applies only to an asset with no version. Omit it when you give a version.",
+    });
+  }
+}
+
+/**
  * Resolve the device ids for a CPE string. A `version` replaces the CPE's
  * version and makes the status KNOWN. A `versionStatus` replaces the status
  * that the CPE implies.
@@ -370,9 +387,11 @@ export async function cpeToDevice(
   overrides: { version?: string; versionStatus?: VersionStatus } = {},
 ) {
   const parsed = parseCpe(cpe);
+  const version = overrides.version ?? parsed.version;
+  assertVersionStatusAllowed(version, overrides.versionStatus);
   return resolveDevice({
     ...parsed,
-    version: overrides.version ?? parsed.version,
+    version,
     versionStatus: overrides.version
       ? VersionStatus.KNOWN
       : (overrides.versionStatus ?? parsed.versionStatus),

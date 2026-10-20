@@ -996,7 +996,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       .post("/remediations")
       .set(authHeader)
       .send({ ...payload, category: "NOT_A_CATEGORY" });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     expect(res.body.issues).toContainEqual(
       expect.objectContaining({ path: ["category"] }),
     );

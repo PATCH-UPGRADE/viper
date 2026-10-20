@@ -36,7 +36,7 @@ describe("dayGroupLabel", () => {
 describe("asDate", () => {
   it("reads a timestamp, with Z or with an offet", () => {
     expect(asDate("2026-10-10T14:30:00.000Z")).toBeInstanceOf(Date);
-    expect(asDate("2026-10-10T00:00:00,000+00:00")).toEqual(
+    expect(asDate("2026-10-10T00:00:00.000+00:00")).toEqual(
       new Date("2026-10-10T00:00:00.000Z"),
     );
   });

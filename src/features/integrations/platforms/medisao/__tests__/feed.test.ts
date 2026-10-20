@@ -143,8 +143,9 @@ describe("toCanonical", () => {
   it("leaves a mechanism it does not know unstated", () => {
     const parsed = rawRemediationSchema.parse({
       ...LIVE_REMEDIATION,
-      mechansim: "something_new",
+      mechanism: "something_new",
     });
+    console.log("parsed ", parsed);
     expect(
       toCanonical(parsed, "https://dev.example.test", "chan-1").release
         .category,

@@ -80,7 +80,7 @@ export const toRemediationImpact = (
 });
 
 const MEDISAO_CATEGORY = new Map<string, RemediationCategory>([
-  ["firmware_patch", RemediationCategory.FIREWALL_RULE],
+  ["firmware_patch", RemediationCategory.HARDWARE_PATCH],
 ]);
 
 export const toRemediationCategory = (

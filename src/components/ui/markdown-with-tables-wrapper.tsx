@@ -1,13 +1,16 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const REMARK_PLUGINS = [remarkGfm];
+const PLAIN_LINKS = {
+  a: ({ children }: { children?: ReactNode }) => <>{children}</>,
+};
 
 export const MarkdownWithTablesWrapper = memo(
-  ({ children }: { children: string }) => {
+  ({ children, plainLinks }: { children: string; plainLinks?: boolean }) => {
     // memo-ized to prevent re-rendering as parsing markdown is really slow!!
     // the Remark-GFM plugin will convert markdown text tables into proper <table> elements in-line
     // they still need to be styled to look good though - CSS generated using Claude LLM
@@ -33,7 +36,12 @@ export const MarkdownWithTablesWrapper = memo(
           [&_hr]:border-border [&_hr]:my-4
         "
       >
-        <Markdown remarkPlugins={REMARK_PLUGINS}>{children}</Markdown>
+        <Markdown
+          remarkPlugins={REMARK_PLUGINS}
+          components={plainLinks ? PLAIN_LINKS : undefined}
+        >
+          {children}
+        </Markdown>
       </div>
     );
   },

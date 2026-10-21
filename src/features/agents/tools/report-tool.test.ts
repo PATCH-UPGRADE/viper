@@ -14,7 +14,6 @@ vi.mock("@/lib/db", () => ({
     asset: { findMany: vi.fn() },
     vulnerability: { findMany: vi.fn() },
     remediation: { findMany: vi.fn() },
-    deviceGroup: { findMany: vi.fn() },
     workflow: { findMany: vi.fn() },
     notification: { findMany: vi.fn() },
     $queryRaw: vi.fn(),
@@ -50,12 +49,11 @@ describe("write_report", () => {
     prisma.asset,
     prisma.vulnerability,
     prisma.remediation,
-    prisma.deviceGroup,
     prisma.workflow,
     prisma.notification,
   ];
 
-  it("batch-validates all six citation types and refuses a missing record", async () => {
+  it("batch-validates all five citation types and refuses a missing record", async () => {
     for (const model of models) {
       // Then the Sources lookup, which finds no named records.
       model.findMany = vi
@@ -67,7 +65,6 @@ describe("write_report", () => {
       "assets",
       "vulnerabilities",
       "remediations",
-      "api/v1/deviceGroups",
       "workflows",
       "inbox",
     ];
@@ -267,7 +264,7 @@ describe("citation retrieval check", () => {
       _: unknown,
       ...values: unknown[]
     ) => (values.includes('"id": "a2"') ? [{}] : [])) as never);
-    const lookups = [Promise.resolve('{"id":"x","deviceGroup":{"id":"a1"}}')];
+    const lookups = [Promise.resolve('{"id":"x","assets":[{"id":"a1"}]}')];
     await run(
       makeWriteReportTool,
       { title: "R", markdown: "[A](/assets/a1) [B](/assets/a2)" },

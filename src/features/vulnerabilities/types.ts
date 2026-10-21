@@ -1,5 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
   PlatformEnum,
@@ -13,9 +14,9 @@ import {
 } from "@/lib/pagination";
 import {
   alohaResponseSchema,
-  cpeSchema,
   createIntegrationInputSchema,
   deviceGroupMatchingResponseSchema,
+  deviceInputSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -41,8 +42,12 @@ export const deviceGroupMatchingInclude = {
 } as const;
 
 export const vulnerabilityInputSchema = z.object({
-  // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
-  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
+  devices: z
+    .array(deviceInputSchema)
+    .min(1, "At least one device is required")
+    .describe(
+      "The affected devices. Each one names its version, a VERS range, or every version with vers:all/*.",
+    ),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cveId: z.string().min(1).nullish(),
   description: z.string().min(1).nullish(),
@@ -62,7 +67,7 @@ export const vulnerabilityArrayInputSchema = z.object({
 
 // make these two fields optional so users can update any field independently
 export const vulnerabilityUpdateInputSchema = vulnerabilityInputSchema.extend({
-  cpes: z.array(cpeSchema).min(1).optional(),
+  devices: z.array(deviceInputSchema).min(1).optional(),
   sarif: z.any().optional(), // JSON data - Prisma JsonValue type
 });
 
@@ -138,8 +143,8 @@ export const vulnerabilityByPriorityInclude = {
       asset: {
         select: {
           id: true,
-          role: true,
           location: true,
+          product: { select: deviceTypeLabelSelect },
         },
       },
     },

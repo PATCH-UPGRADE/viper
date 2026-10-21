@@ -68,9 +68,13 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
     );
   });
 
-  it("forbids 'only' or 'all' about the hospital's devices", () => {
-    // No tool counts devices by type, so the claim cannot be checked.
-    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Never write "only", "all", "every"/);
+  it("allows 'only' or 'all' about devices only from a full device type count", () => {
+    // An untyped asset can be a second CT scanner, so the count proves
+    // nothing while untypedAssetCount is above 0.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(
+      /Write "only", "all", "every", "none", "sole", or "single" about the hospital's devices only\s+when deviceTypes.getMany/,
+    );
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/untypedAssetCount is 0/);
   });
 
   it("embeds the platform catalog, so the tool list cannot drift from the prompt", () => {
@@ -87,11 +91,16 @@ describe("buildWriterPrompt — the findings reach the model intact", () => {
     expect(prompt).toContain('"Work orders: none open"');
   });
 
-  it("forbids 'only' or 'all' about devices, even when the findings say it", () => {
+  it("allows 'only' or 'all' about devices only from a finding with the count", () => {
+    // The writer has no tools, so it can never check the count itself.
     const prompt = buildWriterPrompt(base);
 
-    expect(prompt).toMatch(/Never write "only", "all", "every"/);
-    expect(prompt).toContain("Do not copy such a word from the findings.");
+    expect(prompt).toMatch(
+      /about the hospital's devices only\s+when a finding states the hospital-wide count/,
+    );
+    expect(prompt).toMatch(
+      /Do not copy such a word from a finding that gives no\s+count/,
+    );
   });
 
   it("forbids calling one open sub-ticket the last step", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { BugIcon, ExternalLinkIcon, ServerIcon, SlashIcon } from "lucide-react";
+import { BugIcon, ServerIcon, SlashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -20,6 +20,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Card } from "@/components/ui/card";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
@@ -38,11 +39,15 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetTitle,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
@@ -290,14 +295,14 @@ export const AssetHeader = ({ assetId }: { assetId: string }) => {
             <SlashIcon />
           </BreadcrumbSeparator>
           <BreadcrumbItem>
-            <BreadcrumbPage>{getAssetRoleLabel(asset)}</BreadcrumbPage>
+            <BreadcrumbPage>{getAssetTitle(asset)}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <div className="flex items-center justify-between gap-2 pb-2">
         <h1 className="text-3xl font-semibold tracking-tight">
-          {getAssetRoleLabel(asset)}
+          {getAssetTitle(asset)}
         </h1>
         <AssetQrPdfLink assetId={assetId} />
       </div>
@@ -333,9 +338,21 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Device Type
+                  </div>
+                  <div className="text-sm">
+                    {getAssetDeviceTypeLabel(asset) ??
+                      UNKNOWN_DEVICE_TYPE_STRING}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
                     Role
                   </div>
-                  <div className="text-sm">{getAssetRoleLabel(asset)}</div>
+                  <div className="text-sm">
+                    <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+                  </div>
                 </div>
 
                 <div>
@@ -353,32 +370,8 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Class
                   </div>
-                  <CopyCode>{deviceGroupLabel(asset.deviceGroup)}</CopyCode>
+                  <CopyCode>{deviceLabel(asset)}</CopyCode>
                 </div>
-
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground mb-1">
-                    CPE
-                  </div>
-                  <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>
-                </div>
-
-                {asset.deviceGroup.sbomUrl && (
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      SBOM
-                    </div>
-                    <a
-                      href={asset.deviceGroup.sbomUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                    >
-                      View SBOM
-                      <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                    </a>
-                  </div>
-                )}
               </div>
             </div>
           </Card>

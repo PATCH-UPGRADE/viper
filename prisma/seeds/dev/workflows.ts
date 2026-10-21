@@ -1,5 +1,5 @@
 import prisma from "@/lib/db";
-import { matchingIdsForCpes } from "./canonical-identity";
+import { matchingIdsForCpes } from "./device-groups";
 
 export async function seedWorkflows(userId: string) {
   console.log("\n🌱 Seeding workflows...");

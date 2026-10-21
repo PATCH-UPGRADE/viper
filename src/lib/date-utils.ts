@@ -11,11 +11,32 @@ export const formatScheduled = (
   return format(d, `MMM d, yyyy '${separator}' h:mm a`);
 };
 
+/** Value for a datetime-local input, in the viewer's timezone */
+export const toDateTimeLocal = (date: Date | string | null | undefined) => {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  const offsetMs = d.getTimezoneOffset() * 60_000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
+// "Fri, Oct 2 · 2 PM", or "Fri, Oct 2 · 2:30 PM" off the hour.
+export const formatSlot = (date: Date | string) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return format(d, `EEE, MMM d · ${d.getMinutes() ? "h:mm" : "h"} a`);
+};
+
 /** Heading for a group of items that share a calendar day */
 export const dayGroupLabel = (date: Date | string | number): string => {
   if (isToday(date)) return "Today";
   if (isYesterday(date)) return "Yesterday";
   return format(date, isThisYear(date) ? "MMM d" : "MMM d, yyyy");
+};
+
+/** A date a source sent as text, or null when it is missing or unreadable */
+export const asDate = (value: string | null | undefined): Date | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 /** Three-letter English month abbreviations, indexed 0 = Jan … 11 = Dec. */

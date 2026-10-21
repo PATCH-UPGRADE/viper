@@ -3,8 +3,8 @@ import { assetNameSelect } from "@/features/assets/utils";
 import { SubmissionState } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 import {
-  deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
+  deviceIdentitySelect,
+  findAssetsStrictlyMatching,
 } from "@/lib/device-matching";
 import { keepFileableTargets, validatePayloadForModule } from "./payload";
 import { resolveWorkOrderTargets } from "./targets";
@@ -46,26 +46,11 @@ export async function assetsForMatchings(
   });
   if (matchings.length === 0) return [];
 
-  const candidates = await db.asset.findMany({
-    where: { deviceGroup: { OR: matchings.map(deviceGroupWhereForMatching) } },
-    select: {
-      ...assetNameSelect,
-      deviceGroup: {
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      },
-    },
-  });
-
-  return candidates.filter((asset) =>
-    matchings.some((matching) =>
-      matchingAppliesToDeviceGroup(matching, asset.deviceGroup),
-    ),
+  return findAssetsStrictlyMatching(matchings, (where) =>
+    db.asset.findMany({
+      where,
+      select: { ...assetNameSelect, ...deviceIdentitySelect },
+    }),
   );
 }
 

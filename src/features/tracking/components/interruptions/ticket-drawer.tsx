@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ClockIcon, MailIcon } from "lucide-react";
-import Link from "next/link";
+import { ClockIcon, MailIcon, PhoneIcon } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
+import { ReadReceipts } from "@/components/read-receipts";
 import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
-import { NotificationReadReceipts } from "@/features/inbox/components/notification-read-receipts";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn, plural } from "@/lib/utils";
@@ -33,6 +32,8 @@ import {
   CategoryChip,
   StatusChip,
 } from "../ticket-detail/shared";
+import { RescheduleRequest } from "./reschedule-request";
+import { WorkOrderModal } from "./work-order-modal";
 
 export type DrawerTicket = {
   id: string;
@@ -76,13 +77,8 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <Link
-          href={`/tracking/${data.workOrderId}`}
-          className="text-primary hover:underline"
-        >
-          View work order
-        </Link>
-        <NotificationReadReceipts receipts={data.seenBy} />
+        <WorkOrderModal workOrderId={data.workOrderId} />
+        <ReadReceipts receipts={data.seenBy} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={ticket.status} />
@@ -105,27 +101,36 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           <p className="text-xs">As recorded on the work order</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 rounded-lg border p-3 text-sm">
-        <div>
-          <p className="text-xs text-muted-foreground">
-            Schedule (according to work order)
-          </p>
-          <p className="font-medium">
-            {formatScheduled(ticket.scheduledAt) ?? "No time recorded"}
-          </p>
+      <div className="rounded-lg border text-sm">
+        <div className="grid grid-cols-2 gap-3 p-3">
+          <div>
+            <p className="text-xs text-muted-foreground">
+              Schedule (according to work order)
+            </p>
+            <p className="font-medium">
+              {formatScheduled(ticket.scheduledAt) ?? "No time recorded"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Estimated duration</p>
+            <p className="flex items-center gap-1.5 font-medium">
+              <ClockIcon className="size-4 text-muted-foreground" aria-hidden />
+              {ticket.durationEstimate
+                ? `${ticket.durationEstimate} min`
+                : "Unknown"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Per device, according to the work order
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Estimated duration</p>
-          <p className="flex items-center gap-1.5 font-medium">
-            <ClockIcon className="size-4 text-muted-foreground" aria-hidden />
-            {ticket.durationEstimate
-              ? `${ticket.durationEstimate} min`
-              : "Unknown"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Per device, according to the work order
-          </p>
-        </div>
+        <RescheduleRequest
+          ticketId={id}
+          scheduledAt={ticket.scheduledAt}
+          pending={data.reschedule}
+          related={data.relatedReschedule}
+          past={data.pastReschedules}
+        />
       </div>
       <Section title="Why this work is needed">
         <p className="whitespace-pre-wrap text-muted-foreground">
@@ -186,13 +191,21 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
               </span>
             )}
           </div>
-          <a
-            href={`mailto:${data.contact.email}`}
-            className="flex items-center gap-1.5 text-primary hover:underline"
-          >
-            <MailIcon className="size-4" aria-hidden />
-            {data.contact.email}
-          </a>
+          <div className="flex flex-col items-end gap-1">
+            {data.contact.phone && (
+              <span className="flex items-center gap-1.5">
+                <PhoneIcon className="size-4" aria-hidden />
+                {data.contact.phone}
+              </span>
+            )}
+            <a
+              href={`mailto:${data.contact.email}`}
+              className="flex items-center gap-1.5 text-primary hover:underline"
+            >
+              <MailIcon className="size-4" aria-hidden />
+              {data.contact.email}
+            </a>
+          </div>
         </div>
       </Section>
       <Tabs defaultValue="comments">

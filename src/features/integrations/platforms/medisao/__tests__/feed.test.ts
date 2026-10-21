@@ -112,17 +112,52 @@ describe("toCanonical", () => {
     expect(item.webUrl).toBeNull();
   });
 
-  it("collects the manufacturer impact fields", () => {
-    expect(item.sourceImpact).toEqual({
-      category: "mitigation",
-      mechanism: "firmware_patch",
+  it("normalizes the manufacturer impact fields", () => {
+    expect(item.impact).toEqual({
       requiresDowntime: false,
       estimatedDowntimeSeconds: null,
       restartRequired: false,
       disablesFeatures: false,
-      workflowImpact: "",
-      clinicalImpactNotes: "",
     });
+  });
+
+  it("does not read categroy or mechanism as how the fix is applied", () => {
+    expect(item.impact).not.toHaveProperty("mechanism");
+  });
+
+  it("does not store the free-text workflow and clinical notes yet", () => {
+    expect(item.impact).not.toHaveProperty("workflowImpact");
+    expect(item.impact).not.toHaveProperty("clinicalImpactNotes");
+  });
+
+  it("reads when the manufacturer published it", () => {
+    expect(item.release.publishedAt).toEqual("2026-08-27T17:21:33.274Z");
+  });
+
+  it("reads a firmware_patch as a hardware patch", () => {
+    expect(item.release.category).toBe("HARDWARE_PATCH");
+  });
+
+  it("leaves a mechanism it does not know unstated", () => {
+    const parsed = rawRemediationSchema.parse({
+      ...LIVE_REMEDIATION,
+      mechanism: "something_new",
+    });
+    expect(
+      toCanonical(parsed, "https://dev.example.test", "chan-1").release
+        .category,
+    ).toBeNull();
+  });
+
+  it("leaves the release date unstated when MedISAO sends none", () => {
+    const parsed = rawRemediationSchema.parse({
+      ...LIVE_REMEDIATION,
+      published_at: null,
+    });
+    expect(
+      toCanonical(parsed, "https://dev.example.test", "chan-1").release
+        .publishedAt,
+    ).toBeNull();
   });
 });
 

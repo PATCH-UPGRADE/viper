@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -132,6 +133,13 @@ export async function downloadBufferFromS3(key: string): Promise<Buffer> {
   );
   if (!Body) throw new Error(`Empty S3 response for key: ${key}`);
   return Buffer.from(await Body.transformToByteArray());
+}
+
+/** Removes one object from S3. Succeeds when the key is already gone. */
+export async function deleteFromS3(key: string): Promise<void> {
+  await s3Client.send(
+    new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key }),
+  );
 }
 
 /**

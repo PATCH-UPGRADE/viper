@@ -1,7 +1,11 @@
 import "server-only";
-import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
+import {
+  assetAgentNameSelect,
+  getAssetNameForAgent,
+} from "@/features/assets/utils";
 import type { ScopeTargetModel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { matchingVersionFields } from "@/lib/device-matching";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import {
   canonicalNameWhere,
@@ -18,9 +22,9 @@ export async function resolveNoteTargetLabel(
     case "ASSET": {
       const asset = await prisma.asset.findUnique({
         where: { id: instanceId },
-        select: assetNameSelect,
+        select: assetAgentNameSelect,
       });
-      return asset ? getAssetDisplayName(asset) : null;
+      return asset ? getAssetNameForAgent(asset) : null;
     }
     case "VULNERABILITY": {
       const vuln = await prisma.vulnerability.findUnique({
@@ -43,6 +47,7 @@ export async function resolveNoteTargetLabel(
         where: { id: instanceId },
         select: {
           versionRange: true,
+          versionStatus: true,
           manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalDisplayName: true } },
@@ -93,6 +98,13 @@ export async function findDeviceGroupMatching(
 ): Promise<DeviceGroupMatchingLookup> {
   const productName = identity.productName || null;
   const version = identity.version || null;
+  // Look up the same versionRange and versionStatus that resolveMatchingId
+  // below would store.
+  const versionFields = matchingVersionFields({
+    hasProduct: productName !== null,
+    hasVersion: version !== null,
+    versionRange: identity.versionRange,
+  });
   const versionRange = identity.versionRange || null;
 
   const existing = await prisma.deviceGroupMatching.findFirst({
@@ -104,7 +116,7 @@ export async function findDeviceGroupMatching(
       ...(version
         ? { version: { canonicalName: normalizeName(version) } }
         : { versionId: null }),
-      versionRange,
+      ...versionFields,
     },
     select: { id: true },
   });
@@ -120,7 +132,6 @@ export async function findDeviceGroupMatching(
       product: productName,
       version,
       versionRange,
-      hasCpe: false,
     });
     return { found: true, id };
   }
@@ -136,6 +147,7 @@ export async function findDeviceGroupMatching(
     },
     select: {
       versionRange: true,
+      versionStatus: true,
       manufacturer: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalDisplayName: true } },

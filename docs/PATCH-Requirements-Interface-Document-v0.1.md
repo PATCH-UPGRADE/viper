@@ -276,6 +276,9 @@ TA3 MUST provide comprehensive textual descriptions to enable clinical risk asse
     infra. This gives maximum flexibility to emulator design -- TA1's job is
     to redirect people to the emulator location, rather than trying to limit
     the different emulator approaches.
+- **Impact fields:** `POST /remediations` and `PUT /remediations/{id}` accept
+  optional typed fields describing what applying the remediation does to the device.
+  Send only what you know; an omitted field means "not stated".
 - **Decision Owner:** ARPA-H on direction.
 
 ### 4.2 Patch Metadata Completeness (TA4)

@@ -12,7 +12,6 @@ import {
 const siemensHealthineers: ManufacturerEntry = {
   canonicalName: "siemens healthineers",
   canonicalDisplayName: "Siemens Healthineers",
-  hasCpe: false,
   nameMappings: ["siemens", "siemens healthcare"],
 };
 
@@ -64,7 +63,7 @@ describe("planManufacturerUpserts", () => {
       canonicalName: "siemens healthineers",
       nameMappings: [],
     };
-    const storedSiemensFromCpe: StoredManufacturer = {
+    const storedSiemensAlias: StoredManufacturer = {
       id: "m4",
       canonicalName: "siemens",
       nameMappings: [],
@@ -72,7 +71,7 @@ describe("planManufacturerUpserts", () => {
 
     const plan = planManufacturerUpserts(
       [siemensHealthineers],
-      [storedHealthineers, storedSiemensFromCpe],
+      [storedHealthineers, storedSiemensAlias],
     );
 
     expect(plan.writes).toEqual([
@@ -142,7 +141,6 @@ describe("planManufacturerUpserts", () => {
     const siemensAg: ManufacturerEntry = {
       canonicalName: "siemens ag",
       canonicalDisplayName: "Siemens AG",
-      hasCpe: false,
       nameMappings: ["siemens"],
     };
 
@@ -173,7 +171,6 @@ describe("planManufacturerUpserts", () => {
     const siemensAg: ManufacturerEntry = {
       canonicalName: "siemens ag",
       canonicalDisplayName: "Siemens AG",
-      hasCpe: false,
       nameMappings: ["siemens"],
     };
 

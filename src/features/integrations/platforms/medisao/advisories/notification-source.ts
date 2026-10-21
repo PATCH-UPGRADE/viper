@@ -43,8 +43,6 @@ export const linkAdvisoryEntities =
         product: advisory.product,
         version: advisory.version,
         versionRange: advisory.versionRange,
-        // The channel is the identity here; nothing came from a CPE.
-        hasCpe: false,
       });
 
       const reasonWhy = `MedISAO publishes this advisory on the ${advisory.manufacturer}${

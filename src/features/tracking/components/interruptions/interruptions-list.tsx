@@ -14,6 +14,7 @@ import {
   statusLabels,
   UnreadDot,
 } from "../ticket-detail/shared";
+import { PendingRescheduleIcon } from "./pending-reschedule-icon";
 import { TicketDrawer } from "./ticket-drawer";
 
 const COLUMNS =
@@ -73,6 +74,9 @@ export const InterruptionsList = () => {
                     <span className="flex items-center gap-1.5 font-semibold">
                       {group.some((i) => i.unread) && <UnreadDot />}
                       <span className="truncate">{head.workOrderSummary}</span>
+                      {group.some((i) => i.reschedulePending) && (
+                        <PendingRescheduleIcon />
+                      )}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {categoryLabels[head.category]} · {group.length} asset{" "}
@@ -116,8 +120,11 @@ export const InterruptionsList = () => {
                       >
                         <span className="flex min-w-0 flex-col items-start gap-1">
                           <span className="flex flex-col">
-                            <span className="font-medium">
+                            <span className="flex items-center gap-1.5 font-medium">
                               {item.assetName}
+                              {item.reschedulePending && (
+                                <PendingRescheduleIcon />
+                              )}
                             </span>
                             {item.place && (
                               <span className="text-xs text-muted-foreground">

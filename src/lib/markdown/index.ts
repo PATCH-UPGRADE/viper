@@ -7,13 +7,13 @@ export {
   renderUtilization,
 } from "./asset";
 export {
-  type DeviceIdentity,
-  deviceGroupCpeList,
-  deviceGroupLabel,
   deviceGroupMatchingLabel,
   deviceGroupMatchingsSummary,
-  deviceGroupToMarkdown,
   deviceIdentityInline,
+  deviceLabel,
+  deviceToMarkdown,
+  type ExtractedDeviceIdentity,
+  matchingVersionLabel,
 } from "./device-group";
 export {
   type NoteRow,

@@ -27,7 +27,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getAssetDisplayName } from "@/features/assets/utils";
-import { deviceGroupMatchingLabel, parseLocation } from "@/lib/markdown";
+import {
+  deviceGroupMatchingLabel,
+  matchingVersionLabel,
+  parseLocation,
+} from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import { cn } from "@/lib/utils";
 import {
@@ -175,7 +179,9 @@ export function MatchingAssetTable({
       cellClassName: "font-mono text-xs",
       cell: (asset) => (
         <span className="inline-flex items-center gap-1">
-          {getAssetDisplayName(asset)}
+          {/* Every row comes from one matching, so the id names a row
+              better than the shared device type does. */}
+          {getAssetDisplayName({ ...asset, product: null })}
           {asset.statusNotes && (
             <QuestionTooltip>
               <span className="whitespace-pre-line">{asset.statusNotes}</span>
@@ -195,7 +201,19 @@ export function MatchingAssetTable({
           versionStatus={asset.versionStatus}
           options={options}
           onAnswer={(answer) =>
-            answerVersion.mutateAsync({ id: asset.id, ...answer })
+            answerVersion.mutateAsync({
+              id: asset.id,
+              device: {
+                manufacturer: { id: asset.manufacturerId ?? "" },
+                ...(asset.productId
+                  ? { product: { id: asset.productId } }
+                  : {}),
+                version:
+                  "version" in answer
+                    ? { name: answer.version }
+                    : { status: answer.versionStatus },
+              },
+            })
           }
           isPending={answerVersion.isPending}
         />
@@ -368,8 +386,7 @@ export function BucketAccordion({
                         <span className="text-xs font-normal text-muted-foreground">
                           {[
                             displayName(matching.manufacturer),
-                            displayName(matching.version) ??
-                              matching.versionRange,
+                            matchingVersionLabel(matching),
                           ]
                             .filter(Boolean)
                             .join(" · ")}

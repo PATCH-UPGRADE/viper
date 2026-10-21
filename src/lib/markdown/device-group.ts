@@ -5,46 +5,33 @@ export const displayName = (ref: CanonicalRef): string | undefined =>
     ? ref.canonicalDisplayName
     : undefined;
 
-type DeviceGroupDisplay = {
+type DeviceDisplay = {
   manufacturer?: CanonicalRef;
   product?: CanonicalRef;
   version?: CanonicalRef;
-  cpe?: string[];
 };
 
 /**
- * Human-readable label for a device group, e.g. "Acme InfusionPump".
+ * Human-readable label for a device, e.g. "Acme InfusionPump".
  * Falls back to "Unknown device" when manufacturer/product are unknown.
  */
-export function deviceGroupLabel(dg: DeviceGroupDisplay): string {
-  const parts = [displayName(dg.manufacturer), displayName(dg.product)].filter(
-    Boolean,
-  );
+export function deviceLabel(device: DeviceDisplay): string {
+  const parts = [
+    displayName(device.manufacturer),
+    displayName(device.product),
+  ].filter(Boolean);
   return parts.length > 0 ? parts.join(" ") : "Unknown device";
 }
 
-/** Comma-joined list of a device group's CPE strings. */
-export function deviceGroupCpeList(dg: DeviceGroupDisplay): string {
-  return (dg.cpe ?? []).join(", ");
-}
-
-/**
- * Markdown block for a canonical device group, e.g.
- * ```
- * ### Acme InfusionPump (2.1.3)
- * - **CPE**: cpe:2.3:...
- * ```
- */
-export function deviceGroupToMarkdown(dg: DeviceGroupDisplay): string {
-  const version = displayName(dg.version);
-  const heading = `### ${deviceGroupLabel(dg)}${version ? ` (${version})` : ""}`;
-  const cpe = deviceGroupCpeList(dg);
-  return cpe ? `${heading}\n- **CPE**: ${cpe}` : heading;
+/** Markdown heading for a device, e.g. "### Acme InfusionPump (2.1.3)". */
+export function deviceToMarkdown(device: DeviceDisplay): string {
+  const version = displayName(device.version);
+  return `### ${deviceLabel(device)}${version ? ` (${version})` : ""}`;
 }
 
 /** A loosely-typed device identity (as extracted from a notification, etc.). */
-export interface DeviceIdentity {
-  cpe?: string[] | string | null;
+export interface ExtractedDeviceIdentity {
+  udi?: string | null;
   manufacturer?: string | null;
   modelName?: string | null;
   version?: string | null;
@@ -52,16 +39,13 @@ export interface DeviceIdentity {
 }
 
 /**
- * Inline identifier line for a device identity (CPE + manufacturer + model +
+ * Inline identifier line for a device identity (UDI + manufacturer + model +
  * version + versionRange), e.g.
- * "cpe=… | manufacturer=Acme | modelName=Pump | version=2.1 | versionRange=?".
+ * "udi=? | manufacturer=Acme | modelName=Pump | version=2.1 | versionRange=?".
  * Missing fields render as "?".
  */
-export function deviceIdentityInline(fields: DeviceIdentity): string {
-  const cpe = Array.isArray(fields.cpe)
-    ? fields.cpe.join(", ") || "(none)"
-    : (fields.cpe ?? "?");
-  return `cpe=${cpe} | manufacturer=${fields.manufacturer ?? "?"} | modelName=${fields.modelName ?? "?"} | version=${fields.version ?? "?"} | versionRange=${fields.versionRange ?? "?"}`;
+export function deviceIdentityInline(fields: ExtractedDeviceIdentity): string {
+  return `udi=${fields.udi ?? "?"} | manufacturer=${fields.manufacturer ?? "?"} | modelName=${fields.modelName ?? "?"} | version=${fields.version ?? "?"} | versionRange=${fields.versionRange ?? "?"}`;
 }
 
 type DeviceGroupMatchingDisplay = {
@@ -69,7 +53,24 @@ type DeviceGroupMatchingDisplay = {
   product?: CanonicalRef;
   version?: CanonicalRef;
   versionRange?: string | null;
+  versionStatus?: string | null;
 };
+
+const VERSION_STATUS_LABELS: Record<string, string> = {
+  UNKNOWN: "version unknown",
+  NOT_APPLICABLE: "no versions",
+};
+
+/** The version part of a matching's label: its version, its range, or its status. */
+export function matchingVersionLabel(
+  m: DeviceGroupMatchingDisplay,
+): string | undefined {
+  return (
+    displayName(m.version) ??
+    m.versionRange ??
+    (m.versionStatus ? VERSION_STATUS_LABELS[m.versionStatus] : undefined)
+  );
+}
 
 /**
  * Human-readable label for a device-group matching, e.g. "Acme Radiator 2.1.3"
@@ -86,7 +87,7 @@ export function deviceGroupMatchingLabel(
   const parts = [
     displayName(m.manufacturer),
     displayName(m.product),
-    !opts?.hideVersion ? (displayName(m.version) ?? m.versionRange) : undefined,
+    !opts?.hideVersion ? matchingVersionLabel(m) : undefined,
   ].filter(Boolean);
   return parts.join(" ");
 }

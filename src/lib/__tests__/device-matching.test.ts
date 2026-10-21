@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  matchingAppliesToDeviceGroup,
+  baselineIssueStatus,
+  matchingAppliesToDevice,
+  matchingVersionFields,
   parseVers,
   resolveMatches,
   versSatisfies,
@@ -51,8 +53,8 @@ describe("versSatisfies", () => {
   });
 });
 
-describe("matchingAppliesToDeviceGroup", () => {
-  // device group identity uses canonical FK ids; version carries its string.
+describe("matchingAppliesToDevice", () => {
+  // device identity uses canonical FK ids; version carries its string.
   const dg = {
     id: "dg1",
     manufacturerId: "v-acme",
@@ -63,7 +65,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is false when the manufacturer differs", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-other",
           productId: null,
@@ -77,7 +79,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true for a wildcard-product matching (manufacturer only)", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: null,
@@ -91,7 +93,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true when manufacturer+product match and there's no version constraint", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -105,7 +107,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true for an exact versionId match", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -119,7 +121,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is false for a versionId mismatch", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -133,7 +135,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is true when the version falls in a VERS range", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -147,7 +149,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 
   it("is false when the version is outside the VERS range", () => {
     expect(
-      matchingAppliesToDeviceGroup(
+      matchingAppliesToDevice(
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
@@ -161,7 +163,7 @@ describe("matchingAppliesToDeviceGroup", () => {
 });
 
 describe("resolveMatches", () => {
-  const groups = [
+  const devices = [
     {
       id: "a",
       manufacturerId: "v-acme",
@@ -185,7 +187,7 @@ describe("resolveMatches", () => {
     },
   ];
 
-  it("resolves a wildcard-product matching to all of that manufacturer's groups", () => {
+  it("resolves a wildcard-product matching to all of that manufacturer's devices", () => {
     const matches = resolveMatches(
       [
         {
@@ -195,12 +197,12 @@ describe("resolveMatches", () => {
           versionRange: null,
         },
       ],
-      groups,
+      devices,
     );
     expect(matches.map((g) => g.id).sort()).toEqual(["a", "b"]);
   });
 
-  it("dedupes a group matched by more than one matching", () => {
+  it("dedupes a device matched by more than one matching", () => {
     const matches = resolveMatches(
       [
         {
@@ -208,20 +210,20 @@ describe("resolveMatches", () => {
           productId: null,
           versionId: null,
           versionRange: null,
-        }, // matches group a (and b)
+        }, // matches device a (and b)
         {
           manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: "ver-213",
           versionRange: null,
-        }, // matches group a
+        }, // matches device a
       ],
-      groups,
+      devices,
     );
     expect(matches.filter((g) => g.id === "a")).toHaveLength(1);
   });
 
-  it("returns nothing when no group matches", () => {
+  it("returns nothing when no device matches", () => {
     expect(
       resolveMatches(
         [
@@ -232,8 +234,54 @@ describe("resolveMatches", () => {
             versionRange: null,
           },
         ],
-        groups,
+        devices,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("matchingVersionFields", () => {
+  it("is UNKNOWN for a product with no version and no range", () => {
+    expect(
+      matchingVersionFields({ hasProduct: true, hasVersion: false }),
+    ).toEqual({ versionRange: null, versionStatus: "UNKNOWN" });
+  });
+
+  it("is KNOWN for a version, a range, or no product", () => {
+    expect(
+      matchingVersionFields({ hasProduct: true, hasVersion: true }),
+    ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+    expect(
+      matchingVersionFields({
+        hasProduct: true,
+        hasVersion: false,
+        versionRange: " vers:semver/<2.0 ",
+      }),
+    ).toEqual({ versionRange: "vers:semver/<2.0", versionStatus: "KNOWN" });
+    expect(
+      matchingVersionFields({ hasProduct: false, hasVersion: false }),
+    ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+  });
+
+  it("stores a range of every version as no range, KNOWN", () => {
+    expect(
+      matchingVersionFields({
+        hasProduct: true,
+        hasVersion: false,
+        versionRange: "vers:all/*",
+      }),
+    ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+  });
+});
+
+describe("baselineIssueStatus", () => {
+  it("opens an UNKNOWN matching's issue under investigation", () => {
+    expect(baselineIssueStatus("UNKNOWN")).toBe("UNDER_INVESTIGATION");
+  });
+
+  it("opens every other matching's issue as affected", () => {
+    for (const status of ["KNOWN", "NOT_APPLICABLE", "UNSURE"] as const) {
+      expect(baselineIssueStatus(status)).toBe("AFFECTED");
+    }
   });
 });

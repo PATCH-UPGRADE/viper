@@ -8,12 +8,11 @@ export const PAGINATION = {
 export const mainPadding = "p-4 md:px-10 md:py-6 h-full";
 export const headerClass = "text-lg md:text-xl font-semibold";
 
-export const UNKNOWN_CPE_STRING = "cpe:2.3:-:-:-";
-
 export const MIN_PASSWORD_LENGTH = 8;
 
 export const INTEGRATION_SYNC_EVERY_MIN = 5; //minutes
 export const INTEGRATIONS_POLL_INTERVAL_MS = 10_000;
+export const CSV_IMPORT_POLL_INTERVAL_MS = 5_000;
 
 export const NEW_VULNERABLE_ASSETS_POLL_INTERVAL_MS = 20_000;
 

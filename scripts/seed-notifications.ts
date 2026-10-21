@@ -13,6 +13,8 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
+import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
+import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 import prisma from "../src/lib/db";
 
 const SEED_USER = {
@@ -28,27 +30,10 @@ function upsertManufacturer(name: string) {
   return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+    create: { canonicalName, canonicalDisplayName: name },
   });
 }
 
-function upsertProduct(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.product.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
-  });
-}
-
-function upsertVersion(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.version.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
-  });
-}
 // ---------------------------------------------------------------------------
 // Siemens syngo.plaza VEX scenario (SSA-016040 / CVE-2024-52334)
 // ---------------------------------------------------------------------------
@@ -135,18 +120,15 @@ async function seedSyngoPlazaVexScenario(userId: string) {
   console.log("\n🌱 Seeding Siemens syngo.plaza VEX scenario...");
 
   const manufacturer = await upsertManufacturer(SYNGO_PLAZA.manufacturer);
-  const product = await upsertProduct(SYNGO_PLAZA.product);
-  const version = await upsertVersion(SYNGO_PLAZA.version);
+  const product = await upsertProduct(manufacturer.id, SYNGO_PLAZA.product);
+  const version = await upsertVersion(product.id, SYNGO_PLAZA.version);
 
-  const groupIdentity = {
+  const device = {
     manufacturerId: manufacturer.id,
     productId: product.id,
     versionId: version.id,
     versionStatus: VersionStatus.KNOWN,
   };
-  const deviceGroup =
-    (await prisma.deviceGroup.findFirst({ where: groupIdentity })) ??
-    (await prisma.deviceGroup.create({ data: groupIdentity }));
 
   const assets = await Promise.all(
     SYNGO_PLAZA_ASSETS.map(async (asset) => {
@@ -158,7 +140,7 @@ async function seedSyngoPlazaVexScenario(userId: string) {
         data: {
           ...asset,
           status: "Active" as AssetStatus,
-          deviceGroupId: deviceGroup.id,
+          ...device,
           userId,
         },
       });
@@ -558,8 +540,10 @@ async function upsertDeserializationMatching(spec: {
   versionRange?: string;
 }) {
   const manufacturer = await upsertManufacturer(DESERIALIZATION_MANUFACTURER);
-  const product = await upsertProduct(spec.product);
-  const version = spec.version ? await upsertVersion(spec.version) : null;
+  const product = await upsertProduct(manufacturer.id, spec.product);
+  const version = spec.version
+    ? await upsertVersion(product.id, spec.version)
+    : null;
 
   const where = {
     manufacturerId: manufacturer.id,
@@ -574,7 +558,7 @@ async function upsertDeserializationMatching(spec: {
   );
 }
 
-async function upsertDeviceGroupForAsset(
+async function upsertDeviceForAsset(
   product: string,
   version?: string,
   versionStatus: VersionStatus = version
@@ -582,28 +566,24 @@ async function upsertDeviceGroupForAsset(
     : VersionStatus.UNKNOWN,
 ) {
   const manufacturer = await upsertManufacturer(DESERIALIZATION_MANUFACTURER);
-  const productRec = await upsertProduct(product);
-  const versionRec = version ? await upsertVersion(version) : null;
+  const productRec = await upsertProduct(manufacturer.id, product);
+  const versionRec = version
+    ? await upsertVersion(productRec.id, version)
+    : null;
 
-  const manufacturerId = manufacturer.id;
-  const productId = productRec.id;
-  const versionId = versionRec?.id ?? null;
-
-  return (
-    (await prisma.deviceGroup.findFirst({
-      where: { manufacturerId, productId, versionId, versionStatus },
-    })) ??
-    (await prisma.deviceGroup.create({
-      data: { manufacturerId, productId, versionId, versionStatus },
-    }))
-  );
+  return {
+    manufacturerId: manufacturer.id,
+    productId: productRec.id,
+    versionId: versionRec?.id ?? null,
+    versionStatus,
+  };
 }
 
 async function seedDeserializationScenario(userId: string) {
   console.log("\n🌱 Seeding Siemens deserialization scenario...");
 
-  // Sequential: several products share a canonical version (e.g. "VA30 SP5",
-  // "VB22"), and concurrent upserts of the same Version race on its unique key.
+  // Sequential: several matchings share a product and version, and concurrent
+  // upserts of the same Version race on its unique key.
   const matchings: Awaited<ReturnType<typeof upsertDeserializationMatching>>[] =
     [];
   for (const spec of DESERIALIZATION_MATCHINGS) {
@@ -666,7 +646,7 @@ async function seedDeserializationScenario(userId: string) {
       assets.push(existing);
       continue;
     }
-    const deviceGroup = await upsertDeviceGroupForAsset(
+    const device = await upsertDeviceForAsset(
       spec.product,
       spec.version,
       spec.versionStatus === "UNSURE" ? VersionStatus.UNSURE : undefined,
@@ -682,7 +662,7 @@ async function seedDeserializationScenario(userId: string) {
         data: {
           ...assetFields,
           status: "Active" as AssetStatus,
-          deviceGroupId: deviceGroup.id,
+          ...device,
           userId,
         },
       }),
@@ -833,11 +813,9 @@ The application deserialises untrusted data without sufficient validations that 
 async function assetIdsForProducts(products: string[]): Promise<string[]> {
   const assets = await prisma.asset.findMany({
     where: {
-      deviceGroup: {
-        product: {
-          canonicalName: {
-            in: products.map((product) => product.trim().toLowerCase()),
-          },
+      product: {
+        canonicalName: {
+          in: products.map((product) => product.trim().toLowerCase()),
         },
       },
     },

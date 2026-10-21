@@ -168,13 +168,6 @@ const makeProposeWorkOrder = (userId: string) =>
           ? target.assets.map((a) => [a.id, labelFor(a)])
           : unmanaged.map((u) => [u.id, u.label]),
       );
-      // The fields each child ticket is named from, already fetched by the target
-      // resolution. Absent only on the untargeted branch, where the child falls
-      // back to reading the asset itself.
-      const assetRows = new Map(
-        (target?.assets ?? []).map((asset) => [asset.id, asset]),
-      );
-
       const departmentIds = await resolveResponsibleDepartments(covered);
 
       // The per-asset children are made here rather than at approval, because
@@ -217,7 +210,6 @@ const makeProposeWorkOrder = (userId: string) =>
             assetId,
             actorId: userId,
             parent,
-            asset: assetRows.get(assetId),
           });
         }
         return parent;

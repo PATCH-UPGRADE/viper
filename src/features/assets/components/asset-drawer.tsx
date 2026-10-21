@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
-  ExternalLinkIcon,
   FileText,
   MessageSquare,
   ServerIcon,
@@ -19,6 +18,7 @@ import {
 } from "@/components/dashboard-drawers";
 import { ExternalMappingList } from "@/components/external-mappings";
 import { Badge } from "@/components/ui/badge";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/features/chat/components/chat";
@@ -34,10 +34,14 @@ import type {
   NetworkConnection,
 } from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetTitle,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 import { AssetUtilizationHeatMapGridVertical } from "./asset-utilization-grid";
 
@@ -82,12 +86,11 @@ function getProtocolLabel(port: number, transport: "tcp" | "udp"): string {
 }
 
 function getAssetLabel(asset: EnrichedNetworkAsset): string {
-  return (
-    asset.viper_data?.role ??
-    asset.viper_data?.hostname ??
-    asset.manufacturer ??
-    asset.id.slice(0, 8)
-  );
+  const deviceType = getAssetDeviceTypeLabel(asset.viper_data);
+  const identifier =
+    asset.viper_data?.hostname ?? getAssetIP(asset) ?? asset.id.slice(0, 8);
+  if (deviceType) return `${deviceType} · ${identifier}`;
+  return asset.viper_data?.hostname ?? asset.manufacturer ?? identifier;
 }
 
 function getAssetIP(asset: EnrichedNetworkAsset): string | null {
@@ -284,7 +287,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
   const sections: Section[] = [
     {
       header: "Device Overview",
-      text: `${getAssetRoleLabel(asset)} — ${deviceGroupLabel(asset.deviceGroup)}`,
+      text: `${getAssetTitle(asset)} — ${deviceLabel(asset)}`,
     },
     ...(location
       ? [
@@ -433,31 +436,21 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
       header: "Device Information",
       items: [
         {
-          header: "Role",
-          content: <div className="text-sm">{getAssetRoleLabel(asset)}</div>,
+          header: "Device Type",
+          content: (
+            <div className="text-sm">
+              {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
+            </div>
+          ),
         },
         {
-          header: "CPE",
-          content: <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>,
+          header: "Role",
+          content: (
+            <div className="text-sm">
+              <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+            </div>
+          ),
         },
-        ...(asset.deviceGroup.sbomUrl
-          ? [
-              {
-                header: "SBOM",
-                content: (
-                  <a
-                    href={asset.deviceGroup.sbomUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                  >
-                    View SBOM
-                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                  </a>
-                ),
-              },
-            ]
-          : []),
         ...(asset.serialNumber
           ? [
               {
@@ -708,7 +701,7 @@ export function AssetDashboardDrawer({
     <DashboardDrawerShell
       open={open}
       setOpen={setOpen}
-      title={getAssetRoleLabel(asset)}
+      title={getAssetTitle(asset)}
       description={description}
       tabs={tabs}
       infoColumn={<AssetInfoColumn asset={asset} />}

@@ -36,7 +36,7 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("../agent", () => ({ runAiCrawler: mocks.runAiCrawler }));
 vi.mock("@/features/assets/server/integration-sync", () => ({
-  processAssetIntegrationSync: mocks.asset,
+  processCrawledAssetIntegrationSync: mocks.asset,
 }));
 vi.mock("@/features/vulnerabilities/server/integration-sync", () => ({
   processVulnerabilityIntegrationSync: mocks.vulnerability,
@@ -142,11 +142,11 @@ describe("aiSync", () => {
     mocks.asset.mockResolvedValueOnce({
       ...mocks.ok,
       shouldRetry: true,
-      message: "1 of 1 items failed: bad cpe",
+      message: "1 of 1 items failed: bad device",
     });
 
     await expect(aiSync(makeCtx(ResourceType.Asset))).rejects.toThrow(
-      "The AI crawler failed: overloaded. 1 of 1 items failed: bad cpe",
+      "The AI crawler failed: overloaded. 1 of 1 items failed: bad device",
     );
   });
 
@@ -154,11 +154,11 @@ describe("aiSync", () => {
     mocks.asset.mockResolvedValueOnce({
       ...mocks.ok,
       shouldRetry: true,
-      message: "1 of 1 items failed: bad cpe",
+      message: "1 of 1 items failed: bad device",
     });
 
     await expect(aiSync(makeCtx(ResourceType.Asset))).rejects.toThrow(
-      "1 of 1 items failed: bad cpe",
+      "1 of 1 items failed: bad device",
     );
   });
 

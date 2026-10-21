@@ -7,18 +7,18 @@ import {
 } from "pdf-lib";
 import QRCode from "qrcode";
 import type { Prisma } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import { getBaseUrl } from "@/lib/url-utils";
-import { getAssetRoleLabel } from "../utils";
+import { deviceTypeLabelSelect, getAssetTitle } from "../utils";
 
 export const qrPdfAssetSelect = {
   id: true,
-  role: true,
   serialNumber: true,
-  deviceGroup: {
+  manufacturer: { select: { canonicalDisplayName: true } },
+  product: {
     select: {
-      manufacturer: { select: { canonicalDisplayName: true } },
-      product: { select: { canonicalDisplayName: true } },
+      canonicalDisplayName: true,
+      ...deviceTypeLabelSelect,
     },
   },
 } satisfies Prisma.AssetSelect;
@@ -111,10 +111,10 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   });
   y -= qrBoxSize + 24;
 
-  drawText(getAssetRoleLabel(asset), 18, bold, DARK);
+  drawText(getAssetTitle(asset), 18, bold, DARK);
   y -= 22;
 
-  drawText(deviceGroupLabel(asset.deviceGroup), 12, font, GRAY);
+  drawText(deviceLabel(asset), 12, font, GRAY);
   y -= 24;
 
   drawDivider();

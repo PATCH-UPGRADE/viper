@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getAssetRoleLabel } from "@/features/assets/utils";
+import { getAssetTitle } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import type { VulnerabilityWithRelations } from "../types";
 
@@ -113,9 +113,7 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
     accessorKey: "asset",
     header: "Affected Asset",
     cell: ({ row }) =>
-      row.original.asset
-        ? getAssetRoleLabel(row.original.asset)
-        : "Device Group",
+      row.original.asset ? getAssetTitle(row.original.asset) : "Device Group",
     // TODO: Consider a backend change where device group issues still get displayed
     // in the frontend as one issue per asset in that device group
   },

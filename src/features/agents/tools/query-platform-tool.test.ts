@@ -25,7 +25,10 @@ const DOMAIN_PHRASES: Record<string, string> = {
   assets: "assets",
   vulnerabilities: "vulnerabilities",
   remediations: "remediations",
-  deviceGroups: "device groups",
+  deviceTypes: "device type counts",
+  manufacturers: "manufacturers",
+  products: "products",
+  versions: "versions",
   workflows: "clinical workflows",
   notifications: "notifications",
   tracking: "work orders",
@@ -67,18 +70,17 @@ describe("PLATFORM_CATALOG stays in sync with PLATFORM_QUERY_PROCEDURES", () => 
     expect(missing).toEqual([]);
   });
 
-  // A matching id sent as deviceGroupId returns an empty page rather than an
-  // error, so the model reports "no assets affected" against a real count. The
-  // catalog is the only thing standing between the agent and that answer today.
+  // A matching id sent as an asset id finds nothing, so the model reports "no
+  // assets affected" against a real count. The catalog is the only thing
+  // standing between the agent and that answer today.
   //
   // Anchored on the two emphasised phrases, which appear once each and only in
-  // that paragraph. Bare identifiers do not work: `deviceGroupId` appears three
-  // times in the catalog and `deviceGroups.getMany` twice, both via ordinary
-  // procedure bullets, so asserting them passes even with the warning deleted.
-  // Rewording this guidance will fail here, which is the intent.
-  it("keeps the warning that matching ids are not device group ids", () => {
+  // that paragraph. Bare identifiers do not work: `assets.getMany` appears in
+  // ordinary procedure bullets too, so asserting it passes even with the
+  // warning deleted. Rewording this guidance will fail here, which is the intent.
+  it("keeps the warning that matching ids are not asset ids", () => {
     expect(PLATFORM_CATALOG).toContain("matching RULES");
-    expect(PLATFORM_CATALOG).toContain("NOT device group ids");
+    expect(PLATFORM_CATALOG).toContain("NOT asset ids");
   });
 
   // A typo in a dot-path, or a procedure later renamed in its router, is
@@ -263,6 +265,7 @@ describe("addNavigationLinks — notifications", () => {
     expect(Object.keys(result._links).sort()).toEqual([
       "detail",
       "utilization",
+      "vulnerabilities",
       "workOrders",
       "workflows",
     ]);
@@ -336,7 +339,6 @@ describe("addNavigationLinks — canonical record trimming", () => {
     id: "mfr_1",
     canonicalName: "siemens healthineers",
     canonicalDisplayName: "Siemens Healthineers",
-    hasCpe: true,
     nameMappings: [],
     versScheme: null,
     createdAt: "2026-08-13T14:23:04.179Z",
@@ -350,7 +352,6 @@ describe("addNavigationLinks — canonical record trimming", () => {
     >;
 
     for (const key of [
-      "hasCpe",
       "nameMappings",
       "versScheme",
       "createdAt",
@@ -358,7 +359,7 @@ describe("addNavigationLinks — canonical record trimming", () => {
     ]) {
       expect(result).not.toHaveProperty(key);
     }
-    // The catalog tells the model to find a device group by these names.
+    // The catalog tells the model to find assets by these names.
     expect(result.id).toBe("mfr_1");
     expect(result.canonicalName).toBe("siemens healthineers");
     expect(result.canonicalDisplayName).toBe("Siemens Healthineers");
@@ -381,11 +382,76 @@ describe("addNavigationLinks — canonical record trimming", () => {
     };
 
     for (const m of result.deviceGroupsMatchings) {
-      expect(m.deviceGroupMatching.manufacturer).not.toHaveProperty("hasCpe");
+      expect(m.deviceGroupMatching.manufacturer).not.toHaveProperty(
+        "nameMappings",
+      );
       expect(m.deviceGroupMatching.manufacturer.canonicalDisplayName).toBe(
         "Siemens Healthineers",
       );
     }
+  });
+
+  it("turns a manufacturer's REST URLs into a products link", () => {
+    const result = addNavigationLinks({
+      ...manufacturer(),
+      url: "http://localhost:3000/api/v1/manufacturers/mfr_1",
+      productsUrl: "http://localhost:3000/api/v1/manufacturers/mfr_1/products",
+    }) as Record<string, unknown>;
+
+    expect(result).not.toHaveProperty("url");
+    expect(result).not.toHaveProperty("productsUrl");
+    expect(result._links).toEqual({
+      products: {
+        procedure: "products.getManyByManufacturer",
+        input: { id: "mfr_1" },
+      },
+    });
+  });
+
+  it("turns a product's REST URLs into a versions link", () => {
+    const result = addNavigationLinks({
+      id: "prod_1",
+      canonicalName: "sigma spectrum",
+      canonicalDisplayName: "Sigma Spectrum",
+      url: "http://localhost:3000/api/v1/products/prod_1",
+      versionsUrl: "http://localhost:3000/api/v1/products/prod_1/versions",
+    }) as Record<string, unknown>;
+
+    expect(result).not.toHaveProperty("versionsUrl");
+    expect(result._links).toEqual({
+      versions: {
+        procedure: "versions.getManyByProduct",
+        input: { id: "prod_1" },
+      },
+    });
+  });
+
+  it("turns a version's REST URLs into assets and vulnerabilities links", () => {
+    const result = addNavigationLinks({
+      id: "ver_1",
+      canonicalName: "8.0",
+      canonicalDisplayName: "8.0",
+      url: "u",
+      vulnerabilitiesUrl: "u",
+      assetsUrl: "u",
+      deviceArtifactsUrl: "u",
+    }) as Record<string, unknown>;
+
+    expect(result).toEqual({
+      id: "ver_1",
+      canonicalName: "8.0",
+      canonicalDisplayName: "8.0",
+      _links: {
+        assets: {
+          procedure: "assets.getManyByVersion",
+          input: { id: "ver_1" },
+        },
+        vulnerabilities: {
+          procedure: "vulnerabilities.getManyByVersion",
+          input: { id: "ver_1" },
+        },
+      },
+    });
   });
 
   it("leaves an object that is not a canonical record alone", () => {
@@ -400,36 +466,32 @@ describe("addNavigationLinks — canonical record trimming", () => {
 
 describe("addNavigationLinks — existing behaviour is preserved", () => {
   it("still linkifies assets", () => {
-    const asset = { id: "a_1", hostname: "icu-01", utilization: { "0": 10 } };
+    const asset = {
+      id: "a_1",
+      hostname: "icu-01",
+      utilization: { "0": 10 },
+      vulnerabilitiesUrl:
+        "http://localhost:3000/api/v1/assets/a_1/vulnerabilities",
+    };
 
     const result = addNavigationLinks(asset) as {
       utilization?: unknown;
+      vulnerabilitiesUrl?: unknown;
       _links: Record<string, { procedure: string }>;
     };
 
     expect(result.utilization).toBeUndefined();
+    expect(result.vulnerabilitiesUrl).toBeUndefined();
     expect(result._links.workflows.procedure).toBe("workflows.getManyByAsset");
+    expect(result._links.vulnerabilities).toEqual({
+      procedure: "vulnerabilities.getManyByAsset",
+      input: { id: "a_1" },
+    });
     expect(result._links.utilization.procedure).toBe("assets.getUtilization");
     expect(result._links.workOrders).toEqual({
       procedure: "tracking.getManyForLlm",
       input: { assetId: "a_1" },
     });
-  });
-
-  it("still linkifies device groups and strips their href keys", () => {
-    const deviceGroup = {
-      id: "dg_1",
-      assetsUrl: "https://example.test/dg/1/assets",
-      vulnerabilitiesUrl: "https://example.test/dg/1/vulns",
-    };
-
-    const result = addNavigationLinks(deviceGroup) as {
-      assetsUrl?: string;
-      _links: Record<string, { procedure: string }>;
-    };
-
-    expect(result.assetsUrl).toBeUndefined();
-    expect(result._links.assets.procedure).toBe("assets.getManyByDeviceGroup");
   });
 });
 

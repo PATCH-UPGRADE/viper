@@ -42,5 +42,5 @@ export const RECOMMENDATION_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
   "hospital administration":
     "Frame recommendations in operational and financial terms: downtime cost, regulatory exposure, departmental impact, and scheduling options. Provide a clear go/no-go summary per item.",
   "biomedical engineer":
-    "Focus on the device layer: firmware version, manufacturer patch advisory, device certification impact, required post-patch biomedical validation steps, and any interoperability risks with connected systems. Reference device model and CPE.",
+    "Focus on the device layer: firmware version, manufacturer patch advisory, device certification impact, required post-patch biomedical validation steps, and any interoperability risks with connected systems. Reference the device's manufacturer, product, and version.",
 };

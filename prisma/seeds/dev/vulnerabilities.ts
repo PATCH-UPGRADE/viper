@@ -4,7 +4,8 @@ import {
 } from "@/features/vulnerabilities/server/records";
 import { Priority, Severity, VulnerabilitySource } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { matchingForGroup } from "./canonical-identity";
+import { matchingForDevice } from "./canonical-identity";
+import { deviceForSampleCpe } from "./device-groups";
 
 // Vulnerabilities — cpes is an array to support multi-device-group linking
 const SAMPLE_VULNERABILITIES = [
@@ -230,35 +231,24 @@ export async function seedVulnerabilities(userId: string) {
       impact,
     } = vulnerability;
 
-    const deviceGroups = (
-      await Promise.all(
-        cpes.map((cpe) =>
-          prisma.deviceGroup.findFirst({
-            where: { cpe: { has: cpe } },
-            select: {
-              id: true,
-              manufacturerId: true,
-              productId: true,
-              versionId: true,
-            },
-          }),
-        ),
-      )
-    ).filter((dg): dg is NonNullable<typeof dg> => dg !== null);
+    const devices = [];
+    for (const cpe of cpes) {
+      const device = await deviceForSampleCpe(cpe);
+      if (device) devices.push(device);
+    }
 
-    if (deviceGroups.length === 0) {
-      console.warn(`⚠️  No device groups found for CPEs: ${cpes.join(", ")}`);
+    if (devices.length === 0) {
+      console.warn(`⚠️  No sample devices found for CPEs: ${cpes.join(", ")}`);
       continue;
     }
 
-    // Connect a shared matching per distinct device-group identity so the match
+    // Connect a shared matching per distinct device identity so the match
     // resolver (and issue-creation extension) link them back correctly.
-    const uniqueGroups = [
-      ...new Map(deviceGroups.map((dg) => [dg.id, dg])).values(),
-    ];
-    const matchingIds = (
-      await Promise.all(uniqueGroups.map(matchingForGroup))
-    ).filter((id): id is string => id !== null);
+    const matchingIds = [];
+    for (const device of devices) {
+      const id = await matchingForDevice(device);
+      if (id) matchingIds.push(id);
+    }
 
     const { vulnerabilityId } = await createVulnerabilityRecord(
       {

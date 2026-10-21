@@ -52,7 +52,7 @@ export async function seedVendors() {
   });
 
   const assets = await prisma.asset.findMany({
-    where: { deviceGroup: { manufacturerId: manufacturer.id } },
+    where: { manufacturerId: manufacturer.id },
     select: { id: true },
   });
 
@@ -91,6 +91,18 @@ export async function seedVendors() {
         "IT patches and monitors the imaging workstations and their network segment.",
       departmentId: itDepartment.id,
       assets: { connect: assets.map((asset) => ({ id: asset.id })) },
+    },
+  });
+
+  const monitors = await prisma.asset.findMany({
+    where: { id: { startsWith: "rad-mon-" } },
+    select: { id: true },
+  });
+  await prisma.managesRelationship.create({
+    data: {
+      responsibilities: "IT patches and monitors the bedside patient monitors.",
+      departmentId: itDepartment.id,
+      assets: { connect: monitors },
     },
   });
 

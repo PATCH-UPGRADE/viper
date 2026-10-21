@@ -6,20 +6,29 @@ const db = vi.hoisted(() => ({
   integration: { findUniqueOrThrow: vi.fn() },
   asset: { findMany: vi.fn() },
   externalAssetMapping: { findMany: vi.fn() },
+  product: { findUniqueOrThrow: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ default: db }));
 vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: vi.fn(),
 }));
-vi.mock("@/lib/router-utils", () => ({ resolveDeviceGroup: vi.fn() }));
+vi.mock("@/lib/router-utils", () => ({ resolveDevice: vi.fn() }));
+vi.mock("@/features/device-types/server/apply-device-type", () => ({
+  fillProductDeviceType: vi.fn(),
+}));
+vi.mock("@/features/device-types/server/resolve-device-type", () => ({
+  resolveDeviceType: vi.fn(),
+}));
 vi.mock("../manages-relationship", () => ({
   connectUncontractedAssets: vi.fn(),
 }));
 vi.mock("../contracts", () => ({ syncFleetContracts: vi.fn() }));
 
+import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
+import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
-import { resolveDeviceGroup } from "@/lib/router-utils";
+import { resolveDevice } from "@/lib/router-utils";
 import type { ResourceSyncCtx, Session } from "../../../../core/types";
 import type { FleetConfig, FleetCreds } from "../../config";
 import { syncFleetContracts } from "../contracts";
@@ -30,6 +39,8 @@ const EQUIPMENT = {
   equipmentKey: "US_1006103273",
   serialNumber: "63014",
   productName: "syngo WebSpace",
+  materialNumber: "10191201",
+  modalityCode: "03",
   modalityTranslation: "Computed Tomography (CT)",
   softwareVersion: "VA11A",
   customerName: "SIEMENS DEMO/EVALUATION",
@@ -89,6 +100,13 @@ const makeCtx = (
   ...overrides,
 });
 
+const device = {
+  manufacturerId: "m-1",
+  productId: "p-1",
+  versionId: "v-1",
+  versionStatus: "KNOWN" as const,
+};
+
 beforeEach(() => {
   db.integration.findUniqueOrThrow.mockResolvedValue({
     integrationUserId: "shadow-1",
@@ -97,10 +115,15 @@ beforeEach(() => {
   // By default no Fleet asset is safe to re-group; individual tests opt in.
   db.externalAssetMapping.findMany.mockReset().mockResolvedValue([]);
   vi.mocked(processIntegrationSync).mockReset().mockResolvedValue(okResponse);
-  vi.mocked(resolveDeviceGroup)
+  vi.mocked(resolveDevice).mockReset().mockResolvedValue(device);
+  db.product.findUniqueOrThrow
     .mockReset()
-    .mockResolvedValue({ id: "dg-1" } as Awaited<
-      ReturnType<typeof resolveDeviceGroup>
+    .mockResolvedValue({ deviceTypeId: null });
+  vi.mocked(fillProductDeviceType).mockReset().mockResolvedValue(undefined);
+  vi.mocked(resolveDeviceType)
+    .mockReset()
+    .mockResolvedValue({ id: "dt-ct" } as Awaited<
+      ReturnType<typeof resolveDeviceType>
     >);
   vi.mocked(connectUncontractedAssets).mockReset().mockResolvedValue(undefined);
   vi.mocked(syncFleetContracts).mockReset().mockResolvedValue({
@@ -131,7 +154,7 @@ describe("syncAssets", () => {
     expect(outcome).toEqual({ cursor: null });
   });
 
-  it("derives the device group from Fleet's product and version names", async () => {
+  it("derives the device from Fleet's product and version names", async () => {
     await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
@@ -139,20 +162,31 @@ describe("syncAssets", () => {
       input.items[0] as Parameters<typeof config.transformInputItem>[0],
       "shadow-1",
     );
-    expect(resolveDeviceGroup).toHaveBeenCalledWith({
+    expect(resolveDevice).toHaveBeenCalledWith({
       manufacturer: "Siemens Healthineers",
       product: "syngo WebSpace",
       version: "VA11A",
-      hasCpe: false,
     });
-    expect(out.createData).toMatchObject({
-      deviceGroupId: "dg-1",
-      userId: "shadow-1",
-    });
+    expect(out.createData).toMatchObject({ ...device, userId: "shadow-1" });
     expect(out.uniqueFieldConditions).toEqual([{ serialNumber: "63014" }]);
   });
 
-  it("re-groups an asset whose device group Fleet itself built", async () => {
+  it("never writes Fleet's modality label into the asset role", async () => {
+    db.externalAssetMapping.findMany.mockResolvedValue([
+      { externalId: "US_1006103273" },
+    ]);
+    await syncAssets(makeCtx());
+
+    const [, config, input] = lastSyncCall();
+    const out = await config.transformInputItem(
+      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      "shadow-1",
+    );
+    expect(out.createData).not.toHaveProperty("role");
+    expect(out.updateData).not.toHaveProperty("role");
+  });
+
+  it("updates the device of an asset that Fleet created", async () => {
     db.externalAssetMapping.findMany.mockResolvedValue([
       { externalId: "US_1006103273" },
     ]);
@@ -164,10 +198,10 @@ describe("syncAssets", () => {
       input.items[0] as Parameters<typeof config.transformInputItem>[0],
       "shadow-1",
     );
-    expect(out.updateData).toMatchObject({ deviceGroupId: "dg-1" });
+    expect(out.updateData).toMatchObject(device);
   });
 
-  it("leaves the device group alone when a CPE-derived group owns the asset", async () => {
+  it("leaves the device alone on an asset that another source created", async () => {
     db.externalAssetMapping.findMany.mockResolvedValue([]);
 
     await syncAssets(makeCtx());
@@ -177,17 +211,14 @@ describe("syncAssets", () => {
       input.items[0] as Parameters<typeof config.transformInputItem>[0],
       "shadow-1",
     );
-    expect(out.updateData).not.toHaveProperty("deviceGroupId");
+    expect(out.updateData).not.toHaveProperty("productId");
   });
 
-  it("only asks for assets sitting in a group with no CPE", async () => {
+  it("only asks for the assets that the Fleet user created", async () => {
     await syncAssets(makeCtx());
 
     expect(db.externalAssetMapping.findMany).toHaveBeenCalledWith({
-      where: {
-        integrationId: "int-1",
-        item: { deviceGroup: { cpe: { isEmpty: true } } },
-      },
+      where: { integrationId: "int-1", item: { userId: "shadow-1" } },
       select: { externalId: true },
     });
   });
@@ -255,5 +286,98 @@ describe("syncAssets", () => {
       "1 of 11 contracts failed: boom",
     );
     expect(connectUncontractedAssets).toHaveBeenCalledWith("int-1", new Set());
+  });
+});
+
+describe("product device type", () => {
+  const transformAll = async (
+    equipments: Record<string, unknown>[] = [EQUIPMENT],
+  ) => {
+    const ctx = makeCtx({
+      session: {
+        request: async () =>
+          ({ ok: true, json: async () => equipments }) as unknown as Response,
+      },
+    });
+    await syncAssets(ctx);
+    const [, config, input] = lastSyncCall();
+    for (const item of input.items) {
+      await config.transformInputItem(
+        item as Parameters<typeof config.transformInputItem>[0],
+        "shadow-1",
+      );
+    }
+  };
+
+  it("fills an empty type from the modality label", async () => {
+    await transformAll();
+
+    expect(resolveDeviceType).toHaveBeenCalledWith("Computed Tomography (CT)", {
+      integration: "teamplay Fleet",
+      productName: "syngo WebSpace",
+      materialNumber: "10191201",
+      modalityCode: "03",
+    });
+    expect(fillProductDeviceType).toHaveBeenCalledWith("p-1", "dt-ct");
+  });
+
+  it("keeps a type that the product already has", async () => {
+    db.product.findUniqueOrThrow.mockResolvedValue({
+      deviceTypeId: "dt-viewer",
+    });
+
+    await transformAll();
+
+    expect(resolveDeviceType).not.toHaveBeenCalled();
+    expect(fillProductDeviceType).not.toHaveBeenCalled();
+  });
+
+  it("leaves the type empty if no device type matches", async () => {
+    vi.mocked(resolveDeviceType).mockResolvedValue(null);
+
+    await transformAll();
+
+    expect(fillProductDeviceType).not.toHaveBeenCalled();
+  });
+
+  it("never types the shared product for records with no product name", async () => {
+    await transformAll([{ ...EQUIPMENT, productName: null }]);
+
+    expect(db.product.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(resolveDeviceType).not.toHaveBeenCalled();
+  });
+
+  it("checks each product one time in a sync", async () => {
+    await transformAll([
+      EQUIPMENT,
+      { ...EQUIPMENT, equipmentKey: "US_2", serialNumber: "2" },
+    ]);
+
+    expect(db.product.findUniqueOrThrow).toHaveBeenCalledTimes(1);
+    expect(resolveDeviceType).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses a later record of the product if the first has no modality", async () => {
+    await transformAll([
+      { ...EQUIPMENT, modalityTranslation: null },
+      { ...EQUIPMENT, equipmentKey: "US_2", serialNumber: "2" },
+    ]);
+
+    expect(resolveDeviceType).toHaveBeenCalledTimes(1);
+    expect(resolveDeviceType).toHaveBeenCalledWith(
+      "Computed Tomography (CT)",
+      expect.anything(),
+    );
+  });
+
+  it("accepts a numeric material number and modality code", async () => {
+    await transformAll([
+      { ...EQUIPMENT, materialNumber: 7129534, modalityCode: 3 },
+    ]);
+
+    expect(resolveDeviceType).toHaveBeenCalledWith(
+      "Computed Tomography (CT)",
+      expect.objectContaining({ materialNumber: "7129534", modalityCode: "3" }),
+    );
   });
 });

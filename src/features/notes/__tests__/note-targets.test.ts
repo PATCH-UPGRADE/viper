@@ -68,6 +68,7 @@ describe("findDeviceGroupMatching", () => {
         },
         versionId: null,
         versionRange: "vers:semver/<8.8",
+        versionStatus: "KNOWN",
       },
       select: { id: true },
     });
@@ -117,7 +118,6 @@ describe("findDeviceGroupMatching", () => {
       product: "Sigma Spectrum",
       version: null,
       versionRange: "vers:semver/<8.0",
-      hasCpe: false,
     });
     expect(result).toEqual({ found: true, id: "dgm_new" });
     expect(prisma.deviceGroupMatching.findMany).not.toHaveBeenCalled();

@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  deviceTypeLabelSchema,
+  deviceTypeLabelSelect,
+} from "@/features/assets/utils";
+import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
 } from "@/features/integrations/core/urls";
@@ -224,18 +228,17 @@ export const ticketDetailInclude = {
           status: true,
           macAddress: true,
           location: true,
-          deviceGroupId: true,
-          deviceGroup: {
+          manufacturerId: true,
+          productId: true,
+          versionId: true,
+          manufacturer: { select: { canonicalDisplayName: true } },
+          product: {
             select: {
-              id: true,
-              manufacturerId: true,
-              productId: true,
-              versionId: true,
-              manufacturer: { select: { canonicalDisplayName: true } },
-              product: { select: { canonicalDisplayName: true } },
-              version: { select: { canonicalName: true } },
+              canonicalDisplayName: true,
+              ...deviceTypeLabelSelect,
             },
           },
+          version: { select: { canonicalName: true } },
         },
       },
     },
@@ -706,16 +709,17 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   // Prisma's Json column. Using z.any() so the inferred TS type is `any`,
   // which stays assignable to Prisma.JsonValue on the UI side.
   location: z.any(),
-  deviceGroupId: z.string(),
-  deviceGroup: z.object({
-    id: z.string(),
-    manufacturerId: z.string().nullable(),
-    productId: z.string().nullable(),
-    versionId: z.string().nullable(),
-    manufacturer: z.object({ canonicalDisplayName: z.string() }).nullable(),
-    product: z.object({ canonicalDisplayName: z.string() }).nullable(),
-    version: z.object({ canonicalName: z.string() }).nullable(),
-  }),
+  manufacturerId: z.string().nullable(),
+  productId: z.string().nullable(),
+  versionId: z.string().nullable(),
+  manufacturer: z.object({ canonicalDisplayName: z.string() }).nullable(),
+  product: z
+    .object({
+      canonicalDisplayName: z.string(),
+      deviceType: deviceTypeLabelSchema,
+    })
+    .nullable(),
+  version: z.object({ canonicalName: z.string() }).nullable(),
 });
 
 const detailAssetTicketSchema = z.object({

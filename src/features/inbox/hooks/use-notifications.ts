@@ -8,7 +8,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getAssetRoleLabel } from "@/features/assets/utils";
+import { getAssetTitle } from "@/features/assets/utils";
 import { useTRPC } from "@/trpc/client";
 import type { AffectedAssetsSummary } from "../types";
 import { useNotificationsParams } from "./use-notifications-params";
@@ -114,19 +114,14 @@ export const useAnswerAssetVersion = () => {
   return useMutation(
     trpc.assets.update.mutationOptions({
       onSuccess: (data, variables) => {
-        const label = getAssetRoleLabel(data);
-        if ("version" in variables && variables.version) {
-          toast.success(`${label} set to version ${variables.version}`);
-        } else if (
-          "versionStatus" in variables &&
-          variables.versionStatus === "UNKNOWN"
-        ) {
-          toast.success(`${label} marked version unknown`);
-        } else if (
-          "versionStatus" in variables &&
-          variables.versionStatus === "UNSURE"
-        ) {
-          toast.success(`${label} marked version not sure`);
+        const label = getAssetTitle(data);
+        const version = variables.device?.version;
+        if (version && "name" in version) {
+          toast.success(`${label} set to version ${version.name}`);
+        } else if (version && "status" in version) {
+          toast.success(
+            `${label} marked version ${version.status === "UNSURE" ? "not sure" : "unknown"}`,
+          );
         } else {
           toast.success(`${label} updated`);
         }

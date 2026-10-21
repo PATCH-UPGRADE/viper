@@ -1,5 +1,5 @@
 import "server-only";
-import { assetNameSelect } from "@/features/assets/utils";
+import { assetAgentNameSelect } from "@/features/assets/utils";
 import { decryptCredentials } from "@/features/integrations/core/credentials";
 import { requirePlatform } from "@/features/integrations/core/registry";
 import { openSession } from "@/features/integrations/core/session";
@@ -181,7 +181,7 @@ export async function fileClaimedTicket(
       targetIntegrationId: true,
       assets: {
         select: {
-          asset: { select: assetNameSelect },
+          asset: { select: assetAgentNameSelect },
           ticketId: true,
         },
       },

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dayGroupLabel } from "./date-utils";
+import { asDate, dayGroupLabel } from "./date-utils";
 
 describe("dayGroupLabel", () => {
   beforeEach(() => {
@@ -30,5 +30,20 @@ describe("dayGroupLabel", () => {
 
   it("accepts an ISO string", () => {
     expect(dayGroupLabel("2026-09-16T08:12:00")).toBe("Today");
+  });
+});
+
+describe("asDate", () => {
+  it("reads a timestamp, with Z or with an offet", () => {
+    expect(asDate("2026-10-10T14:30:00.000Z")).toBeInstanceOf(Date);
+    expect(asDate("2026-10-10T00:00:00.000+00:00")).toEqual(
+      new Date("2026-10-10T00:00:00.000Z"),
+    );
+  });
+
+  it("is null for garbage, null and undefined", () => {
+    expect(asDate("not a date")).toBeNull();
+    expect(asDate("null")).toBeNull();
+    expect(asDate(undefined)).toBeNull();
   });
 });

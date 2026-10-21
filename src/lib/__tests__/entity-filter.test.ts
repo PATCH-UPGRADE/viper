@@ -10,11 +10,11 @@ describe("validateEntityFilter", () => {
   describe("ASSET", () => {
     it("accepts a scalar equality filter (shorthand and long form)", () => {
       expect(
-        validateEntityFilter("ASSET", { role: "CT Scanner" }).success,
+        validateEntityFilter("ASSET", { hostname: "CT-BRIGHT-001" }).success,
       ).toBe(true);
       expect(
         validateEntityFilter("ASSET", {
-          role: { equals: "CT Scanner" },
+          hostname: { equals: "CT-BRIGHT-001" },
         }).success,
       ).toBe(true);
     });
@@ -28,18 +28,54 @@ describe("validateEntityFilter", () => {
       ).toBe(true);
     });
 
-    it("accepts a single relation hop through deviceGroup", () => {
+    it("accepts the device ids on the asset", () => {
       const result = validateEntityFilter("ASSET", {
-        deviceGroup: { productId: "prod_infusion_pump" },
+        productId: "prod_infusion_pump",
+        versionStatus: "UNKNOWN",
       });
       expect(result.success).toBe(true);
+    });
+
+    it("accepts a device type through product", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          product: { deviceType: { slug: "infusion-pump" } },
+        }).success,
+      ).toBe(true);
+      expect(
+        validateEntityFilter("ASSET", {
+          product: { deviceTypeId: "dt_infusion_pump" },
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts a UDI through version", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          version: { udiDi: "00843197100156" },
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects the removed deviceGroup hop", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          deviceGroup: { productId: "prod_infusion_pump" },
+        }).success,
+      ).toBe(false);
+    });
+
+    it("rejects role, which is free text", () => {
+      expect(
+        validateEntityFilter("ASSET", { role: "CT Scanner" }).success,
+      ).toBe(false);
     });
 
     it("accepts AND / OR / NOT composition", () => {
       const result = validateEntityFilter("ASSET", {
         OR: [
           { networkSegment: { contains: "ICU" } },
-          { deviceGroup: { manufacturerId: "manufacturer_1" } },
+          { manufacturerId: "manufacturer_1" },
         ],
         NOT: { status: "Decommissioned" },
       });
@@ -51,8 +87,13 @@ describe("validateEntityFilter", () => {
     });
 
     it("returns the parsed where object on success", () => {
-      const result = validateEntityFilter("ASSET", { role: "CT Scanner" });
-      expect(result).toEqual({ success: true, data: { role: "CT Scanner" } });
+      const result = validateEntityFilter("ASSET", {
+        hostname: "CT-BRIGHT-001",
+      });
+      expect(result).toEqual({
+        success: true,
+        data: { hostname: "CT-BRIGHT-001" },
+      });
     });
 
     it("rejects an unknown field", () => {
@@ -62,7 +103,7 @@ describe("validateEntityFilter", () => {
 
     it("rejects an unknown operator", () => {
       const result = validateEntityFilter("ASSET", {
-        role: { startsWithh: "CT" },
+        hostname: { startsWithh: "CT" },
       });
       expect(result.success).toBe(false);
     });
@@ -75,7 +116,7 @@ describe("validateEntityFilter", () => {
     });
 
     it("rejects a wrongly-typed value", () => {
-      const result = validateEntityFilter("ASSET", { role: 42 });
+      const result = validateEntityFilter("ASSET", { hostname: 42 });
       expect(result.success).toBe(false);
     });
 

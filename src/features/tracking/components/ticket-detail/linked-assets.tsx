@@ -17,7 +17,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getAssetDisplayName } from "@/features/assets/utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetIdentifier,
+} from "@/features/assets/utils";
 import { getSwatchClass } from "@/features/tag-colors/palette";
 import { TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -36,6 +39,7 @@ import {
   sortAssetTicketsByStatus,
   statusHue,
   statusLabels,
+  useReadOnly,
 } from "./shared";
 
 const AssetProgressStrip = ({
@@ -120,14 +124,16 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
             <CommandEmpty>No eligible assets found.</CommandEmpty>
             <CommandGroup>
               {(candidates ?? []).map((a) => {
-                const label = getAssetDisplayName(a);
+                const label = getAssetIdentifier(a);
                 const model = [
-                  a.deviceGroup?.manufacturer?.canonicalDisplayName,
-                  a.deviceGroup?.product?.canonicalDisplayName,
+                  a.manufacturer?.canonicalDisplayName,
+                  a.product?.canonicalDisplayName,
                 ]
                   .filter(Boolean)
                   .join(" ");
-                const sub = [a.role, model].filter(Boolean).join(" · ");
+                const sub = [getAssetDeviceTypeLabel(a), model]
+                  .filter(Boolean)
+                  .join(" · ");
                 return (
                   <CommandItem
                     key={a.id}
@@ -166,6 +172,7 @@ export const LinkedAssetsTabContent = ({
   ticketId: string;
   assetTickets: DetailAssetTicket[];
 }) => {
+  const readOnly = useReadOnly();
   const detach = useDetachAsset(ticketId);
   const sortedAssetTickets = sortAssetTicketsByStatus(assetTickets);
   const { data: otherWorkOrders } = useSuspenseOtherAssetWorkOrders(ticketId);
@@ -180,7 +187,7 @@ export const LinkedAssetsTabContent = ({
               ({assetTickets.length})
             </span>
           </h2>
-          <AttachAssetPopover ticketId={ticketId} />
+          {!readOnly && <AttachAssetPopover ticketId={ticketId} />}
         </div>
         <AssetProgressStrip assetTickets={sortedAssetTickets} />
         <div className="p-2">
@@ -191,7 +198,11 @@ export const LinkedAssetsTabContent = ({
               otherWorkOrderCounts={countOtherWorkOrdersByAsset(
                 otherWorkOrders,
               )}
-              onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
+              onDetach={
+                readOnly
+                  ? undefined
+                  : (assetId) => detach.mutate({ ticketId, assetId })
+              }
               detachPending={detach.isPending}
             />
           ) : (

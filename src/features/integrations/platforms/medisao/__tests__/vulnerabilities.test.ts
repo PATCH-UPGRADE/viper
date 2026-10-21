@@ -44,6 +44,10 @@ const uniqueViolation = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // MedISAO channels name a product but no version, so their matching is UNKNOWN.
+  prismaMock.vulnerability.update.mockResolvedValue({
+    deviceGroupMatchings: [{ versionStatus: "UNKNOWN" }],
+  });
   prismaMock.vulnerability.findMany.mockResolvedValue([]);
   prismaMock.externalVulnerabilityMapping.findMany.mockResolvedValue([]);
   prismaMock.vulnerability.create.mockImplementation(({ data }) =>
@@ -131,10 +135,20 @@ describe("resolveOrMintVulnerabilities", () => {
     expect(prismaMock.vulnerability.update).toHaveBeenCalledWith({
       where: { id: "minted-1" },
       data: { deviceGroupMatchings: { connect: [{ id: "matching-1" }] } },
+      select: {
+        deviceGroupMatchings: {
+          where: { id: "matching-1" },
+          select: { versionStatus: true },
+        },
+      },
     });
     expect(prismaMock.issue.createMany).toHaveBeenCalledWith({
       data: [
-        { vulnerabilityId: "minted-1", deviceGroupMatchingId: "matching-1" },
+        {
+          vulnerabilityId: "minted-1",
+          deviceGroupMatchingId: "matching-1",
+          status: "UNDER_INVESTIGATION",
+        },
       ],
       skipDuplicates: true,
     });
@@ -180,7 +194,11 @@ describe("resolveOrMintVulnerabilities", () => {
     // The winner can have minted it for another channel.
     expect(prismaMock.issue.createMany).toHaveBeenCalledWith({
       data: [
-        { vulnerabilityId: "winner-1", deviceGroupMatchingId: "matching-1" },
+        {
+          vulnerabilityId: "winner-1",
+          deviceGroupMatchingId: "matching-1",
+          status: "UNDER_INVESTIGATION",
+        },
       ],
       skipDuplicates: true,
     });

@@ -1,5 +1,5 @@
 import "server-only";
-import { processAssetIntegrationSync } from "@/features/assets/server/integration-sync";
+import { processCrawledAssetIntegrationSync } from "@/features/assets/server/integration-sync";
 import { processDeviceArtifactIntegrationSync } from "@/features/device-artifacts/server/integration-sync";
 import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
 import { processRemediationIntegrationSync } from "@/features/remediations/server/integration-sync";
@@ -36,7 +36,7 @@ const CRAWLER_RESOURCES: {
 } = {
   [ResourceType.Asset]: {
     recentExternalIds: (query) => prisma.externalAssetMapping.findMany(query),
-    ingest: processAssetIntegrationSync,
+    ingest: processCrawledAssetIntegrationSync,
   },
   [ResourceType.Vulnerability]: {
     recentExternalIds: (query) =>

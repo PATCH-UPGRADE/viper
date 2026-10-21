@@ -22,6 +22,7 @@ import type {
   TicketStatus,
 } from "@/generated/prisma";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
+import { toDateTimeLocal } from "@/lib/date-utils";
 import {
   useAssignableUsers,
   useDepartments,
@@ -32,13 +33,6 @@ import { DepartmentMultiSelect } from "./department-multi-select";
 import { categoryLabels, TicketStatusSelectTrigger } from "./shared";
 
 const UNASSIGNED = "__unassigned__";
-
-const toDateTimeLocal = (date: Date | string | null | undefined) => {
-  if (!date) return "";
-  const d = date instanceof Date ? date : new Date(date);
-  const offsetMs = d.getTimezoneOffset() * 60_000;
-  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
-};
 
 type EditState = {
   summary: string;

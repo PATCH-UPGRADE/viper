@@ -8,12 +8,13 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  type DeviceGroupIdentity,
+  type DeviceIdentity,
+  deviceKey,
   type MatchingLike,
   resolveMatches,
 } from "@/lib/device-matching";
-import { deviceGroupLabel } from "@/lib/markdown/device-group";
-import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
+import { deviceLabel } from "@/lib/markdown/device-group";
+import { assetWhereForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 /** Each overview card shows at most this many rows. */
@@ -31,30 +32,50 @@ const ORDER_BY_URGENCY = [
 async function notificationAssetCount(
   matchings: MatchingLike[],
 ): Promise<number> {
-  const deviceGroupIds = await findDeviceGroupIdsForMatchings(matchings);
-  if (deviceGroupIds.length === 0) return 0;
   return prisma.asset.count({
-    where: { deviceGroupId: { in: deviceGroupIds } },
+    where: await assetWhereForMatchings(matchings, { loose: true }),
   });
 }
 
-/** A device group that currently has assets, plus how many. */
-type InventoryDeviceGroup = DeviceGroupIdentity & {
-  _count: { assets: number };
-};
+/** One manufacturer/product/version that assets have, plus how many. */
+type InventoryDevice = DeviceIdentity & { assetCount: number };
+
+/** Every device identity that assets have, with its asset count. */
+async function deviceInventory(): Promise<InventoryDevice[]> {
+  const groups = await prisma.asset.groupBy({
+    by: ["manufacturerId", "productId", "versionId"],
+    _count: { _all: true },
+  });
+  const versionIds = groups.flatMap((g) => (g.versionId ? [g.versionId] : []));
+  const versions = await prisma.version.findMany({
+    where: { id: { in: versionIds } },
+    select: { id: true, canonicalName: true },
+  });
+  const versionName = new Map(versions.map((v) => [v.id, v.canonicalName]));
+  return groups.map((g) => ({
+    id: deviceKey(g),
+    manufacturerId: g.manufacturerId,
+    productId: g.productId,
+    versionId: g.versionId,
+    version: g.versionId
+      ? { canonicalName: versionName.get(g.versionId) ?? "" }
+      : null,
+    assetCount: g._count._all,
+  }));
+}
 
 /**
  * How many assets in the inventory a set of matchings covers.
  *
- * The caller passes every device group that owns assets, fetched once, so this
- * resolves in memory. Doing it per notification would be a query each.
+ * The caller passes the device inventory, fetched once, so this resolves in
+ * memory. Doing it per notification would be a query each.
  */
 const inventoryAssetCount = (
   matchings: MatchingLike[],
-  inventory: InventoryDeviceGroup[],
+  inventory: InventoryDevice[],
 ) =>
   resolveMatches(matchings, inventory).reduce(
-    (total, group) => total + group._count.assets,
+    (total, device) => total + device.assetCount,
     0,
   );
 
@@ -102,8 +123,9 @@ const activitiesToWorkOrders = (statusChanges: StatusChangeRow[]) => {
   });
 };
 
-type NewAssetRow = {
-  deviceGroup: Parameters<typeof deviceGroupLabel>[0] & { id: string };
+type NewAssetRow = Parameters<typeof deviceLabel>[0] & {
+  manufacturerId: string | null;
+  productId: string | null;
   externalMappings: { integration: { name: string } }[];
 };
 
@@ -115,14 +137,14 @@ const assetsToRows = (newAssets: NewAssetRow[]) => {
 
   for (const asset of newAssets) {
     const source = asset.externalMappings[0]?.integration.name ?? null;
-    const key = `${asset.deviceGroup.id}:${source ?? ""}`;
+    const key = `${asset.manufacturerId}:${asset.productId}:${source ?? ""}`;
     const existing = rows.get(key);
     if (existing) {
       existing.count += 1;
     } else {
       rows.set(key, {
         key,
-        label: deviceGroupLabel(asset.deviceGroup),
+        label: deviceLabel(asset),
         source,
         count: 1,
       });
@@ -215,17 +237,7 @@ export const overviewRouter = createTRPCRouter({
 
     const [inventory, notifications, statusChanges, newAssets] =
       await Promise.all([
-        prisma.deviceGroup.findMany({
-          where: { assets: { some: {} } },
-          select: {
-            id: true,
-            manufacturerId: true,
-            productId: true,
-            versionId: true,
-            version: { select: { canonicalName: true } },
-            _count: { select: { assets: true } },
-          },
-        }),
+        deviceInventory(),
 
         prisma.notification.findMany({
           where: {
@@ -278,13 +290,10 @@ export const overviewRouter = createTRPCRouter({
         prisma.asset.findMany({
           where: { createdAt: { gte: since } },
           select: {
-            deviceGroup: {
-              select: {
-                id: true,
-                manufacturer: { select: { canonicalDisplayName: true } },
-                product: { select: { canonicalDisplayName: true } },
-              },
-            },
+            manufacturerId: true,
+            productId: true,
+            manufacturer: { select: { canonicalDisplayName: true } },
+            product: { select: { canonicalDisplayName: true } },
             // Which integration brought the asset in, for the "Added via …"
             // line. Manually created assets have no mapping.
             externalMappings: {

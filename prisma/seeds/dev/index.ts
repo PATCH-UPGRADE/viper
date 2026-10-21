@@ -1,8 +1,9 @@
 import { seedAssets } from "./assets";
+import { seedCalendarWorkOrders } from "./calendar";
 import { seedCategoryColors } from "./category-colors";
 import { seedDepartments } from "./departments";
 import { seedDeviceArtifacts } from "./device-artifacts";
-import { seedDeviceGroups } from "./device-groups";
+import { seedSampleDevices } from "./device-groups";
 import {
   isFleetAdvisoryNotificationSeeded,
   seedFleetAdvisoryNotification,
@@ -27,7 +28,7 @@ export async function seedDemoData() {
 
   await seedDepartments(seedUser.id);
   await seedCategoryColors();
-  await seedDeviceGroups();
+  await seedSampleDevices();
   await seedAssets(seedUser.id);
   await seedVendors();
   await seedFleetIntegration(seedUser.id);
@@ -37,6 +38,7 @@ export async function seedDemoData() {
   await seedWorkflows(seedUser.id);
   await seedNotes(seedUser.id);
   await seedWorkOrderTickets(seedUser.id);
+  await seedCalendarWorkOrders(seedUser.id);
   // After the vulnerabilities, whose CPEs create the matchings it links to.
   await seedFleetAdvisoryNotification();
 }

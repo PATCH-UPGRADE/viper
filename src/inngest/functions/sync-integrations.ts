@@ -10,6 +10,7 @@ import {
 import {
   defaultSyncEveryFor,
   requirePlatform,
+  unscheduledPlatforms,
 } from "@/features/integrations/core/registry";
 import { openSession } from "@/features/integrations/core/session";
 import {
@@ -39,13 +40,14 @@ export const syncAllIntegrations = inngest.createFunction(
     //  integration.enabled  — the whole connection is switched off
     //  resourceSync.enabled — this one resource is switched off
     //  nextSyncAt           — when this resource is next due (null = due now)
-    //
-    // Every due row is scheduled, whatever its platform does with the tick.
     const due = await step.run("fetch-due-resource-syncs", async () =>
       prisma.integrationResourceSync.findMany({
         where: {
           enabled: true,
-          integration: { enabled: true },
+          integration: {
+            enabled: true,
+            platform: { notIn: unscheduledPlatforms() },
+          },
           OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: new Date() } }],
         },
         select: { integrationId: true, resource: true },

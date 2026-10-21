@@ -95,7 +95,6 @@ describe("the advisory linker", () => {
       product: "ViperDevice",
       version: null,
       versionRange: "vers:semver/<=6.0.2",
-      hasCpe: false,
     });
   });
 

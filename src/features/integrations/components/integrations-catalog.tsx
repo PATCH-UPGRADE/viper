@@ -8,6 +8,7 @@ import type { CatalogEntry } from "../core/catalog";
 import { useAddedPlatforms } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
+import { PLATFORM_ADD_OVERRIDES } from "./platform-add-overrides";
 
 const SECTION_SUBTITLES: Record<Category, string> = {
   "Hospital Inventory": "Bring your asset inventory into VIPER.",
@@ -25,24 +26,31 @@ const PlatformCard = ({
 }: {
   entry: CatalogEntry;
   added: boolean;
-}) => (
-  <Card className="p-0 gap-0 overflow-hidden">
-    <div className="flex items-center gap-3 p-4">
-      <Avatar className="size-9 shrink-0 rounded-md border">
-        <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
-          {initialsOf(entry.displayName)}
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0">
-        <CardTitle>{entry.displayName}</CardTitle>
-        <CardDescription>{entry.description}</CardDescription>
+}) => {
+  const PlatformAddButton = PLATFORM_ADD_OVERRIDES[entry.platform];
+  return (
+    <Card className="p-0 gap-0 overflow-hidden">
+      <div className="flex items-center gap-3 p-4">
+        <Avatar className="size-9 shrink-0 rounded-md border">
+          <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
+            {initialsOf(entry.displayName)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <CardTitle>{entry.displayName}</CardTitle>
+          <CardDescription>{entry.description}</CardDescription>
+        </div>
       </div>
-    </div>
-    <div className="p-4 border-t">
-      <CreateIntegrationDialog entry={entry} added={added} />
-    </div>
-  </Card>
-);
+      <div className="p-4 border-t">
+        {PlatformAddButton ? (
+          <PlatformAddButton entry={entry} />
+        ) : (
+          <CreateIntegrationDialog entry={entry} added={added} />
+        )}
+      </div>
+    </Card>
+  );
+};
 
 const CategorySection = ({
   category,

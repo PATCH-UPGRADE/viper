@@ -18,6 +18,7 @@ model User {
   id               String            @id
   name             String
   email            String?
+  phone            String?
   emailVerified    Boolean           @default(false)
   image            String?
   createdAt        DateTime          @default(now())
@@ -41,15 +42,19 @@ model User {
   notificationReads NotificationRead[]
   matchFeedback     MatchFeedback[]
   fieldCorrections  FieldCorrection[]
+  csvImports        CsvImport[]
 
   departmentId             String?
-  department               Department?                      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  workOrderTicketsCreated  WorkOrderTicket[]                @relation("WorkOrderTicketCreator")
-  workOrderTicketsAssigned WorkOrderTicket[]                @relation("WorkOrderTicketAssignee")
+  department               Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated  WorkOrderTicket[] @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned WorkOrderTicket[] @relation("WorkOrderTicketAssignee")
   ticketComments           TicketComment[]
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
   ticketActivities         TicketActivity[]
+
+  rescheduleRequested      RescheduleRequest[]              @relation("RescheduleRequestedBy")
+  rescheduleDecided        RescheduleRequest[]              @relation("RescheduleDecidedBy")
   notes                    Note[]
   answeredQuestions        Question[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
@@ -225,9 +230,9 @@ model Manufacturer {
   id                   String                @id @default(cuid())
   canonicalName        String                @unique
   canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
   nameMappings         String[]              @default([])
-  deviceGroups         DeviceGroup[]
+  products             Product[]
+  assets               Asset[]
   matchings            DeviceGroupMatching[]
   vendors              Vendor[]
   createdAt            DateTime              @default(now())
@@ -336,57 +341,63 @@ model ManagesRelationship {
 
 model Product {
   id                   String                @id @default(cuid())
-  canonicalName        String                @unique
+  manufacturerId       String
+  manufacturer         Manufacturer          @relation(fields: [manufacturerId], references: [id], onDelete: Restrict)
+  canonicalName        String
   canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
   nameMappings         String[]              @default([])
-  deviceGroups         DeviceGroup[]
+  deviceTypeId         String?
+  deviceType           DeviceType?           @relation(fields: [deviceTypeId], references: [id], onDelete: SetNull)
+  versions             Version[]
+  assets               Asset[]
   matchings            DeviceGroupMatching[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
+  @@unique([manufacturerId, canonicalName])
+  // Target of Asset's composite foreign key, which keeps an asset's product inside its manufacturer.
+  @@unique([manufacturerId, id])
   @@index([canonicalName])
+  @@index([deviceTypeId])
   @@map("product")
+}
+
+// What kind of device a product is, for example "Infusion Pump". Asset.role
+// holds what one asset is used for.
+model DeviceType {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  displayName  String
+  // A name from src/lib/icon-map.ts, for example "Syringe". Null shows the generic icon.
+  icon         String?
+  // Lowercase only: Prisma `has` is an exact, case-sensitive match.
+  nameMappings String[] @default([])
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("device_type")
 }
 
 model Version {
   id                   String                @id @default(cuid())
-  canonicalName        String                @unique
+  productId            String
+  product              Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  canonicalName        String
   canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
   versScheme           VersScheme?
-  deviceGroups         DeviceGroup[]
+  udiDi                String?               @unique
+  assets               Asset[]
   matchings            DeviceGroupMatching[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
+  @@unique([productId, canonicalName])
+  // Target of Asset's composite foreign key, which keeps an asset's version inside its product.
+  @@unique([productId, id])
   @@map("version")
-}
-
-model DeviceGroup {
-  id String @id @default(cuid())
-
-  manufacturerId String?
-  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
-  productId      String?
-  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
-  versionId      String?
-  version        Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  versionStatus  VersionStatus @default(UNKNOWN)
-
-  cpe        String[] @default([])
-  udi        String?
-  helmSbomId String?
-
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  deviceGroupHistories DeviceGroupHistory[]
-  assets               Asset[]
-
-  // Explicit map: the generated name would be 65 chars and Postgres truncates at 63.
-  @@unique([manufacturerId, productId, versionId, versionStatus], name: "device_group_identity", map: "device_group_identity_key")
-  @@index([manufacturerId, productId])
-  @@map("device_group")
 }
 
 model DeviceGroupMatching {
@@ -400,6 +411,10 @@ model DeviceGroupMatching {
   version        Version?     @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   versionRange String?
+  // UNKNOWN when the source gives no version, NOT_APPLICABLE when the product
+  // has no versions. Either way the matching has no versionId and no
+  // versionRange, and matches like a product-level rule.
+  versionStatus VersionStatus @default(KNOWN)
 
   vulnerabilities      Vulnerability[]                  @relation("VulnerabilityMatchings")
   remediations         Remediation[]                    @relation("RemediationMatchings")
@@ -413,22 +428,9 @@ model DeviceGroupMatching {
 
   // One row per identity to prevent duplicate race condition;
   // migration creates this with NULLS NOT DISTINCT
-  @@unique([manufacturerId, productId, versionId, versionRange], name: "device_group_matching_identity", map: "device_group_matching_identity_key")
+  @@unique([manufacturerId, productId, versionId, versionRange, versionStatus], name: "device_group_matching_identity", map: "device_group_matching_identity_key")
   @@index([manufacturerId, productId])
   @@map("device_group_matching")
-}
-
-model DeviceGroupHistory {
-  id            String      @id @default(cuid())
-  deviceGroupId String
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@map("device_group_history")
 }
 
 enum AssetStatus {
@@ -450,15 +452,20 @@ model Asset {
   status       AssetStatus?
   utilization  Json? // [{ [key: string]: number }]
 
-  deviceGroupId String
-  // TODO: is Cascade the correct behavior for this?
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  // Each can be null, so that an asset can have a known product and an unknown version.
+  manufacturerId String?
+  productId      String?
+  versionId      String?
+  versionStatus  VersionStatus @default(UNKNOWN)
+
+  manufacturer Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: Restrict)
+  product      Product?      @relation(fields: [manufacturerId, productId], references: [manufacturerId, id], onDelete: Restrict)
+  version      Version?      @relation(fields: [productId, versionId], references: [productId, id], onDelete: Restrict)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   issues               Issue[]
-  deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
   assetTickets         AssetTicket[]
   notificationMappings NotificationAssetMapping[]
@@ -469,8 +476,12 @@ model Asset {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([deviceGroupId])
+  @@index([versionId])
+  @@index([manufacturerId, productId])
   @@index([createdAt])
+  @@index([serialNumber])
+  @@index([macAddress])
+  @@index([hostname])
   @@map("asset")
 }
 
@@ -1055,6 +1066,34 @@ model EntityFilterMatch {
   @@map("entity_filter_match")
 }
 
+enum RemediationMechanism {
+  REMOTE_DEPLOYMENT
+  ON_SITE
+  REMOVABLE_MEDIA // USB stick, DVD, SD card
+  OTHER
+}
+
+// when a remediationImpact applies
+enum ImpactPhase {
+  DURING_APPLY // only while the remediation is being applied
+  AFTER_APPLY // persists once it is complete
+}
+
+// what happens to the affected function
+enum ImpactEffect {
+  UNAVAILABLE // does not work
+  DEGRADED // works, with limits
+  CHANGED // works differently, e.g. a moved menu, UI updates
+}
+
+// what kind of fix a remediation is
+enum RemediationCategory {
+  SOFTWARE_UPDATE
+  HARDWARE_PATCH
+  FIREWALL_RULE
+  OTHER
+}
+
 model Remediation {
   id        String            @id @default(cuid())
   artifacts ArtifactWrapper[]
@@ -1075,10 +1114,24 @@ model Remediation {
   alohaStatus AlohaStatus?
   alohaLog    Json         @default("{}")
 
-  sourceImpact Json @default("{}")
+  category                 RemediationCategory?
+  mechanism                RemediationMechanism?
+  requiresDowntime         Boolean?
+  restartRequired          Boolean?
+  estimatedDowntimeSeconds Int?
+  estimatedDurationSeconds Int?
+  disablesFeatures         Boolean?
+  reversible               Boolean?
+  verificationRequired     Boolean?
+  verificationNotes        String?               @db.Text
+  impacts                  RemediationImpact[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isSecurityUpdate          Boolean?
+  isManufacturerRemediation Boolean  @default(false) // official vendor update, not TA4 submission
+
+  createdAt   DateTime  @default(now()) // when our system first saw it
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime? // when manufacturer released it
 
   externalMappings         ExternalRemediationMapping[]
   // raw TA4 submissions that produced this remediation
@@ -1087,6 +1140,23 @@ model Remediation {
 
   @@index([userId])
   @@map("remediation")
+}
+
+model RemediationImpact {
+  id                     String       @id @default(cuid())
+  remediationId          String
+  remediation            Remediation  @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  phase                  ImpactPhase
+  feature                String // nurse call button, UI color 
+  effect                 ImpactEffect
+  clinicalWorkflowImpact Boolean? // clinicians must be told in advance
+  notes                  String?      @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([remediationId])
+  @@map("remediation_impact")
 }
 
 model IssueRemediation {
@@ -1170,6 +1240,7 @@ model Integration {
   createdAt                DateTime                         @default(now())
   updatedAt                DateTime                         @updatedAt
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
+  csvImports               CsvImport[]
 
   @@index([userId])
   @@index([integrationUserId])
@@ -1211,6 +1282,40 @@ model IntegrationResourceSync {
   @@map("integration_resource_sync")
 }
 
+enum CsvImportStatus {
+  Staging
+  Queued
+  Running
+  Succeeded
+  PartiallyFailed
+  Failed
+}
+
+model CsvImport {
+  id            String          @id @default(cuid())
+  integrationId String
+  integration   Integration     @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName      String
+  headers       String[]
+  plan          Json
+  chunkCount    Int             @default(0)
+  status        CsvImportStatus @default(Staging)
+  totalRows     Int             @default(0)
+  addedCount    Int             @default(0)
+  linkedCount   Int             @default(0)
+  failedCount   Int             @default(0)
+  failures      Json            @default("[]")
+  errorMessage  String?
+  createdAt     DateTime        @default(now())
+  finishedAt    DateTime?
+
+  @@index([userId, status])
+  @@index([integrationId])
+  @@map("csv_import")
+}
+
 model Webhook {
   id     String @id @default(cuid())
   userId String
@@ -1233,8 +1338,6 @@ enum TriggerEnum {
   Artifact_Updated
   DeviceArtifact_Created
   DeviceArtifact_Updated
-  DeviceGroup_Created
-  DeviceGroup_Updated
   Remediation_Created
   Remediation_Updated
   Vulnerability_Created
@@ -1261,6 +1364,7 @@ enum ResourceType {
 enum PlatformEnum {
   AI
   CSAF
+  CSV_UPLOAD
   FLEET
   MEDISAO
   PARTNER
@@ -1497,6 +1601,8 @@ model WorkOrderTicket {
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
 
+  rescheduleRequests RescheduleRequest[]
+
   linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
   linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")
 
@@ -1621,6 +1727,10 @@ enum TicketActivityType {
   ASSET_DETACHED
   TICKET_LINKED
   TICKET_UNLINKED
+  RESCHEDULE_REQUESTED
+  RESCHEDULE_APPROVED
+  RESCHEDULE_DECLINED
+  RESCHEDULE_CANCELLED
 }
 
 model TicketActivity {
@@ -1637,6 +1747,32 @@ model TicketActivity {
   @@index([userId])
   @@index([type, createdAt])
   @@map("ticket_activity")
+}
+
+enum RescheduleStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
+model RescheduleRequest {
+  id              String           @id @default(cuid())
+  ticketId        String
+  ticket          WorkOrderTicket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  requestedById   String
+  requestedBy     User             @relation("RescheduleRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  fromScheduledAt DateTime?
+  proposedAt      DateTime
+  reason          String?          @db.Text
+  status          RescheduleStatus @default(PENDING)
+  decidedById     String?
+  decidedBy       User?            @relation("RescheduleDecidedBy", fields: [decidedById], references: [id])
+  decidedAt       DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([ticketId, status])
+  @@map("reschedule_request")
 }
 
 model TicketComment {

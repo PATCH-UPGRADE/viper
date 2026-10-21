@@ -171,6 +171,35 @@ const DynamicField = ({
 
 type Mode = "create" | "edit";
 
+const dialogWordingFor = (
+  mode: Mode,
+  displayName: string,
+  unscheduled: boolean,
+) => {
+  if (mode === "create") {
+    return {
+      title: `Add ${displayName}`,
+      description: `Connect a new ${displayName} integration.`,
+      nameLabel: "Integration Name",
+      submitLabel: "Create Integration",
+    };
+  }
+  if (unscheduled) {
+    return {
+      title: "Edit name",
+      description: "Rename this upload. Nothing else about it changes.",
+      nameLabel: "Name",
+      submitLabel: "Save Changes",
+    };
+  }
+  return {
+    title: `Edit ${displayName}`,
+    description: "Leave a credential field blank to keep it unchanged.",
+    nameLabel: "Integration Name",
+    submitLabel: "Save Changes",
+  };
+};
+
 export const IntegrationFormDialog = ({
   entry,
   mode,
@@ -190,6 +219,7 @@ export const IntegrationFormDialog = ({
     configFields,
     credentialFields,
     credentialsAreAuthShaped,
+    unscheduled,
   } = entry;
   const createIntegration = useCreateIntegration();
   const updateIntegration = useUpdateIntegration();
@@ -201,18 +231,11 @@ export const IntegrationFormDialog = ({
     ? authSchemaToUse
     : z.object(shapeForFields(credentialFields));
 
-  const [title, description, submitLabel] =
-    mode === "edit"
-      ? [
-          `Edit ${displayName}`,
-          "Leave a credential field blank to keep it unchanged.",
-          "Save Changes",
-        ]
-      : [
-          `Add ${displayName}`,
-          `Connect a new ${displayName} integration.`,
-          "Create Integration",
-        ];
+  const { title, description, nameLabel, submitLabel } = dialogWordingFor(
+    mode,
+    displayName,
+    unscheduled,
+  );
 
   const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -318,7 +341,7 @@ export const IntegrationFormDialog = ({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Integration Name *</FormLabel>
+                  <FormLabel>{nameLabel} *</FormLabel>
                   <FormControl>
                     <Input type="text" placeholder={displayName} {...field} />
                   </FormControl>
@@ -329,28 +352,30 @@ export const IntegrationFormDialog = ({
 
             {inlineConfigFields.map(renderConfigField)}
 
-            <FormField
-              control={form.control}
-              name="syncEvery"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sync Interval (seconds) *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(
-                          Number(e.target.value) ||
-                            INTEGRATION_SYNC_EVERY_MIN * 60,
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!unscheduled && (
+              <FormField
+                control={form.control}
+                name="syncEvery"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sync Interval (seconds) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(
+                            Number(e.target.value) ||
+                              INTEGRATION_SYNC_EVERY_MIN * 60,
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {credentialsAreAuthShaped ? (
               <AuthenticationFields form={form} name="credentials" />

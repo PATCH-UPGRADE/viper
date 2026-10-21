@@ -1,9 +1,6 @@
 import { z } from "zod";
-
-const canonicalRefSchema = z.object({
-  canonicalName: z.string(),
-  canonicalDisplayName: z.string(),
-});
+import { deviceTypeLabelSchema } from "@/features/assets/utils";
+import { canonicalRefSchema } from "@/lib/schemas";
 
 // ============================================================================
 // Network Topology Schema
@@ -64,15 +61,15 @@ export type NetworkTopology = z.infer<typeof networkTopologySchema>;
 
 export const viperAssetDataSchema = z.object({
   id: z.string(),
-  role: z.string().nullable(),
   hostname: z.string().nullable(),
   status: z.enum(["Active", "Decommissioned", "Maintenance"]).nullable(),
-  deviceGroup: z.object({
-    manufacturer: canonicalRefSchema.nullable(),
-    product: canonicalRefSchema.nullable(),
-    version: canonicalRefSchema.nullable(),
-    cpe: z.array(z.string()),
-  }),
+  manufacturer: canonicalRefSchema.nullable(),
+  product: canonicalRefSchema
+    .extend({
+      deviceType: deviceTypeLabelSchema,
+    })
+    .nullable(),
+  version: canonicalRefSchema.nullable(),
 });
 export type ViperAssetData = z.infer<typeof viperAssetDataSchema>;
 

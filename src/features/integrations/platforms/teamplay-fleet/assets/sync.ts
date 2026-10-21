@@ -1,33 +1,63 @@
 import "server-only";
+import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
+import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
+import { computeWeakSerials } from "@/features/integrations/core/sync/serials";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
-import { resolveDeviceGroup } from "@/lib/router-utils";
+import { resolveDevice } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
 import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import { syncFleetContracts } from "./contracts";
 import {
-  computeWeakSerials,
   type FleetAssetItem,
   listChanged,
   toCanonical,
+  UNKNOWN_FLEET_PRODUCT,
 } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
-async function equipmentKeysWeMayRegroup(
+/**
+ * The equipment whose device ids an update may change: the assets that Fleet
+ * created. An asset that another source created keeps that source's device.
+ */
+async function fleetCreatedEquipmentKeys(
   integrationId: string,
+  integrationUserId: string,
 ): Promise<Set<string>> {
-  const mappingsToNameDerivedGroups =
-    await prisma.externalAssetMapping.findMany({
-      where: {
-        integrationId,
-        item: { deviceGroup: { cpe: { isEmpty: true } } },
-      },
-      select: { externalId: true },
-    });
-  return new Set(mappingsToNameDerivedGroups.map((m) => m.externalId));
+  const mappingsToFleetAssets = await prisma.externalAssetMapping.findMany({
+    where: { integrationId, item: { userId: integrationUserId } },
+    select: { externalId: true },
+  });
+  return new Set(mappingsToFleetAssets.map((m) => m.externalId));
+}
+
+// TODO: VW-560
+/**
+ * Give the product a device type from the Fleet modality label, if it has
+ * none. The device type seed sets the type of known products and wins over
+ * this guess.
+ */
+async function typeProductFromModality(
+  productId: string,
+  item: FleetAssetItem,
+) {
+  if (item.productName === UNKNOWN_FLEET_PRODUCT) return;
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id: productId },
+    select: { deviceTypeId: true },
+  });
+  if (product.deviceTypeId) return;
+
+  const deviceType = await resolveDeviceType(item.modality, {
+    integration: "teamplay Fleet",
+    productName: item.productName,
+    materialNumber: item.materialNumber,
+    modalityCode: item.modalityCode,
+  });
+  if (deviceType) await fillProductDeviceType(productId, deviceType.id);
 }
 
 async function ingestFleetAssets(
@@ -39,8 +69,11 @@ async function ingestFleetAssets(
     select: { integrationUserId: true },
   });
   const weakSerials = computeWeakSerials(items);
-  const regroupableEquipmentKeys =
-    await equipmentKeysWeMayRegroup(integrationId);
+  const fleetCreatedKeys = await fleetCreatedEquipmentKeys(
+    integrationId,
+    integrationUserId,
+  );
+  const checkedProductIds = new Set<string>();
 
   const assetsAlreadyMapped = await prisma.asset.findMany({
     where: {
@@ -65,21 +98,24 @@ async function ingestFleetAssets(
       // finalize-sync already records this attempt; a second write double-counts consecutiveFailures.
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetAssetItem, userId: string) => {
-        const deviceGroup = await resolveDeviceGroup({
+        const device = await resolveDevice({
           manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
           product: item.productName,
           version: item.softwareVersion,
-          hasCpe: false,
         });
+        const { productId } = device;
+        if (productId && item.modality && !checkedProductIds.has(productId)) {
+          checkedProductIds.add(productId);
+          await typeProductFromModality(productId, item);
+        }
         const fields = {
           serialNumber: item.serialNumber,
-          role: item.role,
           location: item.location,
         };
         return {
-          createData: { ...fields, deviceGroupId: deviceGroup.id, userId },
-          updateData: regroupableEquipmentKeys.has(item.externalId)
-            ? { ...fields, deviceGroupId: deviceGroup.id }
+          createData: { ...fields, ...device, userId },
+          updateData: fleetCreatedKeys.has(item.externalId)
+            ? { ...fields, ...device }
             : fields,
           uniqueFieldConditions:
             item.serialNumber && !weakSerials.has(item.serialNumber)

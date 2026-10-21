@@ -13,10 +13,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { countAffectedRemediations } from "@/features/assets/utils";
+import {
+  countAffectedRemediations,
+  getAssetDeviceTypeLabel,
+  getSourceToolLabel,
+} from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
@@ -86,18 +90,23 @@ function createSeverityColumn(
 
 export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
-    id: "role",
-    accessorKey: "role",
-    header: ({ column }) => <SortableHeader header="Role" column={column} />,
-    cell: ({ row }) => (
+    id: "deviceType",
+    meta: { title: "Device Type" },
+    header: ({ column }) => (
+      <SortableHeader header="Device Type" column={column} />
+    ),
+    accessorFn: getAssetDeviceTypeLabel,
+    cell: ({ row, getValue }) => (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="cursor-default">{row.original.role}</span>
+            <span className="cursor-default">
+              {getValue<string | null>() ?? (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </span>
           </TooltipTrigger>
-          <TooltipContent>
-            {deviceGroupLabel(row.original.deviceGroup)}
-          </TooltipContent>
+          <TooltipContent>{deviceLabel(row.original)}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     ),
@@ -119,7 +128,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     id: "sourceTool",
     meta: { title: "Source Tool" },
     header: "Source Tool",
-    accessorFn: (row) => row.user.name,
+    accessorFn: getSourceToolLabel,
   },
   {
     id: "remediations",

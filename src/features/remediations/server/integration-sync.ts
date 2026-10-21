@@ -3,7 +3,8 @@ import type { z } from "zod";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { cpesToMatchingConnect } from "@/lib/router-utils";
+import { devicesToMatchingConnect } from "@/lib/router-utils";
+import { impactRowsUpdate } from "../impact";
 import type { integrationRemediationInputSchema } from "../types";
 
 type IntegrationRemediationItem = z.infer<
@@ -26,13 +27,16 @@ export function processRemediationIntegrationSync(
         const {
           externalId: _externalId,
           artifacts,
-          cpes,
+          devices,
           vulnerabilityIds,
+          impacts,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           ...itemData
         } = item;
-        const matchingConnect = cpes ? await cpesToMatchingConnect(cpes) : [];
+        const matchingConnect = devices
+          ? await devicesToMatchingConnect(devices)
+          : [];
         const vulnerabilities =
           vulnerabilityIds &&
           [...new Set(vulnerabilityIds)].map((id) => ({ id }));
@@ -41,14 +45,18 @@ export function processRemediationIntegrationSync(
           createData: {
             ...itemData,
             userId,
+            impacts: { create: impacts ?? [] },
             deviceGroupMatchings: { connect: matchingConnect },
             vulnerabilities: { connect: vulnerabilities ?? [] },
           },
           updateData: {
             ...itemData,
-            // Only replace matchings when CPEs were provided; omitting them
+            impacts: impactRowsUpdate(impacts, "replace"),
+            // Only replace matchings when devices were provided; omitting them
             // on re-sync must not clear a remediation's existing matchings.
-            ...(cpes ? { deviceGroupMatchings: { set: matchingConnect } } : {}),
+            ...(devices
+              ? { deviceGroupMatchings: { set: matchingConnect } }
+              : {}),
             vulnerabilities: vulnerabilities && { set: vulnerabilities },
           },
           uniqueFieldConditions: [],

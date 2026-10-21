@@ -16,14 +16,15 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
-  generateCPE,
+  deleteAssetsForDevices,
+  generateDevice,
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
 
 describe("Remediations Endpoint (/remediations)", () => {
   const payload = {
-    cpes: [generateCPE("rem_v1")],
+    devices: [generateDevice("rem_v1")],
     description: "Mock -- Firmware update to fix vulnerability",
     narrative: "Apply the latest firmware patch to resolve the issue.",
     upstreamApi: "https://vendor.example.com/patches",
@@ -39,7 +40,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   const vulnerabilityPayload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("rem_vuln_v1")],
+    devices: [generateDevice("rem_vuln_v1")],
     exploitUri: "https://exploit-db.com/5678",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Critical vulnerability requiring remediation",
@@ -177,11 +178,11 @@ describe("Remediations Endpoint (/remediations)", () => {
     const remediationId = createRes.body.id;
 
     // The remediation carries its own device-group matchings (resolved from the
-    // uploaded CPEs).
+    // uploaded devices).
     expect(
       createRes.body.deviceGroupMatchings.some(
         (m: { version: { canonicalName: string } | null }) =>
-          m.version?.canonicalName === payload.cpes[0].split(":")[5],
+          m.version?.canonicalName === payload.devices[0].version?.name,
       ),
     ).toBe(true);
 
@@ -264,7 +265,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("POST /remediations - Create with vulnerability references", async () => {
     // First create two vulnerabilities
-    const newCpe = generateCPE("rem_with_vuln_ref_v1");
+    const newDevice = generateDevice("rem_with_vuln_ref_v1");
     const vulnerabilityIds: string[] = [];
     for (let i = 0; i < 2; i++) {
       const vulnRes = await request(BASE_URL)
@@ -272,7 +273,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         .set(authHeader)
         .send({
           ...vulnerabilityPayload,
-          cpes: [newCpe],
+          devices: [newDevice],
         });
       expect(vulnRes.status).toBe(200);
       vulnerabilityIds.push(vulnRes.body.id);
@@ -337,9 +338,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.vulnerability
         .deleteMany({ where: { id: { in: vulnerabilityIds } } })
         .catch(() => {});
-      await prisma.deviceGroup
-        .deleteMany({ where: { cpe: { has: newCpe } } })
-        .catch(() => {});
+      await deleteAssetsForDevices([newDevice]).catch(() => {});
     });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }
@@ -652,7 +651,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 
-  it("integration re-sync without cpes preserves existing deviceGroupMatchings", async () => {
+  it("integration re-sync without devices preserves existing deviceGroupMatchings", async () => {
     const { integration } = await setupMockIntegration(mockIntegrationPayload);
 
     const token = await createIntegrationToken(
@@ -661,7 +660,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     );
 
     const externalId = "mockRemediation-preserve-matchings";
-    const cpe = generateCPE("rem_preserve_matchings_v1");
+    const device = generateDevice("rem_preserve_matchings_v1");
 
     const basePayload = {
       vendor: "mockRemediationIntegrationVendor",
@@ -686,7 +685,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       ],
     };
 
-    // Sync 1: item carries a CPE -> remediation created with one matching.
+    // Sync 1: item carries a device -> remediation created with one matching.
     const firstSync = await request(BASE_URL)
       .post(`/remediations/integrationUpload/${token}`)
       .set(jsonHeader)
@@ -696,7 +695,7 @@ describe("Remediations Endpoint (/remediations)", () => {
           {
             ...itemBase,
             description: "Mock -- preserve matchings, initial",
-            cpes: [cpe],
+            devices: [device],
           },
         ],
       });
@@ -720,11 +719,11 @@ describe("Remediations Endpoint (/remediations)", () => {
     });
     expect(afterCreate.deviceGroupMatchings.length).toBe(1);
     expect(afterCreate.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      cpe.split(":")[5],
+      device.version?.name,
     );
 
-    // Sync 2: same externalId, NO cpes -> the existing matching must survive
-    // (omitting cpes must not clear it). Integration tokens are single-use, so
+    // Sync 2: same externalId, NO devices -> the existing matching must survive
+    // (omitting devices must not clear it). Integration tokens are single-use, so
     // mint a fresh one for the re-sync.
     const secondToken = await createIntegrationToken(
       integration.integrationUserId,
@@ -752,5 +751,271 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(afterUpdate.deviceGroupMatchings[0].id).toBe(
       afterCreate.deviceGroupMatchings[0].id,
     );
+  });
+  const bedsideMonitorImpact = {
+    mechanism: "REMOTE_DEPLOYMENT",
+    estimatedDurationSeconds: 1800,
+    requiresDowntime: false,
+    reversible: true,
+    verificationRequired: true,
+    verificationNotes: "Run the monitor self-test",
+    impacts: [
+      {
+        phase: "DURING_APPLY",
+        feature: "nurse call button",
+        effect: "UNAVAILABLE",
+        clinicalWorkflowImpact: true,
+      },
+    ],
+  };
+
+  const createWithImpact = async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, ...bedsideMonitorImpact });
+    expect(res.status).toBe(200);
+    const id: string = res.body.remediation.id;
+    onTestFinished(async () => {
+      await prisma.remediation.delete({ where: { id } }).catch(() => {});
+    });
+    return res.body.remediation;
+  };
+  it("POST /remediations - Stores impact fields and feature rows", async () => {
+    const created = await createWithImpact();
+    const res = await request(BASE_URL)
+      .get(`/remediations/${created.id}`)
+      .set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      mechanism: "REMOTE_DEPLOYMENT",
+      estimatedDurationSeconds: 1800,
+      requiresDowntime: false,
+      reversible: true,
+      verificationRequired: true,
+      verificationNotes: "Run the monitor self-test",
+      restartRequired: null,
+    });
+    expect(res.body.impacts).toEqual([
+      expect.objectContaining({
+        phase: "DURING_APPLY",
+        feature: "nurse call button",
+        effect: "UNAVAILABLE",
+        clinicalWorkflowImpact: true,
+        notes: null,
+      }),
+    ]);
+  });
+
+  it("POST /remediations - A remediation with no impact reports every field as not stated", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send(payload);
+    expect(res.status).toBe(200);
+    const created = res.body.remediation;
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: created.id } })
+        .catch(() => {});
+    });
+    expect(created.mechanism).toBeNull();
+    expect(created.requiresDowntime).toBeNull();
+    expect(created.impacts).toEqual([]);
+  });
+  it("PUT /remediations/{id} - Update one impact field and leaves the rest", async () => {
+    const created = await createWithImpact();
+    const res = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, restartRequired: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.remediation).toMatchObject({
+      restartRequired: true,
+      mechanism: "REMOTE_DEPLOYMENT",
+      estimatedDurationSeconds: 1800,
+    });
+    expect(res.body.remediation.impacts).toHaveLength(1);
+  });
+  it("PUT /remediations/{id} - An explicit null clears an impact field", async () => {
+    const created = await createWithImpact();
+    const res = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, verificationNotes: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.remediation.verificationNotes).toBeNull();
+    expect(res.body.remediation.verificationRequired).toBe(true);
+  });
+  it("PUT /remediations/{id} - impacts replaces every row, [] clears them", async () => {
+    const created = await createWithImpact();
+    const replaced = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({
+        id: created.id,
+        impacts: [
+          {
+            phase: "AFTER_APPLY",
+            feature: "alarm beeping",
+            effect: "CHANGED",
+            notes: "Off by default; re-enable in settings.",
+          },
+        ],
+      });
+
+    expect(replaced.status).toBe(200);
+    expect(replaced.body.remediation.impacts).toEqual([
+      expect.objectContaining({
+        phase: "AFTER_APPLY",
+        feature: "alarm beeping",
+      }),
+    ]);
+    const cleared = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, impacts: [] });
+
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.remediation.impacts).toEqual([]);
+  });
+  it("POST /remediations - Rejects an unknown mechanism", async () => {
+    const res = await request(BASE_URL)
+      .post(`/remediations`)
+      .set(authHeader)
+      .send({ ...payload, mechanism: "CARRIER" });
+    expect(res.status).toBe(400);
+    expect(res.body.issues).toContainEqual(
+      expect.objectContaining({ path: ["mechanism"] }),
+    );
+  });
+  it("integration upload stores impact from a partner", async () => {
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Remediation,
+    );
+    const item = {
+      ...remediationIntegrationPayload.items[0],
+      externalId: "mockRemediation-impact",
+      ...bedsideMonitorImpact,
+    };
+    const res = await request(BASE_URL)
+      .post(`/remediations/integrationUpload/${createToken}`)
+      .set(jsonHeader)
+      .send({ ...remediationIntegrationPayload, items: [item], totalCount: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.createdItemsCount).toBe(1);
+
+    const mapping = await prisma.externalRemediationMapping.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        externalId: item.externalId,
+      },
+    });
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: mapping.itemId } })
+        .catch(() => {});
+    });
+    const found = await prisma.remediation.findUniqueOrThrow({
+      where: { id: mapping.itemId },
+      include: { impacts: true },
+    });
+
+    expect(found.mechanism).toBe("REMOTE_DEPLOYMENT");
+    expect(found.reversible).toBe(true);
+    expect(found.impacts).toHaveLength(1);
+    expect(found.impacts[0].feature).toBe("nurse call button");
+  });
+
+  const releaseFields = {
+    category: "SOFTWARE_UPDATE",
+    publishedAt: "2026-10-19T14:30:00.000Z",
+    isSecurityUpdate: true,
+  };
+
+  const createWithRelease = async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, ...releaseFields });
+    expect(res.status).toBe(200);
+    const id: string = res.body.remediation.id;
+    onTestFinished(async () => {
+      await prisma.remediation.delete({ where: { id } }).catch(() => {});
+    });
+    return res.body.remediation;
+  };
+
+  it("POST /remediations - Stores the release fields", async () => {
+    const created = await createWithRelease();
+    expect(created).toMatchObject({
+      category: "SOFTWARE_UPDATE",
+      publishedAt: "2026-10-19T14:30:00.000Z",
+      isSecurityUpdate: true,
+    });
+  });
+  it("POST /remediations - A remediation with no release fields reports them as not stated", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send(payload);
+    expect(res.status).toBe(200);
+    const created = res.body.remediation;
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: created.id } })
+        .catch(() => {});
+    });
+    expect(created.category).toBeNull();
+    expect(created.publishedAt).toBeNull();
+    expect(created.isSecurityUpdate).toBeNull();
+  });
+  it("PUT /remediations/{id} - An omitted release field is left alone, null clears", async () => {
+    const created = await createWithRelease();
+    const res = await request(BASE_URL)
+      .put(`/remediations/${created.id}`)
+      .set(authHeader)
+      .send({ id: created.id, publishedAt: null });
+    expect(res.status).toBe(200);
+    expect(res.body.remediation.publishedAt).toBeNull();
+    expect(res.body.remediation.category).toBe("SOFTWARE_UPDATE");
+    expect(res.body.remediation.isSecurityUpdate).toBe(true);
+  });
+
+  it("POST /remediations - Rejects an unknown category", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, category: "NOT_A_CATEGORY" });
+    expect(res.status).toBe(400);
+    expect(res.body.issues).toContainEqual(
+      expect.objectContaining({ path: ["category"] }),
+    );
+  });
+
+  it("POST /remediations - A TA4 submission is not a manufacturer remediation", async () => {
+    const created = await createWithRelease();
+    expect(created.isManufacturerRemediation).toBe(false);
+  });
+
+  it("POST /remediations - Ignores isManufacturerRemediation in the body", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, isManufacturerRemediation: true });
+    expect(res.status).toBe(200);
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: res.body.remediation.id } })
+        .catch(() => {});
+    });
+    expect(res.body.remediation.isManufacturerRemediation).toBe(false);
   });
 });

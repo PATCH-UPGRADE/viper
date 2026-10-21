@@ -1,6 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
@@ -119,22 +120,20 @@ export const networkRouter = createTRPCRouter({
         where: { id: { in: subgraphIds } },
         select: {
           id: true,
-          role: true,
           hostname: true,
           status: true,
-          deviceGroup: {
+          manufacturer: {
+            select: { canonicalName: true, canonicalDisplayName: true },
+          },
+          product: {
             select: {
-              manufacturer: {
-                select: { canonicalName: true, canonicalDisplayName: true },
-              },
-              product: {
-                select: { canonicalName: true, canonicalDisplayName: true },
-              },
-              version: {
-                select: { canonicalName: true, canonicalDisplayName: true },
-              },
-              cpe: true,
+              canonicalName: true,
+              canonicalDisplayName: true,
+              ...deviceTypeLabelSelect,
             },
+          },
+          version: {
+            select: { canonicalName: true, canonicalDisplayName: true },
           },
         },
       });

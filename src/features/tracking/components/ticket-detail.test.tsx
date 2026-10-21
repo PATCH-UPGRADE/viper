@@ -111,10 +111,8 @@ const {
           ip: "10.0.0.1",
           serialNumber: null,
           role: "Workstation",
-          deviceGroup: {
-            manufacturer: { canonicalDisplayName: "Acme" },
-            product: { canonicalDisplayName: "X100" },
-          },
+          manufacturer: { canonicalDisplayName: "Acme" },
+          product: { canonicalDisplayName: "X100" },
         },
         {
           id: "asset-2",
@@ -122,7 +120,8 @@ const {
           ip: null,
           serialNumber: "63014",
           role: null,
-          deviceGroup: null,
+          manufacturer: null,
+          product: null,
         },
       ],
     })),
@@ -703,18 +702,17 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   serialNumber: null,
-  role: "Infusion Pump",
+  role: "ICU Bay Pump",
   location: { building: "A", floor: "3", room: "302" },
-  deviceGroupId: "dg-1",
-  deviceGroup: {
-    id: "dg-1",
-    manufacturerId: "manufacturer-icu",
-    productId: "product-plum",
-    versionId: null,
-    manufacturer: { canonicalDisplayName: "ICU Medical" },
-    product: { canonicalDisplayName: "Plum 360" },
-    version: null,
+  manufacturerId: "manufacturer-icu",
+  productId: "product-plum",
+  versionId: null,
+  manufacturer: { canonicalDisplayName: "ICU Medical" },
+  product: {
+    canonicalDisplayName: "Plum 360",
+    deviceType: { displayName: "Infusion Pump" },
   },
+  version: null,
   ...overrides,
 });
 
@@ -727,7 +725,7 @@ const sampleAssetTicket = (
 });
 
 describe("LinkedAssetsTable", () => {
-  it("renders one row per asset with role, model, IP, location, and an editable status", () => {
+  it("renders one row per asset with device type, model, IP, location, and an editable status", () => {
     render(
       <LinkedAssetsTable
         parentTicketId="t1"
@@ -736,6 +734,7 @@ describe("LinkedAssetsTable", () => {
     );
 
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
+    expect(screen.queryByText("ICU Bay Pump")).not.toBeInTheDocument();
     expect(screen.getByText("ICU Medical Plum 360")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();
@@ -765,7 +764,8 @@ describe("LinkedAssetsTable", () => {
             sampleAssetTicket({
               role: null,
               location: null,
-              deviceGroup: null,
+              manufacturer: null,
+              product: null,
             }),
           ] as never
         }
@@ -1088,13 +1088,21 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const renderDetail = (overrides: Record<string, unknown> = {}) => {
+const renderDetail = (
+  overrides: Record<string, unknown> = {},
+  {
+    embedded,
+    onUrlUpdate,
+  }: { embedded?: boolean; onUrlUpdate?: () => void } = {},
+) => {
   mockUseSuspenseTrackingTicket.mockReturnValue({
     data: baseTicketDetail(overrides),
   });
-  return render(<TicketDetailContent id="ticket-1" />, {
+  return render(<TicketDetailContent id="ticket-1" embedded={embedded} />, {
     wrapper: ({ children }) => (
-      <NuqsTestingAdapter>{children}</NuqsTestingAdapter>
+      <NuqsTestingAdapter onUrlUpdate={onUrlUpdate}>
+        {children}
+      </NuqsTestingAdapter>
     ),
   });
 };
@@ -1366,6 +1374,94 @@ describe("TicketDetailContent — view mode", () => {
     expect(within(entry).getByText("High")).toBeInTheDocument();
     expect(within(entry).getByText("Critical")).toBeInTheDocument();
   });
+});
+
+describe("TicketDetailContent — embedded", () => {
+  it("shows every section, read-only except for comments", async () => {
+    const user = userEvent.setup();
+    renderDetail(
+      {
+        descriptions: [],
+        body: "See [the advisory](https://example.test/advisory)",
+        children: [
+          { id: "child-1", summary: "Patch ICU room 301", status: "TO_DO" },
+        ],
+        relatedTickets: [
+          {
+            source: "manual",
+            linkId: "link-1",
+            ticket: {
+              id: "rt-1",
+              summary: "Patch PACS Server",
+              status: "TO_DO",
+              departments: [],
+              externalMappings: [],
+            },
+          },
+        ],
+        assets: [sampleAssetTicket({ hostname: "linked-host" })],
+        notification: { id: "n-1", title: "Advisory for ICU monitors" },
+      },
+      { embedded: true },
+    );
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
+    );
+
+    for (const text of [
+      "Patch ICU room 301",
+      "Patch PACS Server",
+      "Advisory for ICU monitors",
+      "See the advisory",
+      "Activity",
+    ]) {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
+    // Comments are the one thing the modal lets you change.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    await user.type(screen.getByPlaceholderText(/write a comment/i), "Noted");
+    await user.click(screen.getByRole("button", { name: /^comment$/i }));
+    expect(mockAddCommentMutate.mock.calls[0][0]).toMatchObject({
+      ticketId: "ticket-1",
+      body: "Noted",
+    });
+
+    await user.click(screen.getByRole("tab", { name: /^assets/i }));
+    expect(screen.getByText("linked-host")).toBeInTheDocument();
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    for (const name of [
+      /^edit$/i,
+      /^watch/i,
+      /add sub-ticket/i,
+      /link ticket/i,
+      /add asset/i,
+      /detach|unlink/i,
+    ]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it.each([
+    { embedded: true, urlUpdates: 0 },
+    { embedded: false, urlUpdates: 1 },
+  ])(
+    "embedded=$embedded changes the tab with $urlUpdates URL update(s)",
+    async ({ embedded, urlUpdates }) => {
+      const user = userEvent.setup();
+      const onUrlUpdate = vi.fn();
+      renderDetail({}, { embedded, onUrlUpdate });
+
+      await user.click(screen.getByRole("tab", { name: /^assets/i }));
+
+      expect(screen.getByRole("tab", { name: /^assets/i })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(onUrlUpdate).toHaveBeenCalledTimes(urlUpdates);
+    },
+  );
 });
 
 describe("TicketDetailContent — edit mode", () => {

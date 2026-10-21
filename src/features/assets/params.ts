@@ -1,10 +1,13 @@
 import type { SingleParserBuilder } from "nuqs";
-import { parseAsInteger, parseAsStringEnum } from "nuqs/server";
+import { parseAsInteger, parseAsString, parseAsStringEnum } from "nuqs/server";
 import { PAGINATION } from "@/config/constants";
 import { IssueStatus } from "@/generated/prisma";
 import { createPaginationParams } from "@/lib/url-state";
 
-export const assetsParams = createPaginationParams();
+export const assetsParams = {
+  ...createPaginationParams(),
+  source: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
+};
 
 const issueStatusPageParams: Record<string, SingleParserBuilder<number>> = {};
 for (const status of Object.values(IssueStatus)) {

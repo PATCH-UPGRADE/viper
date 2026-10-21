@@ -6,13 +6,8 @@ import {
 } from "@/features/workflows/utils";
 import prisma from "@/lib/db";
 import {
-  deviceGroupWhereForMatching,
-  type MatchingLike,
-  matchingAppliesToDeviceGroup,
-} from "@/lib/device-matching";
-import {
-  deviceGroupLabel,
   deviceGroupMatchingLabel,
+  deviceLabel,
   type NoteTargetLabels,
   type RemediationForMarkdown,
   remediationToMarkdown,
@@ -23,6 +18,7 @@ import {
   workflowClinicalSummary,
 } from "@/lib/markdown";
 import { notRejected } from "../../types";
+import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
 export type LinkableIds = {
@@ -141,27 +137,12 @@ export async function gatherTriageContext(
   }
   const matchings = [...matchingsById.values()];
 
-  const candidateGroups =
-    matchings.length > 0
-      ? await prisma.deviceGroup.findMany({
-          where: { OR: matchings.map(deviceGroupWhereForMatching) },
-          include: {
-            manufacturer: true,
-            product: true,
-            version: true,
-            assets: true,
-          },
-        })
-      : [];
-
-  const groups = candidateGroups.filter((g) =>
-    matchings.some((m: MatchingLike) => matchingAppliesToDeviceGroup(m, g)),
-  );
+  const groups = await deviceAssetGroupsForMatchings(matchings);
 
   const seenAssets = new Set<string>();
   const affectedAssets: AffectedAsset[] = [];
   for (const g of groups) {
-    const label = deviceGroupLabel(g);
+    const label = careAreaGroupLabel(g);
     for (const asset of g.assets) {
       if (seenAssets.has(asset.id)) continue;
       seenAssets.add(asset.id);
@@ -198,7 +179,7 @@ export async function gatherTriageContext(
         asset.hostname ?? asset.ip ?? asset.id,
       ]),
     ),
-    groupLabel: new Map(groups.map((g) => [g.id, deviceGroupLabel(g)])),
+    groupLabel: new Map(groups.map((g) => [g.id, deviceLabel(g)])),
     matchingLabel: new Map(
       matchings.map((m) => [m.id, deviceGroupMatchingLabel(m)]),
     ),
@@ -235,7 +216,7 @@ export async function gatherTriageContext(
   // One line per matching (the entity an agent links against), with the device
   // groups and assets it actually resolves to. Only rendered under includeIds.
   const matchingSummaries: MatchingSummary[] = matchings.map((m) => {
-    const resolved = groups.filter((g) => matchingAppliesToDeviceGroup(m, g));
+    const resolved = groups.filter((g) => g.matchingIds.includes(m.id));
     return {
       id: m.id,
       label: deviceGroupMatchingLabel(m),
@@ -314,7 +295,6 @@ type GroupForRender = {
   manufacturer?: { canonicalDisplayName: string } | null;
   product?: { canonicalDisplayName: string } | null;
   version?: { canonicalDisplayName: string } | null;
-  cpe?: string[];
   assets: unknown[];
 };
 
@@ -366,6 +346,16 @@ function plainEnum(value: string, labels: Record<string, string>): string {
   return labels[value] ?? value.toLowerCase().replaceAll("_", " ");
 }
 
+/** The device group label, with the product's device type when it has one. */
+export function careAreaGroupLabel(
+  g: Parameters<typeof deviceLabel>[0] & {
+    product?: { deviceType?: { displayName: string } | null } | null;
+  },
+): string {
+  const deviceType = g.product?.deviceType?.displayName;
+  return deviceType ? `${deviceLabel(g)} (${deviceType})` : deviceLabel(g);
+}
+
 function careAreaLocation(raw: unknown): string {
   if (!raw || typeof raw !== "object") return "";
   const loc = raw as { facility?: string; building?: string; floor?: string };
@@ -378,7 +368,7 @@ function careAreaLocation(raw: unknown): string {
     .join(" / ");
 }
 
-function renderTriagePrompt(args: RenderArgs): string {
+export function renderTriagePrompt(args: RenderArgs): string {
   const sections: string[] = [];
 
   if (args.vulnerabilities.length > 0) {
@@ -444,7 +434,7 @@ function renderTriagePrompt(args: RenderArgs): string {
         args.groups
           .map(
             (g) =>
-              `- **${deviceGroupLabel(g)}** — ${g.assets.length} asset${g.assets.length === 1 ? "" : "s"}`,
+              `- **${deviceLabel(g)}** — ${g.assets.length} asset${g.assets.length === 1 ? "" : "s"}`,
           )
           .join("\n"),
     );
@@ -454,11 +444,9 @@ function renderTriagePrompt(args: RenderArgs): string {
     const careLines = [
       ...new Set(
         args.affectedAssets.map(({ asset, groupLabel }) => {
-          const role = asset.role ?? "unknown role";
+          const role = asset.role ? ` — ${asset.role}` : "";
           const area = careAreaLocation(asset.location);
-          return area
-            ? `- ${groupLabel} — ${role} @ ${area}`
-            : `- ${groupLabel} — ${role}`;
+          return `- ${groupLabel}${role}${area ? ` @ ${area}` : ""}`;
         }),
       ),
     ];

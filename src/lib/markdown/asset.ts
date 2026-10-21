@@ -1,6 +1,10 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
-import { getAssetDisplayName } from "@/features/assets/utils";
-import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetNameForAgent,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "@/features/assets/utils";
+import { deviceLabel } from "./device-group";
 import type { CanonicalRef } from "./shared";
 
 // ─── Utilization rendering ────────────────────────────────────────────────────
@@ -102,12 +106,12 @@ export interface AssetForMarkdown {
   location?: unknown;
   utilization?: unknown;
   updatedAt?: Date;
-  deviceGroup: {
-    manufacturer?: CanonicalRef;
-    product?: CanonicalRef;
-    version?: CanonicalRef;
-    cpe?: string[];
-  };
+  manufacturer?: CanonicalRef;
+  product: {
+    canonicalDisplayName: string;
+    deviceType?: { displayName: string } | null;
+  } | null;
+  version?: CanonicalRef;
   issues?: Array<{
     status: string;
     vulnerability: {
@@ -123,17 +127,18 @@ export function assetToMarkdown(
   a: AssetForMarkdown,
   opts: { includeIssues?: boolean } = { includeIssues: true },
 ): string {
-  const label = getAssetDisplayName(a);
+  const label = getAssetNameForAgent(a);
   const lines = [
     `### ${label} (${a.id})`,
     `- **IP**: ${a.ip ?? "N/A"}`,
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
+    `- **Device Type**: ${getAssetDeviceTypeLabel(a) ?? UNKNOWN_DEVICE_TYPE_STRING}`,
     `- **Role**: ${a.role ?? "Unknown"}`,
     `- **Status**: ${a.status ?? "Unknown"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
     `- **Location**: ${parseLocation(a.location)}`,
-    `- **Device Group**: ${deviceGroupLabel(a.deviceGroup)}${a.deviceGroup.cpe?.length ? ` (CPE: ${deviceGroupCpeList(a.deviceGroup)})` : ""}`.trim(),
-    `- **Device Group Version**: ${a.deviceGroup.version?.canonicalDisplayName ?? "N/A"}`,
+    `- **Device**: ${deviceLabel(a)}`,
+    `- **Version**: ${a.version?.canonicalDisplayName ?? "N/A"}`,
   ];
 
   if (a.utilization) {

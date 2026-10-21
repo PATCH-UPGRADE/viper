@@ -4,7 +4,8 @@ An `Issue` is a VEX verdict ("is this vulnerability a problem for this
 target?") on exactly one vulnerability. It targets one of two things:
 
 - `deviceGroupMatchingId` set, `assetId` null — a **matching-level** issue:
-  the verdict for every asset whose device group the matching rule covers.
+  the verdict for every asset whose manufacturer, product, and version the
+  matching rule covers.
 - `assetId` set, `deviceGroupMatchingId` null — an **asset-level** issue:
   overrides the matching-level issue for that vulnerability, for that asset
   only.
@@ -18,9 +19,9 @@ in Postgres enforces the rule.
 An issue affects an asset when either:
 
 1. it is asset-level and points at the asset, or
-2. it is matching-level and its matching applies to the asset's device group
-   (`matchingAppliesToDeviceGroup` — strict version matching: an
-   unknown-version device group does NOT match version-constrained rules),
+2. it is matching-level and its matching applies to the asset's manufacturer,
+   product, and version (`matchingAppliesToDevice` — strict version matching:
+   an unknown-version asset does NOT match version-constrained rules),
    and no asset-level issue for the same vulnerability exists on that asset.
 
 When both exist for one (asset, vulnerability) pair, the asset-level issue
@@ -29,7 +30,7 @@ the most severe status (AFFECTED > UNDER_INVESTIGATION > NOT_AFFECTED >
 FIXED).
 
 The asset-to-matching hop is computed, never stored: there is no foreign key
-between `DeviceGroup` and `DeviceGroupMatching`, and version-range (VERS)
+between `Asset` and `DeviceGroupMatching`, and version-range (VERS)
 checks only run in JavaScript. All reads of "issues affecting an asset" must
 go through `resolveEffectiveIssuesByAsset`
 (`src/features/issues/server/effective-issues.ts`) — it is the single seam

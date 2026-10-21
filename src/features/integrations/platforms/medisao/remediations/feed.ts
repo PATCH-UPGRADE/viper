@@ -1,4 +1,8 @@
 import { z } from "zod";
+import type { RemediationImpactInput } from "@/features/remediations/impact";
+import type { ReleaseScalars } from "@/features/remediations/release";
+import { RemediationCategory } from "@/generated/prisma";
+import { asDate } from "@/lib/date-utils";
 import type { Session } from "../../../core/types";
 import { walkPages, withSince } from "../paginate";
 import { channelRemediationsUrl } from "../urls";
@@ -34,6 +38,7 @@ export const rawRemediationSchema = z.object({
   workflow_impact: z.string().nullish(),
   clinical_impact_notes: z.string().nullish(),
   files: z.array(z.unknown()).nullish(),
+  published_at: z.string().nullish(),
   updated_at: z.string(),
 });
 export type RawMedIsaoRemediation = z.infer<typeof rawRemediationSchema>;
@@ -55,41 +60,33 @@ export interface MedIsaoRemediationItem {
   narrative: string | null;
   fixedVulnerabilities: string[];
   advisoryId: string | null;
-  /** Manufacturer-stated impact, reshaped for `Remediation.sourceImpact`. */
-  sourceImpact: MedIsaoSourceImpact;
-
+  /** viper shape manufacturer-stated impact */
+  impact: RemediationImpactInput;
+  release: ReleaseScalars;
   updatedAt: string;
   raw: RawMedIsaoRemediation;
 }
 
-export interface MedIsaoSourceImpact {
-  category: string | null;
-  mechanism: string | null;
-  requiresDowntime: boolean | null;
-  estimatedDowntimeSeconds: number | null;
-  restartRequired: boolean | null;
-  disablesFeatures: boolean | null;
-  workflowImpact: string | null;
-  clinicalImpactNotes: string | null;
-}
-
-/**
- * MedISAO answers the downtime question the manufacturer alone can answer.
- * Kept as sent — `category` and `mechanism` are their enums, and we hold only
- * one observed value of each, so neither is narrowed to a Prisma enum yet.
- */
-export const toSourceImpact = (
+export const toRemediationImpact = (
   raw: RawMedIsaoRemediation,
-): MedIsaoSourceImpact => ({
-  category: raw.category ?? null,
-  mechanism: raw.mechanism ?? null,
+): RemediationImpactInput => ({
   requiresDowntime: raw.requires_downtime ?? null,
-  estimatedDowntimeSeconds: raw.estimated_downtime_seconds ?? null,
   restartRequired: raw.restart_required ?? null,
+  estimatedDowntimeSeconds:
+    (raw.estimated_downtime_seconds ?? -1) >= 0
+      ? raw.estimated_downtime_seconds
+      : null,
   disablesFeatures: raw.disables_features ?? null,
-  workflowImpact: raw.workflow_impact ?? null,
-  clinicalImpactNotes: raw.clinical_impact_notes ?? null,
 });
+
+const MEDISAO_CATEGORY = new Map<string, RemediationCategory>([
+  ["firmware_patch", RemediationCategory.HARDWARE_PATCH],
+]);
+
+export const toRemediationCategory = (
+  raw: RawMedIsaoRemediation,
+): RemediationCategory | null =>
+  MEDISAO_CATEGORY.get(raw.mechanism ?? "") ?? null;
 
 export const toCanonical = (
   raw: RawMedIsaoRemediation,
@@ -109,8 +106,11 @@ export const toCanonical = (
   narrative: raw.narrative ?? null,
   fixedVulnerabilities: raw.fixed_vulnerabilities ?? [],
   advisoryId: raw.advisory_id ?? null,
-  sourceImpact: toSourceImpact(raw),
-
+  impact: toRemediationImpact(raw),
+  release: {
+    category: toRemediationCategory(raw),
+    publishedAt: asDate(raw.published_at)?.toISOString() ?? null,
+  },
   updatedAt: raw.updated_at,
   raw,
 });

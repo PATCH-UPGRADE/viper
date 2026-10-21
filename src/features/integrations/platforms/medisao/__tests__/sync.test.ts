@@ -299,20 +299,29 @@ describe("the ingest mapping", () => {
   };
 
   it("carries the manufacturer impact onto the row", async () => {
-    const { createData } = await transformOf();
+    const { createData, updateData } = await transformOf();
 
     expect(createData.description).toBe("patch it");
     expect(createData.narrative).toBe("how to patch it");
-    expect(createData.sourceImpact).toEqual({
-      category: "mitigation",
-      mechanism: "firmware_patch",
+    const expected = {
       requiresDowntime: true,
       estimatedDowntimeSeconds: 5400,
       restartRequired: true,
       disablesFeatures: false,
-      workflowImpact: "imaging paused",
-      clinicalImpactNotes: "schedule outside clinic hours",
-    });
+    };
+    expect(createData).toMatchObject(expected);
+    expect(updateData).toMatchObject(expected);
+    expect(createData).not.toHaveProperty("sourceImpact");
+  });
+
+  it("does not erase a field MedISAO leaves unstated", async () => {
+    const { updateData } = await transformOf({ requires_downtime: null });
+    expect(updateData).not.toHaveProperty("requiresDowntime");
+  });
+
+  it("writes no impact rows, which MedISAO does not send", async () => {
+    const { updateData } = await transformOf();
+    expect(updateData).not.toHaveProperty("impacts");
   });
 
   it("links a held vulnerability and mints the one Viper lacks", async () => {
@@ -366,7 +375,7 @@ describe("the ingest mapping", () => {
     });
   });
 
-  it("resolves the channel to a device group matching, not a CPE", async () => {
+  it("resolves the channel to a device group matching", async () => {
     const { createData } = await transformOf({
       version: "vers:semver/<=6.0.2",
     });
@@ -376,7 +385,6 @@ describe("the ingest mapping", () => {
       product: "ViperDevice",
       version: null,
       versionRange: "vers:semver/<=6.0.2",
-      hasCpe: false,
     });
     expect(createData.deviceGroupMatchings).toEqual({
       connect: [{ id: "matching-1" }],

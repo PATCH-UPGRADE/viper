@@ -38,7 +38,24 @@ const { db, identifiers } = vi.hoisted(() => {
     vulnerability: {
       create: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),
-      update: vi.fn(async (_args: { data: Record<string, unknown> }) => ({})),
+      // Returns the matchings the update connected. "m-2" is a matching with an UNKNOWN version.
+      update: vi.fn(
+        async ({
+          data,
+        }: {
+          data: {
+            deviceGroupMatchings?: { connect: { id: string }[] };
+            [key: string]: unknown;
+          };
+        }) => ({
+          deviceGroupMatchings: (data.deviceGroupMatchings?.connect ?? []).map(
+            ({ id }) => ({
+              id,
+              versionStatus: id === "m-2" ? "UNKNOWN" : "KNOWN",
+            }),
+          ),
+        }),
+      ),
       deleteMany: vi.fn(async () => ({ count: 0 })),
     },
     vulnerabilityRecord: {
@@ -153,8 +170,16 @@ describe("createVulnerabilityRecord", () => {
     });
     expect(db.issue.createMany).toHaveBeenCalledWith({
       data: [
-        { vulnerabilityId: "v-1", deviceGroupMatchingId: "m-1" },
-        { vulnerabilityId: "v-1", deviceGroupMatchingId: "m-2" },
+        {
+          vulnerabilityId: "v-1",
+          deviceGroupMatchingId: "m-1",
+          status: "AFFECTED",
+        },
+        {
+          vulnerabilityId: "v-1",
+          deviceGroupMatchingId: "m-2",
+          status: "UNDER_INVESTIGATION",
+        },
       ],
       skipDuplicates: true,
     });
@@ -290,7 +315,13 @@ describe("updateVulnerabilityRecord", () => {
       },
     });
     expect(db.issue.createMany).toHaveBeenCalledWith({
-      data: [{ vulnerabilityId: "v-1", deviceGroupMatchingId: "m-3" }],
+      data: [
+        {
+          vulnerabilityId: "v-1",
+          deviceGroupMatchingId: "m-3",
+          status: "AFFECTED",
+        },
+      ],
       skipDuplicates: true,
     });
   });

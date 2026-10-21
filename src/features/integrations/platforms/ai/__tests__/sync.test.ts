@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
     runAiCrawler: vi.fn(),
     mappings: {
       externalAssetMapping: vi.fn(),
-      externalVulnerabilityMapping: vi.fn(),
+      externalVulnerabilityRecordMapping: vi.fn(),
       externalRemediationMapping: vi.fn(),
       externalDeviceArtifactMapping: vi.fn(),
     },
@@ -87,9 +87,9 @@ beforeEach(() => {
 });
 
 describe("aiSync", () => {
+  // Vulnerability is covered below: its ingest also gets the AI source.
   it.each([
     [ResourceType.Asset, mocks.asset],
-    [ResourceType.Vulnerability, mocks.vulnerability],
     [ResourceType.Remediation, mocks.remediation],
     [ResourceType.DeviceArtifact, mocks.deviceArtifact],
   ])(
@@ -116,6 +116,17 @@ describe("aiSync", () => {
       expect(outcome).toEqual({ cursor: "cursor-1" });
     },
   );
+
+  it("records crawled vulnerabilities with the AI source", async () => {
+    await aiSync(makeCtx(ResourceType.Vulnerability));
+
+    expect(mocks.vulnerability).toHaveBeenCalledWith(
+      { items: ITEMS },
+      "shadow-1",
+      "int-1",
+      { shouldRecordSyncOutcome: false, source: "AI" },
+    );
+  });
 
   it("saves a partial crawl, then throws its reason so the sync is not Success", async () => {
     mocks.runAiCrawler.mockResolvedValueOnce({
@@ -174,7 +185,7 @@ describe("aiSync", () => {
 
   it.each([
     [ResourceType.Asset, "externalAssetMapping"],
-    [ResourceType.Vulnerability, "externalVulnerabilityMapping"],
+    [ResourceType.Vulnerability, "externalVulnerabilityRecordMapping"],
     [ResourceType.Remediation, "externalRemediationMapping"],
     [ResourceType.DeviceArtifact, "externalDeviceArtifactMapping"],
   ] as const)(

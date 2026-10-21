@@ -9,6 +9,7 @@ import {
   VulnerabilitySource,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { baselineIssueStatus } from "@/lib/device-matching";
 import { isUniqueViolation } from "@/lib/router-utils";
 import { requireExistence } from "@/trpc/middleware";
 import {
@@ -328,23 +329,33 @@ async function refreshVulnerability(
   });
   const matchings = [...new Set(deviceGroupMatchingIds)].map((id) => ({ id }));
 
-  await prisma.vulnerability.update({
+  const { deviceGroupMatchings: attached } = await prisma.vulnerability.update({
     where: { id: vulnerabilityId },
     data: {
+      // Explicit: with no new devices or severity the update is otherwise empty, and ALOHA and
+      // the lastUpdated filters rely on the bump.
+      updatedAt: new Date(),
       ...(matchings.length > 0
         ? { deviceGroupMatchings: { connect: matchings } }
         : {}),
       ...(rated?.severity ? { severity: rated.severity } : {}),
     },
+    select: {
+      deviceGroupMatchings: {
+        where: { id: { in: matchings.map(({ id }) => id) } },
+        select: { id: true, versionStatus: true },
+      },
+    },
   });
 
   // vulnerabilityExtension only opens baseline Issues on create, before any matching is
   // connected here, so open them for every matching this call attached.
-  if (matchings.length > 0) {
+  if (attached.length > 0) {
     await prisma.issue.createMany({
-      data: matchings.map(({ id }) => ({
+      data: attached.map((matching) => ({
         vulnerabilityId,
-        deviceGroupMatchingId: id,
+        deviceGroupMatchingId: matching.id,
+        status: baselineIssueStatus(matching.versionStatus),
       })),
       skipDuplicates: true,
     });

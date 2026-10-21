@@ -12,12 +12,8 @@ export async function suggest(ctx: SuggestCtx): Promise<Suggestion | null> {
   // Once the curated row exists, resolveManufacturer maps every alias to it. A row created under an alias before that is not counted.
   const count = await prisma.asset.count({
     where: {
-      deviceGroup: {
-        is: {
-          manufacturer: {
-            is: { canonicalName: SIEMENS_HEALTHINEERS.canonicalName },
-          },
-        },
+      manufacturer: {
+        is: { canonicalName: SIEMENS_HEALTHINEERS.canonicalName },
       },
     },
   });

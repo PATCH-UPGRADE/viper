@@ -42,11 +42,7 @@ describe("teamplay Fleet suggest", () => {
     );
     expect(mockAssetCount).toHaveBeenCalledWith({
       where: {
-        deviceGroup: {
-          is: {
-            manufacturer: { is: { canonicalName: "siemens healthineers" } },
-          },
-        },
+        manufacturer: { is: { canonicalName: "siemens healthineers" } },
       },
     });
   });

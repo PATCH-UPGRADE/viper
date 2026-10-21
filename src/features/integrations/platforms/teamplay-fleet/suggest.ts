@@ -21,6 +21,6 @@ export async function suggest(ctx: SuggestCtx): Promise<Suggestion | null> {
 
   const { canonicalDisplayName } = SIEMENS_HEALTHINEERS;
   return {
-    reason: `We found ${count} ${canonicalDisplayName} ${plural("asset", count)} on your network, which are handled in teamplay Fleet.`,
+    reason: `We found ${count} ${canonicalDisplayName} ${plural("asset", count)} in your inventory, which Siemens services through teamplay Fleet.`,
   };
 }

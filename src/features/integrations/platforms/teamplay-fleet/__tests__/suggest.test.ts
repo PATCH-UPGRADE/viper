@@ -38,7 +38,7 @@ describe("teamplay Fleet suggest", () => {
     });
 
     expect(result?.reason).toBe(
-      "We found 12 Siemens Healthineers assets on your network, which are handled in teamplay Fleet.",
+      "We found 12 Siemens Healthineers assets in your inventory, which Siemens services through teamplay Fleet.",
     );
     expect(mockAssetCount).toHaveBeenCalledWith({
       where: {
@@ -52,6 +52,6 @@ describe("teamplay Fleet suggest", () => {
 
     const result = await suggest({ integrations: [] });
 
-    expect(result?.reason).toContain("1 Siemens Healthineers asset on");
+    expect(result?.reason).toContain("1 Siemens Healthineers asset in");
   });
 });

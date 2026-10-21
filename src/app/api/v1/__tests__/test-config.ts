@@ -29,7 +29,10 @@ export type TestDevice = {
   version?: TestVersion;
 };
 
-/** A version name, or a range or status as it is. */
+/**
+ * A device input. A string version is a version name. A range or a status
+ * goes in as given.
+ */
 export const namedDevice = (
   manufacturer: string,
   product?: string,

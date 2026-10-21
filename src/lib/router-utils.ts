@@ -310,7 +310,8 @@ export type ResolvedDeviceIds = {
 /**
  * Resolve a device input to its canonical ids. An unknown id is a 404, and an
  * id under another parent is a 400. A name is found or created inside its
- * parent.
+ * parent. A range or a status names no version row, so its versionId is null:
+ * matchingVersionRange stores the range.
  */
 export async function resolveDeviceInput(
   device: DeviceInput | AssetDeviceInput,

@@ -1,16 +1,10 @@
 import "server-only";
-import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import {
   workflowSerializeInclude,
   workflowsUsingAssetsOrMatchings,
 } from "@/features/workflows/utils";
 import prisma from "@/lib/db";
-import {
-  deviceGroupWhereForMatching,
-  type MatchingLike,
-  matchingAppliesToDevice,
-} from "@/lib/device-matching";
 import {
   deviceGroupMatchingLabel,
   deviceLabel,
@@ -24,6 +18,7 @@ import {
   workflowClinicalSummary,
 } from "@/lib/markdown";
 import { notRejected } from "../../types";
+import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
 export type LinkableIds = {
@@ -142,24 +137,7 @@ export async function gatherTriageContext(
   }
   const matchings = [...matchingsById.values()];
 
-  const candidateGroups =
-    matchings.length > 0
-      ? await prisma.deviceGroup.findMany({
-          where: { OR: matchings.map(deviceGroupWhereForMatching) },
-          include: {
-            manufacturer: true,
-            product: {
-              include: deviceTypeLabelSelect,
-            },
-            version: true,
-            assets: true,
-          },
-        })
-      : [];
-
-  const groups = candidateGroups.filter((g) =>
-    matchings.some((m: MatchingLike) => matchingAppliesToDevice(m, g)),
-  );
+  const groups = await deviceAssetGroupsForMatchings(matchings);
 
   const seenAssets = new Set<string>();
   const affectedAssets: AffectedAsset[] = [];
@@ -238,7 +216,7 @@ export async function gatherTriageContext(
   // One line per matching (the entity an agent links against), with the device
   // groups and assets it actually resolves to. Only rendered under includeIds.
   const matchingSummaries: MatchingSummary[] = matchings.map((m) => {
-    const resolved = groups.filter((g) => matchingAppliesToDevice(m, g));
+    const resolved = groups.filter((g) => g.matchingIds.includes(m.id));
     return {
       id: m.id,
       label: deviceGroupMatchingLabel(m),
@@ -317,7 +295,6 @@ type GroupForRender = {
   manufacturer?: { canonicalDisplayName: string } | null;
   product?: { canonicalDisplayName: string } | null;
   version?: { canonicalDisplayName: string } | null;
-  cpe?: string[];
   assets: unknown[];
 };
 

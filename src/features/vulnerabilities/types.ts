@@ -140,13 +140,7 @@ export const vulnerabilityByPriorityInclude = {
         select: {
           id: true,
           location: true,
-          deviceGroup: {
-            select: {
-              product: {
-                select: deviceTypeLabelSelect,
-              },
-            },
-          },
+          product: { select: deviceTypeLabelSelect },
         },
       },
     },

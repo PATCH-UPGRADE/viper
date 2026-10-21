@@ -45,19 +45,15 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
 const assetSelect = {
   ...assetNameSelect,
   location: true,
-  deviceGroup: {
-    select: {
-      product: {
-        select: { deviceType: { select: { displayName: true, icon: true } } },
-      },
-    },
+  product: {
+    select: { deviceType: { select: { displayName: true, icon: true } } },
   },
 } as const;
 
 type SelectedAsset = Prisma.AssetGetPayload<{ select: typeof assetSelect }>;
 
 const iconOf = (asset: SelectedAsset) =>
-  asset.deviceGroup.product?.deviceType?.icon ?? null;
+  asset.product?.deviceType?.icon ?? null;
 
 // "Medical-Surgical Unit · Bed 18"
 const placeOf = (location: unknown) => {

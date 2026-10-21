@@ -4,7 +4,7 @@ import {
   getAssetNameForAgent,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "@/features/assets/utils";
-import { deviceGroupCpeList, deviceLabel } from "./device-group";
+import { deviceLabel } from "./device-group";
 import type { CanonicalRef } from "./shared";
 
 // ─── Utilization rendering ────────────────────────────────────────────────────
@@ -106,15 +106,12 @@ export interface AssetForMarkdown {
   location?: unknown;
   utilization?: unknown;
   updatedAt?: Date;
-  deviceGroup: {
-    manufacturer?: CanonicalRef;
-    product?: {
-      canonicalDisplayName: string;
-      deviceType?: { displayName: string } | null;
-    } | null;
-    version?: CanonicalRef;
-    cpe?: string[];
-  };
+  manufacturer?: CanonicalRef;
+  product: {
+    canonicalDisplayName: string;
+    deviceType?: { displayName: string } | null;
+  } | null;
+  version?: CanonicalRef;
   issues?: Array<{
     status: string;
     vulnerability: {
@@ -140,8 +137,8 @@ export function assetToMarkdown(
     `- **Status**: ${a.status ?? "Unknown"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
     `- **Location**: ${parseLocation(a.location)}`,
-    `- **Device Group**: ${deviceLabel(a.deviceGroup)}${a.deviceGroup.cpe?.length ? ` (CPE: ${deviceGroupCpeList(a.deviceGroup)})` : ""}`.trim(),
-    `- **Device Group Version**: ${a.deviceGroup.version?.canonicalDisplayName ?? "N/A"}`,
+    `- **Device**: ${deviceLabel(a)}`,
+    `- **Version**: ${a.version?.canonicalDisplayName ?? "N/A"}`,
   ];
 
   if (a.utilization) {

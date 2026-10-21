@@ -30,14 +30,10 @@ const contextAssetSelect = {
   networkSegment: true,
   status: true,
   location: true,
-  deviceGroup: {
-    select: {
-      productId: true,
-      manufacturer: { select: { canonicalDisplayName: true } },
-      product: {
-        select: { canonicalDisplayName: true, ...deviceTypeLabelSelect },
-      },
-    },
+  productId: true,
+  manufacturer: { select: { canonicalDisplayName: true } },
+  product: {
+    select: { canonicalDisplayName: true, ...deviceTypeLabelSelect },
   },
   externalMappings: {
     select: { integration: { select: { platform: true } } },
@@ -63,9 +59,8 @@ function storedLocation(
 }
 
 function deviceLabel(assetRow: ContextAssetRow): string {
-  const manufacturerName =
-    assetRow.deviceGroup.manufacturer?.canonicalDisplayName;
-  const productName = assetRow.deviceGroup.product?.canonicalDisplayName;
+  const manufacturerName = assetRow.manufacturer?.canonicalDisplayName;
+  const productName = assetRow.product?.canonicalDisplayName;
   const deviceName = [manufacturerName, productName].filter(Boolean).join(" ");
   if (!deviceName) return getAssetDisplayName(assetRow);
   const deviceType = getAssetDeviceTypeLabel(assetRow);
@@ -78,7 +73,7 @@ function toContextAsset(assetRow: ContextAssetRow): ContextAsset {
   );
   return {
     id: assetRow.id,
-    productId: assetRow.deviceGroup.productId,
+    productId: assetRow.productId,
     label: deviceLabel(assetRow),
     platforms: [...new Set(reportingPlatforms)],
     serialNumber: assetRow.serialNumber,

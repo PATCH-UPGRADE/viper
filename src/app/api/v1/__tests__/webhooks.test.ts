@@ -11,7 +11,7 @@ describe("Webhook Endpoints (/webhooks)", () => {
   const webhookPayload = {
     name: "mockWebhook",
     callbackUrl: "http://example.com",
-    triggers: [TriggerEnum.DeviceGroup_Created],
+    triggers: [TriggerEnum.Vulnerability_Created],
     authType: AuthType.Bearer,
     authentication: {
       token: process.env.API_KEY, // "Bearer" we be added back in fetch call
@@ -32,7 +32,7 @@ describe("Webhook Endpoints (/webhooks)", () => {
 
   it("Mock sendWebhook fetch", async () => {
     const mockBody = {
-      webhookTrigger: TriggerEnum.DeviceGroup_Created,
+      webhookTrigger: TriggerEnum.Vulnerability_Created,
       timestamp: new Date(),
     };
 

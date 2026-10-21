@@ -24,12 +24,8 @@ export const questionInclude = {
       },
       asset: {
         include: {
-          deviceGroup: {
-            include: {
-              manufacturer: { select: { canonicalDisplayName: true } },
-              product: { select: { canonicalDisplayName: true } },
-            },
-          },
+          manufacturer: { select: { canonicalDisplayName: true } },
+          product: { select: { canonicalDisplayName: true } },
         },
       },
     },

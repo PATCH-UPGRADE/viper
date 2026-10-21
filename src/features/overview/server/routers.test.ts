@@ -5,10 +5,10 @@ vi.mock("server-only", () => ({}));
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    deviceGroup: { findMany: vi.fn() },
     notification: { findMany: vi.fn() },
     ticketActivity: { findMany: vi.fn() },
-    asset: { findMany: vi.fn(), count: vi.fn() },
+    asset: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn() },
+    version: { findMany: vi.fn() },
     workOrderTicket: { findMany: vi.fn() },
   },
 }));
@@ -25,13 +25,12 @@ const caller = createCaller({
   // biome-ignore lint/suspicious/noExplicitAny: test fixture
 } as any);
 
+/** Four assets of one manufacturer + product, version unknown. */
 const OWNED = {
-  id: "dg-owned",
   manufacturerId: "mfr-1",
   productId: "prod-1",
   versionId: null,
-  version: null,
-  _count: { assets: 4 },
+  _count: { _all: 4 },
 };
 
 /** Matching that resolves to OWNED: same manufacturer + product, no version pin. */
@@ -73,14 +72,15 @@ const notification = (
 
 describe("overview.recentUpdates", () => {
   beforeEach(() => {
-    mockPrisma.deviceGroup.findMany.mockResolvedValue([]);
+    mockPrisma.asset.groupBy.mockResolvedValue([]);
+    mockPrisma.version.findMany.mockResolvedValue([]);
     mockPrisma.notification.findMany.mockResolvedValue([]);
     mockPrisma.ticketActivity.findMany.mockResolvedValue([]);
     mockPrisma.asset.findMany.mockResolvedValue([]);
   });
 
   it("keeps notifications whose matchings resolve to owned assets and drops the rest", async () => {
-    mockPrisma.deviceGroup.findMany.mockResolvedValue([OWNED]);
+    mockPrisma.asset.groupBy.mockResolvedValue([OWNED]);
     mockPrisma.notification.findMany.mockResolvedValue([
       notification("kept", "Advisory", [ownedMatching]),
       notification("dropped", "Advisory", [unownedMatching]),
@@ -132,7 +132,7 @@ describe("overview.recentUpdates", () => {
   });
 
   it("ignores a matching the user rejected", async () => {
-    mockPrisma.deviceGroup.findMany.mockResolvedValue([OWNED]);
+    mockPrisma.asset.groupBy.mockResolvedValue([OWNED]);
     mockPrisma.notification.findMany.mockResolvedValue([
       notification("rejected", "Advisory", [
         { ...ownedMatching, confidence: "Rejected" },
@@ -173,7 +173,8 @@ describe("overview.recentUpdates", () => {
 
   it("counts new assets individually but lists them collapsed by model", async () => {
     const monitor = {
-      id: "dg-1",
+      manufacturerId: "mfr-ge",
+      productId: "prod-b650",
       manufacturer: { canonicalDisplayName: "GE" },
       product: { canonicalDisplayName: "CARESCAPE B650" },
     };
@@ -182,29 +183,28 @@ describe("overview.recentUpdates", () => {
       {
         id: "a1",
         createdAt: new Date(),
-        deviceGroup: monitor,
+        ...monitor,
         externalMappings: fleet,
       },
       {
         id: "a2",
         createdAt: new Date(),
-        deviceGroup: monitor,
+        ...monitor,
         externalMappings: fleet,
       },
       {
         id: "a3",
         createdAt: new Date(),
-        deviceGroup: monitor,
+        ...monitor,
         externalMappings: fleet,
       },
       {
         id: "a4",
         createdAt: new Date(),
-        deviceGroup: {
-          id: "dg-2",
-          manufacturer: { canonicalDisplayName: "Mindray" },
-          product: { canonicalDisplayName: "Resona 7" },
-        },
+        manufacturerId: "mfr-mindray",
+        productId: "prod-resona",
+        manufacturer: { canonicalDisplayName: "Mindray" },
+        product: { canonicalDisplayName: "Resona 7" },
         externalMappings: [],
       },
     ]);
@@ -214,12 +214,17 @@ describe("overview.recentUpdates", () => {
     expect(result.newAssets.count).toBe(4);
     expect(result.newAssets.items).toEqual([
       {
-        key: "dg-1:teamplay Fleet",
+        key: "mfr-ge:prod-b650:teamplay Fleet",
         label: "GE CARESCAPE B650",
         source: "teamplay Fleet",
         count: 3,
       },
-      { key: "dg-2:", label: "Mindray Resona 7", source: null, count: 1 },
+      {
+        key: "mfr-mindray:prod-resona:",
+        label: "Mindray Resona 7",
+        source: null,
+        count: 1,
+      },
     ]);
     expect(result.totalCount).toBe(4);
   });

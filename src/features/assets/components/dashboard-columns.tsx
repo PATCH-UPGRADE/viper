@@ -106,9 +106,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
               )}
             </span>
           </TooltipTrigger>
-          <TooltipContent>
-            {deviceLabel(row.original.deviceGroup)}
-          </TooltipContent>
+          <TooltipContent>{deviceLabel(row.original)}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     ),

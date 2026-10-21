@@ -7,7 +7,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     manufacturer: { findFirst: vi.fn() },
     product: { findFirst: vi.fn() },
-    version: { findFirst: vi.fn() },
+    version: { findFirst: vi.fn(), updateMany: vi.fn() },
     deviceGroupMatching: { findFirst: vi.fn(), create: vi.fn() },
   },
 }));
@@ -16,7 +16,7 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/trpc/middleware", () => ({ requireExistence: vi.fn() }));
 vi.mock("../tokens", () => ({ consumeUserToken: vi.fn() }));
 
-const { resolveMatchingId } = await import("../router-utils");
+const { resolveDevice, resolveMatchingId } = await import("../router-utils");
 
 const input = { manufacturer: "Acme", product: "X1", version: "1.0" };
 const identity = {
@@ -72,5 +72,80 @@ describe("resolveMatchingId", () => {
     mockPrisma.deviceGroupMatching.create.mockRejectedValue(error);
 
     await expect(resolveMatchingId(input)).rejects.toBe(error);
+  });
+
+  it("looks up the product inside its manufacturer, and the version inside its product", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-1" });
+
+    await resolveMatchingId(input);
+
+    expect(mockPrisma.product.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        OR: [{ canonicalName: "x1" }, { nameMappings: { has: "x1" } }],
+      },
+    });
+    expect(mockPrisma.version.findFirst).toHaveBeenCalledWith({
+      where: { productId: "p-1", canonicalName: "1.0" },
+    });
+  });
+
+  it("stores no version on a matching with no product", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-1" });
+
+    await resolveMatchingId({ manufacturer: "Acme", version: "1.0" });
+
+    expect(mockPrisma.version.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.deviceGroupMatching.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        productId: null,
+        versionId: null,
+        versionRange: null,
+      },
+    });
+  });
+});
+
+describe("resolveDevice", () => {
+  it("returns the canonical ids, and KNOWN when the version resolves", async () => {
+    await expect(resolveDevice(input)).resolves.toEqual({
+      manufacturerId: "m-1",
+      productId: "p-1",
+      versionId: "v-1",
+      versionStatus: "KNOWN",
+    });
+  });
+
+  it("returns UNKNOWN and no version when there is no product", async () => {
+    await expect(
+      resolveDevice({ manufacturer: "Acme", version: "1.0" }),
+    ).resolves.toEqual({
+      manufacturerId: "m-1",
+      productId: null,
+      versionId: null,
+      versionStatus: "UNKNOWN",
+    });
+    expect(mockPrisma.version.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("fills an empty udiDi on the version", async () => {
+    mockPrisma.version.findFirst.mockResolvedValue({ id: "v-1", udiDi: null });
+
+    await resolveDevice({ ...input, udi: "00843197100156" });
+
+    expect(mockPrisma.version.updateMany).toHaveBeenCalledWith({
+      where: { id: "v-1", udiDi: null },
+      data: { udiDi: "00843197100156" },
+    });
+  });
+
+  it("keeps the udiDi when another version already holds it", async () => {
+    mockPrisma.version.findFirst.mockResolvedValue({ id: "v-1", udiDi: null });
+    mockPrisma.version.updateMany.mockRejectedValue({ code: "P2002" });
+
+    await expect(
+      resolveDevice({ ...input, udi: "00843197100156" }),
+    ).resolves.toMatchObject({ versionId: "v-1" });
   });
 });

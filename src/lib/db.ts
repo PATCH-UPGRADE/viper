@@ -1,8 +1,6 @@
-import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { type Prisma, PrismaClient } from "@/generated/prisma";
 import {
   artifactExtension,
-  deviceGroupExtension,
   mappingUrlExtension,
   sendWebhooksExtension,
   vulnerabilityExtension,
@@ -10,7 +8,6 @@ import {
 
 const createPrismaClient = () =>
   new PrismaClient()
-    .$extends(deviceGroupExtension)
     .$extends(artifactExtension)
     .$extends(vulnerabilityExtension)
     .$extends(sendWebhooksExtension)
@@ -31,40 +28,6 @@ const prisma = globalForPrisma.prisma ?? createPrismaClient();
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export default prisma;
-
-const canonicalRefSelect = {
-  select: { canonicalName: true, canonicalDisplayName: true },
-} as const;
-
-const deviceGroupSummarySelect = {
-  select: {
-    id: true,
-    manufacturer: canonicalRefSelect,
-    product: {
-      select: {
-        canonicalName: true,
-        canonicalDisplayName: true,
-        ...deviceTypeLabelSelect,
-      },
-    },
-    version: canonicalRefSelect,
-    versionStatus: true,
-    cpe: true,
-  },
-} as const;
-
-export type AssetWithIssues = Prisma.AssetGetPayload<{
-  include: {
-    issues: true;
-    deviceGroup: typeof deviceGroupSummarySelect;
-  };
-}>;
-
-export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
-  include: {
-    deviceGroup: typeof deviceGroupSummarySelect;
-  };
-}>;
 
 // TODO: these should eventually get moved to /types.ts
 // However, I'm not touching them now becuase I think we're retiring everything these are currently

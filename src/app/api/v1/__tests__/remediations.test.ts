@@ -16,6 +16,7 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
+  deleteAssetsForCpes,
   generateCPE,
   jsonHeader,
   setupMockIntegration,
@@ -337,9 +338,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.vulnerability
         .deleteMany({ where: { id: { in: vulnerabilityIds } } })
         .catch(() => {});
-      await prisma.deviceGroup
-        .deleteMany({ where: { cpe: { has: newCpe } } })
-        .catch(() => {});
+      await deleteAssetsForCpes([newCpe]).catch(() => {});
     });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }

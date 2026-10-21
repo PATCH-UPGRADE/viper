@@ -52,7 +52,7 @@ export async function seedVendors() {
   });
 
   const assets = await prisma.asset.findMany({
-    where: { deviceGroup: { manufacturerId: manufacturer.id } },
+    where: { manufacturerId: manufacturer.id },
     select: { id: true },
   });
 

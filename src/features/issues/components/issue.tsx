@@ -135,8 +135,8 @@ export const IssuesSidebarList = ({
         {visibleIssues.map((issue) => {
           const issueData = issuesMap[issue.id];
           if (!issueData) return null;
-          // issues.getManyByIds loads the asset's device group for type
-          // "assets", but its conditional include drops it from the type.
+          // issues.getManyByIds loads the asset's product for type "assets",
+          // but its conditional include drops it from the type.
           const asset = issueData.asset as
             | (NonNullable<typeof issueData.asset> & DeviceTypeSource)
             | null;

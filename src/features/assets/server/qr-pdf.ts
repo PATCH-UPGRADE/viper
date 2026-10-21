@@ -14,15 +14,11 @@ import { deviceTypeLabelSelect, getAssetTitle } from "../utils";
 export const qrPdfAssetSelect = {
   id: true,
   serialNumber: true,
-  deviceGroup: {
+  manufacturer: { select: { canonicalDisplayName: true } },
+  product: {
     select: {
-      manufacturer: { select: { canonicalDisplayName: true } },
-      product: {
-        select: {
-          canonicalDisplayName: true,
-          ...deviceTypeLabelSelect,
-        },
-      },
+      canonicalDisplayName: true,
+      ...deviceTypeLabelSelect,
     },
   },
 } satisfies Prisma.AssetSelect;
@@ -118,7 +114,7 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   drawText(getAssetTitle(asset), 18, bold, DARK);
   y -= 22;
 
-  drawText(deviceLabel(asset.deviceGroup), 12, font, GRAY);
+  drawText(deviceLabel(asset), 12, font, GRAY);
   y -= 24;
 
   drawDivider();

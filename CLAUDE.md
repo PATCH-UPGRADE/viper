@@ -312,14 +312,14 @@ Typical shape: `new ChatOpenAI({ model, useResponsesApi: true, reasoning: { effo
 **Key Models**:
 
 - `User`: Authentication (managed by Better Auth)
-- `Asset`: A concrete networked device instance on the hospital network (a real box with an IP)
-- `DeviceGroup`: Canonical identity for a *class* of devices — the resolved Vendor + Product + Version triple that `Asset`s are grouped under
+- `Asset`: A concrete networked device instance on the hospital network (a real box with an IP). It points to its `Manufacturer`, `Product`, and `Version` directly; each can be null (for example, a known product with an unknown version), and `versionStatus` says why the version is missing.
+- `Manufacturer` → `Product` → `Version`: the canonical device identity. A manufacturer owns its products, and a product owns its versions, so `canonicalName` is unique only inside the parent. `Product.deviceType` says what kind of device the product is. `Version.udiDi` holds the UDI-DI.
 - `DeviceGroupMatching`: A matching *rule* (wildcard-capable: null `productId` = all products of a vendor; `versionRange` is a VERS expression) that attaches `Vulnerability`, `Remediation`, and `Issue` records to whole classes of devices.
 * `Issue`: A mapping between a Vulnerability and an Asset/DeviceGroupMatching. An Issue affects an Asset if:
-    * The issue is linked to a device group matching that resolves to that asset, and there is no issue that overrides it
+    * The issue is linked to a device group matching that applies to that asset's manufacturer, product, and version, and there is no issue that overrides it
     * The issue is directly linked to the asset
 
-**Model relationships**: `Asset` → `DeviceGroup` is the concrete grouping; `DeviceGroupMatching` is the parallel *rule* construct (there is no direct FK between `DeviceGroup` and `DeviceGroupMatching`). `Issue` joins a `Vulnerability` to either a `DeviceGroupMatching` (class-level) or a specific `Asset` (which overrides the class-level record).
+**Model relationships**: `Asset` → `Manufacturer` / `Product` / `Version` is the concrete identity; `DeviceGroupMatching` is the parallel *rule* construct (there is no direct FK between `Asset` and `DeviceGroupMatching`: `matchingAppliesToDevice` in `src/lib/device-matching.ts` resolves a rule to assets, in memory for VERS ranges). `Issue` joins a `Vulnerability` to either a `DeviceGroupMatching` (class-level) or a specific `Asset` (which overrides the class-level record).
 
 **Schema Location**: `prisma/schema.prisma`
 

@@ -448,6 +448,7 @@ export const SYSTEM_PROMPT = `You are an issue triage analyst for a hospital cyb
 Statuses:
 - AFFECTED ("at risk"): the vulnerability is exploitable on this device group as deployed.
 - UNDER_INVESTIGATION ("possibly at risk"): there is not enough detail about the device to decide. Use this when device details are insufficient.
+  A device group labeled "version unknown" starts here, because the notification names no version. Move it to AFFECTED only when its device details show the vulnerability applies.
 - NOT_AFFECTED ("unaffected"): evidence shows the vulnerability is not exploitable here. You MUST provide a VEX justification:
   - COMPONENT_NOT_PRESENT: the affected feature/component is not enabled or installed (e.g. a note says the affected feature is off).
   - HOSPITAL_COMPENSATING_CONTROL: the hospital has a compensating control (e.g. an asset is not reachable over the network, which the exploit requires).

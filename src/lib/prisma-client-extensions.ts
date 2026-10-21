@@ -13,6 +13,7 @@ import {
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import { inngest } from "@/inngest/client";
 import prisma from "./db";
+import { baselineIssueStatus } from "./device-matching";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
 
@@ -123,7 +124,7 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
           // vulnerability, regardless of whether any assets exist yet.
           const matchings = await client.deviceGroupMatching.findMany({
             where: { vulnerabilities: { some: { id: vulnerabilityId } } },
-            select: { id: true },
+            select: { id: true, versionStatus: true },
           });
 
           if (matchings.length > 0) {
@@ -131,6 +132,7 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
               data: matchings.map((matching) => ({
                 vulnerabilityId,
                 deviceGroupMatchingId: matching.id,
+                status: baselineIssueStatus(matching.versionStatus),
               })),
               skipDuplicates: true,
             });

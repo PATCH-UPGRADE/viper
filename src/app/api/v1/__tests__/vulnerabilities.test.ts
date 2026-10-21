@@ -389,6 +389,13 @@ describe("Vulnerabilities Endpoint version input", () => {
     expect(affecting.body.items.map((v: { id: string }) => v.id)).toContain(
       res.body.id,
     );
+    // Possibly at risk, not known to be: the baseline issue opens under
+    // investigation.
+    const issue = await prisma.issue.findFirst({
+      where: { vulnerabilityId: res.body.id },
+      select: { status: true },
+    });
+    expect(issue?.status).toBe("UNDER_INVESTIGATION");
   });
 
   it.each([

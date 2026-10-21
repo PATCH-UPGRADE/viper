@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  baselineIssueStatus,
   matchingAppliesToDevice,
   matchingVersionFields,
   parseVers,
@@ -270,5 +271,17 @@ describe("matchingVersionFields", () => {
         versionRange: "vers:all/*",
       }),
     ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+  });
+});
+
+describe("baselineIssueStatus", () => {
+  it("opens an UNKNOWN matching's issue under investigation", () => {
+    expect(baselineIssueStatus("UNKNOWN")).toBe("UNDER_INVESTIGATION");
+  });
+
+  it("opens every other matching's issue as affected", () => {
+    for (const status of ["KNOWN", "NOT_APPLICABLE", "UNSURE"] as const) {
+      expect(baselineIssueStatus(status)).toBe("AFFECTED");
+    }
   });
 });

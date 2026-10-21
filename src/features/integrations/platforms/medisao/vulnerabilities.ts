@@ -1,5 +1,7 @@
 import "server-only";
+import { VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { baselineIssueStatus } from "@/lib/device-matching";
 import { isUniqueViolation } from "@/lib/router-utils";
 
 const CVE_PATTERN = /^CVE-\d{4}-\d{4,}$/i;
@@ -147,14 +149,28 @@ async function findMinted(
  * later needs its baseline Issue opened here.
  */
 async function attach(vulnerabilityId: string, deviceGroupMatchingId: string) {
-  await prisma.vulnerability.update({
+  const matching = await prisma.vulnerability.update({
     where: { id: vulnerabilityId },
     data: {
       deviceGroupMatchings: { connect: [{ id: deviceGroupMatchingId }] },
     },
+    select: {
+      deviceGroupMatchings: {
+        where: { id: deviceGroupMatchingId },
+        select: { versionStatus: true },
+      },
+    },
   });
+  const versionStatus =
+    matching.deviceGroupMatchings[0]?.versionStatus ?? VersionStatus.KNOWN;
   await prisma.issue.createMany({
-    data: [{ vulnerabilityId, deviceGroupMatchingId }],
+    data: [
+      {
+        vulnerabilityId,
+        deviceGroupMatchingId,
+        status: baselineIssueStatus(versionStatus),
+      },
+    ],
     skipDuplicates: true,
   });
 }

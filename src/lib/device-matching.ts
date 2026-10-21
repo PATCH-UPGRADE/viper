@@ -1,5 +1,5 @@
 import semver from "semver";
-import { type Prisma, VersionStatus } from "@/generated/prisma";
+import { IssueStatus, type Prisma, VersionStatus } from "@/generated/prisma";
 
 // ============================================================================
 // VERS version-range support
@@ -164,6 +164,17 @@ export function matchingVersionFields(matching: {
     versionRange: range,
     versionStatus: noVersion ? VersionStatus.UNKNOWN : VersionStatus.KNOWN,
   };
+}
+
+/**
+ * The status that a matching's baseline issue opens with. An UNKNOWN matching
+ * means the source gave no version, so its devices are possibly at risk, not
+ * known to be at risk: they show under investigation instead of affected.
+ */
+export function baselineIssueStatus(versionStatus: VersionStatus): IssueStatus {
+  return versionStatus === VersionStatus.UNKNOWN
+    ? IssueStatus.UNDER_INVESTIGATION
+    : IssueStatus.AFFECTED;
 }
 
 /**

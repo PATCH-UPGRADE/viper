@@ -32,6 +32,13 @@ export const dayGroupLabel = (date: Date | string | number): string => {
   return format(date, isThisYear(date) ? "MMM d" : "MMM d, yyyy");
 };
 
+/** A date a source sent as text, or null when it is missing or unreadable */
+export const asDate = (value: string | null | undefined): Date | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 /** Three-letter English month abbreviations, indexed 0 = Jan … 11 = Dec. */
 export const MONTHS_SHORT = [
   "Jan",

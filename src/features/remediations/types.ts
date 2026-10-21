@@ -22,6 +22,10 @@ import {
   remediationImpactRowSchema,
   remediationImpactRowSelect,
 } from "./impact";
+import {
+  remediationReleaseFieldsSchema,
+  remediationReleaseResponseSchema,
+} from "./release";
 
 const canonicalRefInclude = {
   select: { canonicalName: true, canonicalDisplayName: true },
@@ -52,6 +56,7 @@ export const remediationInputSchema = z.object({
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   ...remediationImpactFieldsSchema.shape,
+  ...remediationReleaseFieldsSchema.shape,
   impacts: z.array(featureImpactSchema).optional(),
   artifacts: z
     .array(artifactInputSchema)
@@ -71,6 +76,7 @@ export const remediationUpdateSchema = z.object({
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   ...remediationImpactFieldsSchema.shape,
+  ...remediationReleaseFieldsSchema.shape,
   impacts: z.array(featureImpactSchema).optional(),
   artifacts: z.array(artifactInputSchema).optional(),
 });
@@ -98,6 +104,8 @@ export const remediationResponseSchema = z.object({
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   ...remediationImpactFieldsSchema.shape,
+  ...remediationReleaseResponseSchema.shape,
+  isManufacturerRemediation: z.boolean(),
   impacts: z.array(remediationImpactRowSchema),
   vulnerabilities: z.array(vulnerabilitySchema),
   user: userSchema,

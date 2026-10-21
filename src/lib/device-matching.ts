@@ -145,6 +145,28 @@ export const deviceKey = (device: Omit<DeviceIdentity, "id">): string =>
   `${device.manufacturerId}:${device.productId}:${device.versionId}`;
 
 /**
+ * The versionRange and versionStatus to store for a matching from a source
+ * that names versions. A product with no version and no range is UNKNOWN: the
+ * source gave no version, which is not the same as every version. A range that
+ * matches every version is stored as no range, KNOWN, as the API stores it.
+ */
+export function matchingVersionFields(matching: {
+  hasProduct: boolean;
+  hasVersion: boolean;
+  versionRange?: string | null;
+}): { versionRange: string | null; versionStatus: VersionStatus } {
+  const range = matching.versionRange?.trim() || null;
+  if (range && parseVers(range)?.matchesAll) {
+    return { versionRange: null, versionStatus: VersionStatus.KNOWN };
+  }
+  const noVersion = matching.hasProduct && !matching.hasVersion && !range;
+  return {
+    versionRange: range,
+    versionStatus: noVersion ? VersionStatus.UNKNOWN : VersionStatus.KNOWN,
+  };
+}
+
+/**
  * Whether a matching applies to a concrete device. Manufacturer/product/exact-
  * version comparisons use canonical FK ids; version-range checks use the
  * version's canonical string.

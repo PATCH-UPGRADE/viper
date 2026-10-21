@@ -411,8 +411,9 @@ model DeviceGroupMatching {
   version        Version?     @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   versionRange String?
-  // UNKNOWN or NOT_APPLICABLE when the source gives no version: the matching has
-  // no versionId and no versionRange, and matches like a product-level rule.
+  // UNKNOWN when the source gives no version, NOT_APPLICABLE when the product
+  // has no versions. Either way the matching has no versionId and no
+  // versionRange, and matches like a product-level rule.
   versionStatus VersionStatus @default(KNOWN)
 
   vulnerabilities      Vulnerability[]                  @relation("VulnerabilityMatchings")

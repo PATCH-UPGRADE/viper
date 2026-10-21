@@ -16,6 +16,7 @@ import {
   deviceKey,
   type MatchingLike,
   matchingAppliesToDevice,
+  matchingVersionFields,
   matchingWhereForDevice,
   parseVers,
   strictAssetWhereForMatching,
@@ -448,12 +449,17 @@ export async function resolveMatchingId(
       ? await resolveVersion(input.version, productRow.id)
       : null;
 
+  const productId = productRow?.id ?? null;
+  const versionId = versionRow?.id ?? null;
   return findOrCreateMatching({
     manufacturerId: manufacturerRow.id,
-    productId: productRow?.id ?? null,
-    versionId: versionRow?.id ?? null,
-    versionRange: input.versionRange ?? null,
-    versionStatus: VersionStatus.KNOWN,
+    productId,
+    versionId,
+    ...matchingVersionFields({
+      hasProduct: productId !== null,
+      hasVersion: versionId !== null,
+      versionRange: input.versionRange,
+    }),
   });
 }
 
@@ -506,8 +512,8 @@ export async function resolveMatchingIdForDevice(
 
 /**
  * The versionRange to store for a device input. A range that matches every
- * version is stored as no range: that is the same matching that a product-level
- * rule from the inbox has, so the two do not become duplicate rows.
+ * version is stored as no range, the same row that matchingVersionFields gives
+ * an internal source, so the two do not become duplicate rows.
  */
 function matchingVersionRange(version: DeviceInput["version"]): string | null {
   if (!("range" in version)) return null;

@@ -3,8 +3,9 @@ import {
   assetAgentNameSelect,
   getAssetNameForAgent,
 } from "@/features/assets/utils";
-import { type ScopeTargetModel, VersionStatus } from "@/generated/prisma";
+import type { ScopeTargetModel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { matchingVersionFields } from "@/lib/device-matching";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import {
   canonicalNameWhere,
@@ -97,6 +98,13 @@ export async function findDeviceGroupMatching(
 ): Promise<DeviceGroupMatchingLookup> {
   const productName = identity.productName || null;
   const version = identity.version || null;
+  // Look up the same versionRange and versionStatus that resolveMatchingId
+  // below would store.
+  const versionFields = matchingVersionFields({
+    hasProduct: productName !== null,
+    hasVersion: version !== null,
+    versionRange: identity.versionRange,
+  });
   const versionRange = identity.versionRange || null;
 
   const existing = await prisma.deviceGroupMatching.findFirst({
@@ -108,8 +116,7 @@ export async function findDeviceGroupMatching(
       ...(version
         ? { version: { canonicalName: normalizeName(version) } }
         : { versionId: null }),
-      versionRange,
-      versionStatus: VersionStatus.KNOWN,
+      ...versionFields,
     },
     select: { id: true },
   });

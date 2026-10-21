@@ -3,7 +3,8 @@ import prisma from "@/lib/db";
 import { formatResourceName } from "@/lib/string-utils";
 
 // Models requireOwnership can check: every one has a `userId` field, which is
-// what the `as typeof prisma.asset` cast below assumes. Adding a model here
+// what the `as typeof prisma.asset` cast below assumes. On vulnerabilityRecord it is
+// nullable: see `allowUnowned`. Adding a model here
 // that lacks `userId` fails at compile time on its call site, not silently at
 // runtime (see PR #227 review: passing a model without `userId` produces a
 // Prisma "Unknown field 'userId'" warning and a broken ownership check).
@@ -13,7 +14,8 @@ type OwnableModel =
   | "deviceArtifact"
   | "remediation"
   | "webhook"
-  | "asset";
+  | "asset"
+  | "vulnerabilityRecord";
 
 /**
  * Verifies that a resource belongs to the current user
@@ -22,13 +24,16 @@ type OwnableModel =
  *
  * @param resourceId - The ID of the resource to check
  * @param userId - The ID of the current user
- * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerability')
+ * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerabilityRecord')
+ * @param options.allowUnowned - Let anyone modify a resource with no owner (a null `userId`),
+ *   such as a vulnerability record an integration created
  * @returns The resource with userId field
  */
 export async function requireOwnership(
   resourceId: string,
   userId: string,
   modelName: OwnableModel,
+  { allowUnowned = false }: { allowUnowned?: boolean } = {},
 ) {
   const model = prisma[modelName] as unknown as typeof prisma.asset;
 
@@ -41,7 +46,8 @@ export async function requireOwnership(
   );
 
   // TODO: Is this secure? Double check.
-  if (resource.userId !== userId) {
+  const unowned = (resource.userId as string | null) === null;
+  if (resource.userId !== userId && !(allowUnowned && unowned)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `You can only modify ${String(modelName)}s that you created`,
@@ -49,28 +55,6 @@ export async function requireOwnership(
   }
 
   return resource;
-}
-
-/**
- * Verifies the current user may change a vulnerability record. A record with an owner can only
- * be changed by that user; one without (integration and feed records) by anyone.
- * Throws NOT_FOUND if the record doesn't exist, FORBIDDEN if someone else owns it.
- */
-export async function requireRecordOwnership(recordId: string, userId: string) {
-  const record = requireExistence(
-    await prisma.vulnerabilityRecord.findUnique({
-      where: { id: recordId },
-      select: { userId: true },
-    }),
-    "VulnerabilityRecord",
-  );
-  if (record.userId !== null && record.userId !== userId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "You can only modify vulnerability records that you created",
-    });
-  }
-  return record;
 }
 
 export function requireExistence<T>(item: T | null, modelName: string): T {

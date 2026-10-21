@@ -8,7 +8,6 @@ import {
   Priority,
   type Prisma,
   Severity,
-  type TA3Submission,
   VulnerabilitySource,
 } from "@/generated/prisma";
 import {
@@ -167,52 +166,26 @@ export const ta3SubmissionInclude = {
   record: { select: { vulnerabilityId: true } },
 } satisfies Prisma.TA3SubmissionInclude;
 
-export function toTa3SubmissionResponse(
-  submission: TA3Submission,
-  vulnerabilityId: string,
-): Ta3SubmissionResponse {
-  return {
-    id: submission.id,
-    recordId: submission.recordId,
-    vulnerabilityId,
-    sarif: submission.sarif,
-    narrative: submission.narrative,
-    impact: submission.impact,
-    exploitUri: submission.exploitUri,
-    deviceArtifactId: submission.deviceArtifactId,
-    createdAt: submission.createdAt,
-    updatedAt: submission.updatedAt,
-  };
-}
-
-/** Prisma returns Decimal for metric scores; the API returns plain numbers. */
+/**
+ * Prisma returns Decimal for metric scores; the API returns plain numbers. The rest is the row
+ * as is: the output schema strips the fields the API doesn't return.
+ */
 export function toVulnerabilityRecordResponse(
   record: Prisma.VulnerabilityRecordGetPayload<{
     include: typeof vulnerabilityRecordInclude;
   }>,
 ): VulnerabilityRecordResponse {
   return {
-    id: record.id,
-    vulnerabilityId: record.vulnerabilityId,
-    source: record.source,
-    externalId: record.externalId,
-    summary: record.summary,
-    details: record.details,
-    publishedAt: record.publishedAt,
-    userId: record.userId,
+    ...record,
     metrics: record.metrics.map((metric) => ({
-      id: metric.id,
-      type: metric.type,
-      vector: metric.vector,
+      ...metric,
       score: metric.score?.toNumber() ?? null,
       percentile: metric.percentile?.toNumber() ?? null,
-      severity: metric.severity,
     })),
-    ta3Submission: record.ta3Submission
-      ? toTa3SubmissionResponse(record.ta3Submission, record.vulnerabilityId)
-      : null,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
+    ta3Submission: record.ta3Submission && {
+      ...record.ta3Submission,
+      vulnerabilityId: record.vulnerabilityId,
+    },
   };
 }
 

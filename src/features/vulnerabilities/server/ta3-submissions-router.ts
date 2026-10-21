@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AlohaStatus } from "@/generated/prisma";
+import type { AlohaStatus, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
@@ -10,15 +10,17 @@ import {
   paginatedTa3SubmissionResponseSchema,
   ta3SubmissionAlohaResponseSchema,
   ta3SubmissionInclude,
-  toTa3SubmissionResponse,
 } from "../types";
 
-type SubmissionWithRecord = Parameters<typeof toTa3SubmissionResponse>[0] & {
-  record: { vulnerabilityId: string };
-};
+type SubmissionWithRecord = Prisma.TA3SubmissionGetPayload<{
+  include: typeof ta3SubmissionInclude;
+}>;
 
-const toResponse = (submission: SubmissionWithRecord) =>
-  toTa3SubmissionResponse(submission, submission.record.vulnerabilityId);
+// The output schema strips the fields the API doesn't return.
+const toResponse = ({ record, ...submission }: SubmissionWithRecord) => ({
+  ...submission,
+  vulnerabilityId: record.vulnerabilityId,
+});
 
 const toAlohaResponse = (submission: SubmissionWithRecord) => ({
   ta3Submission: toResponse(submission),

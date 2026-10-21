@@ -2,6 +2,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { type Prisma, VulnerabilitySource } from "@/generated/prisma";
+import { asDate } from "@/lib/date-utils";
 import { devicesToMatchingConnect } from "@/lib/router-utils";
 import type {
   VulnerabilityRecordInput,
@@ -46,10 +47,6 @@ async function resolveDevices(
   return connect.map(({ id }) => id);
 }
 
-/** Undefined stays undefined, so an update leaves the field alone. */
-const toDate = (value: string | null | undefined) =>
-  value === undefined ? undefined : value === null ? null : new Date(value);
-
 function toSubmission(
   submission: VulnerabilityRecordInput["ta3Submission"],
 ): VulnerabilityRecordData["ta3Submission"] {
@@ -74,7 +71,7 @@ export async function recordDataFromInput(
     identifiers: input.identifiers,
     summary: input.summary,
     details: input.details,
-    publishedAt: toDate(input.publishedAt),
+    publishedAt: asDate(input.publishedAt),
     metrics: input.metrics,
     deviceGroupMatchingIds: await resolveDevices(input.devices),
     ta3Submission: toSubmission(input.ta3Submission),
@@ -90,7 +87,9 @@ export async function recordPatchFromInput(
     identifiers: input.identifiers,
     summary: input.summary,
     details: input.details,
-    publishedAt: toDate(input.publishedAt),
+    // Undefined stays undefined, so the update leaves publishedAt alone.
+    publishedAt:
+      input.publishedAt === undefined ? undefined : asDate(input.publishedAt),
     metrics: input.metrics,
     deviceGroupMatchingIds: await resolveDevices(input.devices),
     ta3Submission: toSubmission(input.ta3Submission),

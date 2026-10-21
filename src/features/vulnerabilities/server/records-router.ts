@@ -1,7 +1,7 @@
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireRecordOwnership } from "@/trpc/middleware";
+import { requireOwnership } from "@/trpc/middleware";
 import {
   toVulnerabilityRecordResponse,
   type VulnerabilityRecordInput,
@@ -95,7 +95,14 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
     })
     .output(vulnerabilityRecordResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireRecordOwnership(input.id, ctx.auth.user.id);
+      await requireOwnership(
+        input.id,
+        ctx.auth.user.id,
+        "vulnerabilityRecord",
+        {
+          allowUnowned: true,
+        },
+      );
       await updateVulnerabilityRecord(
         input.id,
         await recordPatchFromInput(input.data),
@@ -118,7 +125,14 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
     })
     .output(vulnerabilityRecordDeleteResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireRecordOwnership(input.id, ctx.auth.user.id);
+      await requireOwnership(
+        input.id,
+        ctx.auth.user.id,
+        "vulnerabilityRecord",
+        {
+          allowUnowned: true,
+        },
+      );
       const result = await deleteVulnerabilityRecord(input.id);
       return { id: input.id, ...result };
     }),

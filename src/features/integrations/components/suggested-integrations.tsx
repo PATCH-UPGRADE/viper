@@ -22,7 +22,7 @@ export const SuggestedIntegrations = ({
     <div className="flex flex-col gap-3">
       <SettingsSubheader
         title="Suggested for you"
-        description="Based on activity we've seen on your network."
+        description="Based on information we've collected about your hospital environment."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {cards.map(({ entry, reason }) => (

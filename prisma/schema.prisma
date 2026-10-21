@@ -841,7 +841,7 @@ model VulnerabilityRecord {
   source VulnerabilitySource
 
   /// ID of the statement inside its source (eg, GHSA-XXX, CVE-XXX). Null for TA3 submissions.
-  externalId String?
+  sourceId String?
 
   // TODO later: IF we add OSV support, what `aliases` does this record say refer to this vuln?
   // Used to resolve and merge, and kept so a bad merge can be traced back to the record that
@@ -881,7 +881,7 @@ model VulnerabilityRecord {
   updatedAt DateTime @updatedAt
 
   // Postgres treats NULLs as distinct, so TA3 and manual records never collide.
-  @@unique([source, externalId, vulnerabilityId])
+  @@unique([source, sourceId, vulnerabilityId])
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("vulnerability_record")
@@ -1342,6 +1342,7 @@ enum TriggerEnum {
   Remediation_Updated
   Vulnerability_Created
   Vulnerability_Updated
+  TA3Submission_Created
 }
 
 enum AuthType {

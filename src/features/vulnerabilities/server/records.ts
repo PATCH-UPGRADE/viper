@@ -61,7 +61,8 @@ export interface Ta3SubmissionInput {
 
 export interface VulnerabilityRecordData {
   source: VulnerabilitySource;
-  externalId?: string | null;
+  /** The statement's ID inside its source, e.g. GHSA-xxxx-xxxx-xxxx. */
+  sourceId?: string | null;
   /** CVE, GHSA, or other IDs. With none, the record gets a new vulnerability with a VIPER- ID. */
   identifiers?: string[];
   summary?: string | null;
@@ -147,7 +148,7 @@ export async function createVulnerabilityRecord(
         data: {
           vulnerabilityId,
           source: data.source,
-          externalId: data.externalId ?? null,
+          sourceId: data.sourceId ?? null,
           summary: data.summary ?? null,
           details: data.details ?? null,
           publishedAt: data.publishedAt ?? null,
@@ -215,7 +216,7 @@ export async function updateVulnerabilityRecord(
     return tx.vulnerabilityRecord.update({
       where: { id: recordId },
       data: {
-        externalId: patch.externalId,
+        sourceId: patch.sourceId,
         summary: patch.summary,
         details: patch.details,
         publishedAt: patch.publishedAt,

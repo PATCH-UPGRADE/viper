@@ -101,6 +101,11 @@ each asset's version with the matching before you call the asset affected. A
 notification's "vulnerabilities" array holds vulnerabilityId values; send one to
 vulnerabilities.getOne for the CVE.
 
+A matching rule with no version and no versionRange covers every version of its
+product. Its "versionStatus" says why: KNOWN means the source said every version,
+UNKNOWN means the source named no version, and NOT_APPLICABLE means the product has
+no versions. When you say what a vulnerability affects, say which one applies.
+
 'Work orders' show whether anyone is already working an item. Notifications, assets,
 and vulnerabilities carry "_links.workOrders"; follow it before you say whether an item
 is being worked. An empty result means no open work order was found — say that, and

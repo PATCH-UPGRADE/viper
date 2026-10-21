@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import {
   assetNameSearchTerms,
   countAffectedRemediations,
@@ -26,14 +25,11 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
-  assertVersionStatusAllowed,
   assetWhereForMatchings,
-  cpeToDevice,
+  deviceInputToAsset,
   fetchPaginated,
   findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
-  type ResolvedDevice,
-  resolveDevice,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
 import {
@@ -119,6 +115,38 @@ export const assetsRouter = createTRPCRouter({
         include: assetInclude,
       });
 
+      return {
+        ...result,
+        items: await attachNotes("ASSET", result.items),
+      };
+    }),
+
+  // GET /api/versions/{id}/assets - Assets that run one product version
+  getManyByVersion: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/versions/{id}/assets",
+        tags: ["Assets", "Versions"],
+        summary: "List Assets by Version",
+        description: "Get the assets that run one product version.",
+      },
+    })
+    .output(paginatedAssetResponseSchema)
+    .query(async ({ input }) => {
+      const version = await prisma.version.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+      requireExistence(version, "Version");
+      const result = await fetchPaginated(prisma.asset, input, {
+        where: {
+          versionId: input.id,
+          ...createSearchFilter(input.search),
+        },
+        include: assetInclude,
+      });
       return {
         ...result,
         items: await attachNotes("ASSET", result.items),
@@ -454,18 +482,13 @@ export const assetsRouter = createTRPCRouter({
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const {
-        cpe,
-        version,
-        versionStatus,
+        device: deviceInput,
         utilization,
         deviceType,
         ...dataInput
       } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
-      const device = await cpeToDevice(cpe ?? UNKNOWN_CPE_STRING, {
-        version,
-        versionStatus,
-      });
+      const device = await deviceInputToAsset(deviceInput);
       await applyDeviceType(device.productId, deviceType);
       return prisma.asset.create({
         data: {
@@ -498,9 +521,7 @@ export const assetsRouter = createTRPCRouter({
       );
       // resolve all devices in parallel
       const devices = await Promise.all(
-        input.assets.map(({ cpe, version, versionStatus }) =>
-          cpeToDevice(cpe ?? UNKNOWN_CPE_STRING, { version, versionStatus }),
-        ),
+        input.assets.map(({ device }) => deviceInputToAsset(device)),
       );
       for (const [index, { deviceType }] of input.assets.entries()) {
         await applyDeviceType(devices[index].productId, deviceType);
@@ -510,9 +531,7 @@ export const assetsRouter = createTRPCRouter({
       return prisma.$transaction(
         input.assets.map((asset, index) => {
           const {
-            cpe: _cpe,
-            version: _version,
-            versionStatus: _versionStatus,
+            device: _device,
             utilization,
             deviceType: _deviceType,
             ...dataInput
@@ -643,37 +662,21 @@ export const assetsRouter = createTRPCRouter({
 
       const {
         id,
-        cpe,
+        device: deviceInput,
         utilization,
-        version,
-        versionStatus,
         deviceType,
         ...updateData
       } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
       const current = await prisma.asset.findUniqueOrThrow({
         where: { id },
-        select: {
-          productId: true,
-          manufacturer: { select: { canonicalName: true } },
-          product: { select: { canonicalName: true } },
-        },
+        select: { productId: true },
       });
 
-      assertVersionStatusAllowed(version, versionStatus);
-      let device: ResolvedDevice | undefined;
-      if (cpe) {
-        device = await cpeToDevice(cpe, { version, versionStatus });
-      } else if (version || versionStatus) {
-        if (current.manufacturer && current.product) {
-          device = await resolveDevice({
-            manufacturer: current.manufacturer.canonicalName,
-            product: current.product.canonicalName,
-            version: version ?? null,
-            versionStatus: version ? "KNOWN" : (versionStatus ?? "UNKNOWN"),
-          });
-        }
-      }
+      const device =
+        deviceInput === undefined
+          ? undefined
+          : await deviceInputToAsset(deviceInput);
       await applyDeviceType(device?.productId ?? current.productId, deviceType);
       return prisma.asset.update({
         where: { id },

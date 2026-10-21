@@ -115,18 +115,13 @@ export const useAnswerAssetVersion = () => {
     trpc.assets.update.mutationOptions({
       onSuccess: (data, variables) => {
         const label = getAssetTitle(data);
-        if ("version" in variables && variables.version) {
-          toast.success(`${label} set to version ${variables.version}`);
-        } else if (
-          "versionStatus" in variables &&
-          variables.versionStatus === "UNKNOWN"
-        ) {
-          toast.success(`${label} marked version unknown`);
-        } else if (
-          "versionStatus" in variables &&
-          variables.versionStatus === "UNSURE"
-        ) {
-          toast.success(`${label} marked version not sure`);
+        const version = variables.device?.version;
+        if (version && "name" in version) {
+          toast.success(`${label} set to version ${version.name}`);
+        } else if (version && "status" in version) {
+          toast.success(
+            `${label} marked version ${version.status === "UNSURE" ? "not sure" : "unknown"}`,
+          );
         } else {
           toast.success(`${label} updated`);
         }

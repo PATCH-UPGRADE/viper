@@ -24,6 +24,7 @@ const identity = {
   productId: "p-1",
   versionId: "v-1",
   versionRange: null,
+  versionStatus: "KNOWN",
 };
 
 beforeEach(() => {
@@ -90,6 +91,42 @@ describe("resolveMatchingId", () => {
     });
   });
 
+  it("stores UNKNOWN for a product with no version and no range", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-1" });
+
+    await resolveMatchingId({ manufacturer: "Acme", product: "X1" });
+
+    expect(mockPrisma.deviceGroupMatching.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        productId: "p-1",
+        versionId: null,
+        versionRange: null,
+        versionStatus: "UNKNOWN",
+      },
+    });
+  });
+
+  it("stores a range of every version as no range, KNOWN", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-1" });
+
+    await resolveMatchingId({
+      manufacturer: "Acme",
+      product: "X1",
+      versionRange: "vers:all/*",
+    });
+
+    expect(mockPrisma.deviceGroupMatching.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        productId: "p-1",
+        versionId: null,
+        versionRange: null,
+        versionStatus: "KNOWN",
+      },
+    });
+  });
+
   it("stores no version on a matching with no product", async () => {
     mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-1" });
 
@@ -102,6 +139,7 @@ describe("resolveMatchingId", () => {
         productId: null,
         versionId: null,
         versionRange: null,
+        versionStatus: "KNOWN",
       },
     });
   });

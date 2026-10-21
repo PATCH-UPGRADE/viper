@@ -8,8 +8,7 @@ export function normalizeVersion(v?: string | null): string | null {
   return v;
 }
 
-// Mirror of router-utils' CPE-token → versionStatus mapping so seeded assets
-// carry the same semantics as ones resolved from CPEs at runtime:
+// The versionStatus of a sample CPE's version token:
 // "-" => NOT_APPLICABLE, "*"/empty => UNKNOWN, any value => KNOWN.
 export function cpeVersionStatus(
   cpe: string,
@@ -52,16 +51,24 @@ export type DeviceIds = {
   versionId: string | null;
 };
 
-// Find-or-create a shared DeviceGroupMatching for a device identity.
+// Find-or-create a shared DeviceGroupMatching for a device identity. A product
+// with no version takes the sample's versionStatus: NOT_APPLICABLE for a "-"
+// version token, otherwise UNKNOWN.
 export async function matchingForDevice(
-  device: DeviceIds,
+  device: DeviceIds & { versionStatus?: ReturnType<typeof cpeVersionStatus> },
 ): Promise<string | null> {
   if (!device.manufacturerId) return null;
+  const noVersion = device.productId !== null && device.versionId === null;
   const where = {
     manufacturerId: device.manufacturerId,
     productId: device.productId,
     versionId: device.versionId,
     versionRange: null,
+    versionStatus: !noVersion
+      ? ("KNOWN" as const)
+      : device.versionStatus === "NOT_APPLICABLE"
+        ? ("NOT_APPLICABLE" as const)
+        : ("UNKNOWN" as const),
   };
   const existing = await prisma.deviceGroupMatching.findFirst({ where });
   const matching =

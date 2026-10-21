@@ -12,19 +12,21 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
+  ALL_VERSIONS,
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
   createIntegrationToken,
-  deleteAssetsForCpes,
-  generateCPE,
+  deleteAssetsForDevices,
+  generateDevice,
   jsonHeader,
+  namedDevice,
   setupMockIntegration,
 } from "./test-config";
 
 describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
   const payload = {
-    cpe: generateCPE("dev_art_v1"),
+    device: generateDevice("dev_art_v1"),
     role: "Primary Controller",
     description: "Mock -- CT Scanner firmware and documentation",
     upstreamApi: "https://vendor.example.com/api",
@@ -58,7 +60,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     vendor: "mockDeviceArtifactIntegrationVendor",
     items: [
       {
-        cpe: "cpe:2.3:h:mock:dev_art_integration_v10:*:*:*:*:*:*:*",
+        device: namedDevice("mock", "dev_art_integration_v10", ALL_VERSIONS),
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock -- run apt update",
@@ -72,7 +74,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         ],
       },
       {
-        cpe: "cpe:2.3:h:mock:dev_art_integration_v11:*:*:*:*:*:*:*",
+        device: namedDevice("mock", "dev_art_integration_v11", ALL_VERSIONS),
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock - Turn it off and on again",
@@ -142,7 +144,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   it("POST /deviceArtifacts - Create without artifacts should fail", async () => {
     const invalidPayload = {
-      cpe: generateCPE("dev_art_v1"),
+      device: generateDevice("dev_art_v1"),
       role: "Test Role",
       description: "No artifacts",
       artifacts: [],
@@ -159,7 +161,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   it("POST /deviceArtifacts - Create without role should fail", async () => {
     const invalidPayload = {
-      cpe: generateCPE("dev_art_v1"),
+      device: generateDevice("dev_art_v1"),
       description: "No role",
       artifacts: [
         {
@@ -181,7 +183,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   it("POST /deviceArtifacts - Create without description should fail", async () => {
     const invalidPayload = {
-      cpe: generateCPE("dev_art_v1"),
+      device: generateDevice("dev_art_v1"),
       role: "Test Role",
       artifacts: [
         {
@@ -225,13 +227,13 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         });
     });
 
-    // Verify the response structure: a device-group matching reflects the CPE's
-    // manufacturer/product/version.
+    // Verify the response structure: a device-group matching reflects the
+    // device's manufacturer/product/version.
     expect(createdDeviceArtifact).toHaveProperty("deviceGroupMatchings");
     expect(
       createdDeviceArtifact.deviceGroupMatchings.some(
         (m: { version: { canonicalName: string } | null }) =>
-          m.version?.canonicalName === payload.cpe.split(":")[5].toLowerCase(),
+          m.version?.canonicalName === payload.device.version?.name,
       ),
     ).toBe(true);
 
@@ -289,21 +291,21 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(updateRes.body.description).toBe("Updated description");
     expect(updateRes.body.role).toBe("Updated Role");
 
-    // Update CPE
-    const newCpe = generateCPE("dev_art_v2");
-    const updateCpeRes = await request(BASE_URL)
+    // Update the device
+    const newDevice = generateDevice("dev_art_v2");
+    const updateDeviceRes = await request(BASE_URL)
       .put(`/deviceArtifacts/${deviceArtifactId}`)
       .set(authHeader)
       .send({
         id: deviceArtifactId,
-        cpe: newCpe,
+        device: newDevice,
       });
 
-    expect(updateCpeRes.status).toBe(200);
+    expect(updateDeviceRes.status).toBe(200);
     expect(
-      updateCpeRes.body.deviceGroupMatchings.some(
+      updateDeviceRes.body.deviceGroupMatchings.some(
         (m: { version: { canonicalName: string } | null }) =>
-          m.version?.canonicalName === newCpe.split(":")[5].toLowerCase(),
+          m.version?.canonicalName === newDevice.version?.name,
       ),
     ).toBe(true);
 
@@ -378,7 +380,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   it("GET /deviceArtifacts - Pagination test", async () => {
     // Create multiple device artifacts
-    const cpeName = "dev_art_pagination_";
+    const versionPrefix = "dev_art_pagination_";
     const createPromises = Array.from({ length: 5 }, (_, i) =>
       request(BASE_URL)
         .post("/deviceArtifacts")
@@ -386,7 +388,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         .send({
           ...payload,
           description: `Test device artifact ${i}`,
-          cpe: generateCPE(`${cpeName}${i}`),
+          device: generateDevice(`${versionPrefix}${i}`),
         }),
     );
 
@@ -403,8 +405,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
           }),
         ),
       );
-      await deleteAssetsForCpes(
-        Array.from({ length: 5 }, (_, i) => generateCPE(`${cpeName}${i}`)),
+      await deleteAssetsForDevices(
+        Array.from({ length: 5 }, (_, i) =>
+          generateDevice(`${versionPrefix}${i}`),
+        ),
       );
     });
 
@@ -501,9 +505,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       ResourceType.DeviceArtifact,
     );
 
-    await deleteAssetsForCpes([
-      deviceArtifactsIntegrationPayload.items[0].cpe,
-      deviceArtifactsIntegrationPayload.items[1].cpe,
+    await deleteAssetsForDevices([
+      deviceArtifactsIntegrationPayload.items[0].device,
+      deviceArtifactsIntegrationPayload.items[1].device,
     ]);
 
     const integrationRes = await request(BASE_URL)
@@ -544,8 +548,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(
       foundDeviceArtifact1.deviceGroupMatchings.some(
         (m: { product: { canonicalName: string } | null }) =>
-          m.product?.canonicalName ===
-          daPayload1.cpe.split(":")[4].toLowerCase(),
+          m.product?.canonicalName === daPayload1.device.product?.name,
       ),
     ).toBe(true);
     expect(foundDeviceArtifact1.artifacts.length).toBe(1);
@@ -577,8 +580,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(
       foundDeviceArtifact2.deviceGroupMatchings.some(
         (m: { product: { canonicalName: string } | null }) =>
-          m.product?.canonicalName ===
-          daPayload2.cpe.split(":")[4].toLowerCase(),
+          m.product?.canonicalName === daPayload2.device.product?.name,
       ),
     ).toBe(true);
     expect(foundDeviceArtifact2.artifacts.length).toBe(1);

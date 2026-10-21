@@ -13,6 +13,7 @@ import {
 } from "@/features/remediations/impact";
 import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { matchingVersionFields } from "@/lib/device-matching";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
 import { notRejected } from "../types";
@@ -429,6 +430,7 @@ export async function applyDecisions(
               manufacturerId: true,
               productId: true,
               versionId: true,
+              versionStatus: true,
             },
           });
 
@@ -437,23 +439,35 @@ export async function applyDecisions(
             targetMatching &&
             !targetMatching.versionRange
           ) {
-            // The identity (manufacturer, product, version, versionRange) is
-            // unique. If another matching already has the ranged identity, adding
-            // the range here would throw P2002 and abort this transaction, so
-            // leave this matching as it is.
-            const rangedTwin = await tx.deviceGroupMatching.findFirst({
-              where: {
-                manufacturerId: targetMatching.manufacturerId,
-                productId: targetMatching.productId,
-                versionId: targetMatching.versionId,
-                versionRange: data.versionRange,
-              },
-              select: { id: true },
+            // A range is version information, so an UNKNOWN matching that
+            // gets one becomes KNOWN.
+            const next = matchingVersionFields({
+              hasProduct: targetMatching.productId !== null,
+              hasVersion: targetMatching.versionId !== null,
+              versionRange: data.versionRange,
             });
-            if (!rangedTwin) {
+            const changes =
+              next.versionRange !== null ||
+              next.versionStatus !== targetMatching.versionStatus;
+            // The identity (manufacturer, product, version, versionRange,
+            // versionStatus) is unique. If another matching already has the new
+            // identity, the update would throw P2002 and abort this
+            // transaction, so leave this matching as it is.
+            const twin = changes
+              ? await tx.deviceGroupMatching.findFirst({
+                  where: {
+                    manufacturerId: targetMatching.manufacturerId,
+                    productId: targetMatching.productId,
+                    versionId: targetMatching.versionId,
+                    ...next,
+                  },
+                  select: { id: true },
+                })
+              : null;
+            if (changes && !twin) {
               await tx.deviceGroupMatching.update({
                 where: { id: decision.targetId },
-                data: { versionRange: data.versionRange },
+                data: next,
               });
             }
           }

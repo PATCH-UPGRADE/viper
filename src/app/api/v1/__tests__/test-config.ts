@@ -3,7 +3,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import type { IntegrationFormValues } from "@/features/integrations/types";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { normalizeName, parseCpe } from "@/lib/router-utils";
+import { normalizeName } from "@/lib/router-utils";
 import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 
 export const BASE_URL = "http://localhost:3000/api/v1";
@@ -15,44 +15,84 @@ if (!process.env.API_KEY) {
 
 export const AUTH_TOKEN = `Bearer ${process.env.API_KEY}`;
 
-export const generateCPE = (suffix: string) =>
-  `cpe:2.3:o:vendor:product:${suffix}`;
+type CanonicalName = { canonicalName: string } | null | undefined;
 
-/** The canonical manufacturer, product, and version names that a CPE gives. */
-function namesFromCpe(cpe: string) {
-  const { manufacturer, product, version } = parseCpe(cpe);
+type TestVersion =
+  | { name: string }
+  | { range: string }
+  | { status: "UNKNOWN" | "UNSURE" };
+
+/** A device input that names its manufacturer and product by name. */
+export type TestDevice = {
+  manufacturer: { name: string };
+  product?: { name: string };
+  version?: TestVersion;
+};
+
+/**
+ * A device input. A string version is a version name. A range or a status
+ * goes in as given.
+ */
+export const namedDevice = (
+  manufacturer: string,
+  product?: string,
+  version?: string | TestVersion,
+): TestDevice => ({
+  manufacturer: { name: manufacturer },
+  ...(product ? { product: { name: product } } : {}),
+  ...(version
+    ? { version: typeof version === "string" ? { name: version } : version }
+    : {}),
+});
+
+export const generateDevice = (suffix: string) => ({
+  manufacturer: { name: "vendor" },
+  product: { name: "product" },
+  version: { name: suffix },
+});
+
+/** Every version, for a vulnerability, remediation, or device artifact. */
+export const ALL_VERSIONS = { range: "vers:all/*" } as const;
+
+/** No version, for an asset. */
+export const VERSION_UNKNOWN = { status: "UNKNOWN" } as const;
+
+function namesFromDevice(device: TestDevice) {
   return {
-    manufacturer: normalizeName(manufacturer),
-    product: normalizeName(product),
-    version: version ? normalizeName(version) : null,
+    manufacturer: normalizeName(device.manufacturer.name),
+    product: device.product ? normalizeName(device.product.name) : null,
+    version:
+      device.version && "name" in device.version
+        ? normalizeName(device.version.name)
+        : null,
   };
 }
 
-type CanonicalName = { canonicalName: string } | null | undefined;
-
-/** Checks that an asset has the manufacturer, product, and version its CPE names. */
-export function expectDeviceFromCpe(
+/** Checks that an asset has the manufacturer, product, and version a device input names. */
+export function expectDevice(
   asset: {
     manufacturer?: CanonicalName;
     product?: CanonicalName;
     version?: CanonicalName;
   },
-  cpe: string,
+  device: TestDevice,
 ) {
-  const names = namesFromCpe(cpe);
+  const names = namesFromDevice(device);
   expect(asset.manufacturer?.canonicalName).toBe(names.manufacturer);
-  expect(asset.product?.canonicalName).toBe(names.product);
+  expect(asset.product?.canonicalName ?? null).toBe(names.product);
   expect(asset.version?.canonicalName ?? null).toBe(names.version);
 }
 
-/** Deletes the assets that have the manufacturer, product, and version a CPE names. */
-export async function deleteAssetsForCpes(cpes: string[]) {
-  for (const cpe of cpes) {
-    const names = namesFromCpe(cpe);
+/** Deletes the assets that have the manufacturer, product, and version a device input names. */
+export async function deleteAssetsForDevices(devices: TestDevice[]) {
+  for (const device of devices) {
+    const names = namesFromDevice(device);
     await prisma.asset.deleteMany({
       where: {
         manufacturer: { canonicalName: names.manufacturer },
-        product: { canonicalName: names.product },
+        product: names.product
+          ? { canonicalName: names.product }
+          : { is: null },
         version: names.version
           ? { canonicalName: names.version }
           : { is: null },

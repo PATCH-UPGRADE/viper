@@ -16,7 +16,9 @@ import {
   deviceKey,
   type MatchingLike,
   matchingAppliesToDevice,
+  matchingVersionFields,
   matchingWhereForDevice,
+  parseVers,
   strictAssetWhereForMatching,
   versSatisfies,
 } from "./device-matching";
@@ -25,6 +27,7 @@ import {
   createPaginatedResponse,
   type PaginationInput,
 } from "./pagination";
+import type { AssetDeviceInput, DeviceInput } from "./schemas";
 import { consumeUserToken } from "./tokens";
 
 // ============================================================================
@@ -298,6 +301,107 @@ export async function resolveDevice(
   };
 }
 
+/** The canonical ids that a device input names. */
+export type ResolvedDeviceIds = {
+  manufacturerId: string;
+  productId: string | null;
+  versionId: string | null;
+};
+
+/**
+ * Resolve a device input to its canonical ids. An unknown id is a 404, and an
+ * id under another parent is a 400. A name is found or created inside its
+ * parent. A range or a status names no version row, so its versionId is null:
+ * matchingVersionRange stores the range.
+ */
+export async function resolveDeviceInput(
+  device: DeviceInput | AssetDeviceInput,
+): Promise<ResolvedDeviceIds> {
+  const version =
+    "id" in device.version || "name" in device.version ? device.version : null;
+  if (version && !device.product) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "device.version needs device.product.",
+    });
+  }
+  const notUnder = (child: string, parent: string) =>
+    new TRPCError({
+      code: "BAD_REQUEST",
+      message: `The ${child} does not belong to the ${parent}.`,
+    });
+
+  const manufacturer =
+    "id" in device.manufacturer
+      ? requireExistence(
+          await prisma.manufacturer.findUnique({
+            where: { id: device.manufacturer.id },
+            select: { id: true },
+          }),
+          "Manufacturer",
+        )
+      : await resolveManufacturer(device.manufacturer.name);
+
+  let productId: string | null = null;
+  if (device.product) {
+    if ("id" in device.product) {
+      const product = requireExistence(
+        await prisma.product.findUnique({
+          where: { id: device.product.id },
+          select: { id: true, manufacturerId: true },
+        }),
+        "Product",
+      );
+      if (product.manufacturerId !== manufacturer.id)
+        throw notUnder("product", "manufacturer");
+      productId = product.id;
+    } else {
+      productId = (await resolveProduct(device.product.name, manufacturer.id))
+        .id;
+    }
+  }
+
+  let versionId: string | null = null;
+  if (version && productId) {
+    if ("id" in version) {
+      const row = requireExistence(
+        await prisma.version.findUnique({
+          where: { id: version.id },
+          select: { id: true, productId: true },
+        }),
+        "Version",
+      );
+      if (row.productId !== productId) throw notUnder("version", "product");
+      versionId = row.id;
+    } else {
+      versionId = (await resolveVersion(version.name, productId)).id;
+    }
+  }
+
+  return { manufacturerId: manufacturer.id, productId, versionId };
+}
+
+/**
+ * The device fields to write on an asset. Without a device, the asset has no
+ * manufacturer, product, or version.
+ */
+export async function deviceInputToAsset(
+  device: AssetDeviceInput | null | undefined,
+) {
+  const ids = device
+    ? await resolveDeviceInput(device)
+    : { manufacturerId: null, productId: null, versionId: null };
+  const status =
+    device?.version && "status" in device.version
+      ? device.version.status
+      : undefined;
+  return {
+    ...ids,
+    versionStatus:
+      status ?? (ids.versionId ? VersionStatus.KNOWN : VersionStatus.UNKNOWN),
+  };
+}
+
 /**
  * Sets the UDI-DI of the version that `where` selects, if it has none. udiDi is
  * unique: when another version already holds this UDI, that version keeps it.
@@ -316,87 +420,6 @@ export async function fillVersionUdi(
   }
 }
 
-const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
-
-/** The manufacturer and product name that parseCpe gives an unknown token. */
-export const UNKNOWN_CPE_NAME = "-";
-
-/**
- * Map a CPE 2.3 version token to an asset `versionStatus`:
- * - "-"        => NOT_APPLICABLE (the CPE's NA marker)
- * - "*"/empty  => UNKNOWN        (the CPE's ANY marker / unspecified)
- * - any value  => KNOWN
- */
-function cpeVersionStatus(versionRaw: string): VersionStatus {
-  if (versionRaw === "-") return VersionStatus.NOT_APPLICABLE;
-  if (versionRaw === "" || versionRaw === "*") return VersionStatus.UNKNOWN;
-  return VersionStatus.KNOWN;
-}
-
-/**
- * Parse a CPE 2.3 string into a manufacturer/product/version identity.
- * Format: cpe:2.3:<part>:<vendor>:<product>:<version>:...
- * Unknown tokens ("-", "*", empty) map to "-" for manufacturer/product and null for
- * version; `versionStatus` preserves the NA-vs-ANY distinction for the version.
- */
-export function parseCpe(cpe: string): {
-  manufacturer: string;
-  product: string;
-  version: string | null;
-  versionStatus: VersionStatus;
-} {
-  const parts = cpe.split(":");
-  const manufacturerRaw = parts[3] ?? UNKNOWN_CPE_NAME;
-  const productRaw = parts[4] ?? UNKNOWN_CPE_NAME;
-  const versionRaw = parts[5] ?? "";
-  const norm = (value: string, fallback: string) =>
-    CPE_UNKNOWN_TOKENS.has(value) ? fallback : value;
-  return {
-    manufacturer: norm(manufacturerRaw, UNKNOWN_CPE_NAME),
-    product: norm(productRaw, UNKNOWN_CPE_NAME),
-    version: CPE_UNKNOWN_TOKENS.has(versionRaw) ? null : versionRaw,
-    versionStatus: cpeVersionStatus(versionRaw),
-  };
-}
-
-/**
- * A `versionStatus` says why an asset has no version, so a request that gives
- * both a version and a status is a 400.
- */
-export function assertVersionStatusAllowed(
-  version: string | null | undefined,
-  versionStatus: VersionStatus | undefined,
-): void {
-  if (version && versionStatus) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "versionStatus applies only to an asset with no version. Omit it when you give a version.",
-    });
-  }
-}
-
-/**
- * Resolve the device ids for a CPE string. A `version` replaces the CPE's
- * version and makes the status KNOWN. A `versionStatus` replaces the status
- * that the CPE implies.
- */
-export async function cpeToDevice(
-  cpe: string,
-  overrides: { version?: string; versionStatus?: VersionStatus } = {},
-) {
-  const parsed = parseCpe(cpe);
-  const version = overrides.version ?? parsed.version;
-  assertVersionStatusAllowed(version, overrides.versionStatus);
-  return resolveDevice({
-    ...parsed,
-    version,
-    versionStatus: overrides.version
-      ? VersionStatus.KNOWN
-      : (overrides.versionStatus ?? parsed.versionStatus),
-  });
-}
-
 // ============================================================================
 // DeviceGroupMatching resolution + matching queries
 // ============================================================================
@@ -411,10 +434,6 @@ type MatchingResolveInput = {
 /**
  * Find-or-create a shared DeviceGroupMatching for a manufacturer/product/version
  * identity (resolved to canonical rows).
- *
- * The identity is unique (device_group_matching_identity_key), so a concurrent
- * create that loses the race throws P2002; we re-read the winner's row. Runs on
- * the autocommit client for the same reason as resolveManufacturer.
  */
 export async function resolveMatchingId(
   input: MatchingResolveInput,
@@ -430,13 +449,30 @@ export async function resolveMatchingId(
       ? await resolveVersion(input.version, productRow.id)
       : null;
 
-  const where = {
+  const productId = productRow?.id ?? null;
+  const versionId = versionRow?.id ?? null;
+  return findOrCreateMatching({
     manufacturerId: manufacturerRow.id,
-    productId: productRow?.id ?? null,
-    versionId: versionRow?.id ?? null,
-    versionRange: input.versionRange ?? null,
-  };
+    productId,
+    versionId,
+    ...matchingVersionFields({
+      hasProduct: productId !== null,
+      hasVersion: versionId !== null,
+      versionRange: input.versionRange,
+    }),
+  });
+}
 
+/**
+ * Find-or-create the shared matching for these canonical ids.
+ *
+ * The identity is unique (device_group_matching_identity_key), so a concurrent
+ * create that loses the race throws P2002; we re-read the winner's row. Runs on
+ * the autocommit client for the same reason as resolveManufacturer.
+ */
+async function findOrCreateMatching(
+  where: MatchingLike & { versionStatus: VersionStatus },
+): Promise<string> {
   const find = () => prisma.deviceGroupMatching.findFirst({ where });
   const existing = await find();
   if (existing) return existing.id;
@@ -454,25 +490,41 @@ export async function resolveMatchingId(
 }
 
 /**
- * Resolve a CPE string to a single shared DeviceGroupMatching id (the "identity"
- * of a device artifact — the device it emulates/describes).
+ * Resolve device inputs to their shared matchings and return a Prisma `connect`
+ * array.
  */
-export async function resolveMatchingIdFromCpe(cpe: string): Promise<string> {
-  const { manufacturer, product, version } = parseCpe(cpe);
-  return resolveMatchingId({ manufacturer, product, version });
+export async function devicesToMatchingConnect(devices: DeviceInput[]) {
+  const ids = await Promise.all(devices.map(resolveMatchingIdForDevice));
+  return [...new Set(ids)].map((id) => ({ id }));
+}
+
+/** Resolve one device input to its shared matching id. */
+export async function resolveMatchingIdForDevice(
+  device: DeviceInput,
+): Promise<string> {
+  const { version } = device;
+  return findOrCreateMatching({
+    ...(await resolveDeviceInput(device)),
+    versionRange: matchingVersionRange(version),
+    versionStatus: "status" in version ? version.status : VersionStatus.KNOWN,
+  });
 }
 
 /**
- * Resolve a list of CPE strings to shared DeviceGroupMatching rows and return a
- * Prisma `connect` array. This is how the CPE-based upload endpoints
- * connect vulnerabilities/remediations to devices without exposing the
- * match-object input shape.
+ * The versionRange to store for a device input. A range that matches every
+ * version is stored as no range, the same row that matchingVersionFields gives
+ * an internal source, so the two do not become duplicate rows.
  */
-export async function cpesToMatchingConnect(cpes: string[]) {
-  const ids = await Promise.all(
-    [...new Set(cpes)].map(resolveMatchingIdFromCpe),
-  );
-  return [...new Set(ids)].map((id) => ({ id }));
+function matchingVersionRange(version: DeviceInput["version"]): string | null {
+  if (!("range" in version)) return null;
+  const parsed = parseVers(version.range);
+  if (!parsed) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid VERS range: ${version.range}`,
+    });
+  }
+  return parsed.matchesAll ? null : version.range;
 }
 
 /**
@@ -546,6 +598,32 @@ function identityAppliesToDevice(
     );
   }
   return false;
+}
+
+/**
+ * The device identity of a version: its product's manufacturer, its product,
+ * and the version itself. Null for an unknown id.
+ */
+export async function findVersionIdentity(
+  versionId: string,
+): Promise<DeviceIdentity | null> {
+  const version = await prisma.version.findUnique({
+    where: { id: versionId },
+    select: {
+      id: true,
+      canonicalName: true,
+      productId: true,
+      product: { select: { manufacturerId: true } },
+    },
+  });
+  if (!version) return null;
+  return {
+    id: version.id,
+    manufacturerId: version.product.manufacturerId,
+    productId: version.productId,
+    versionId: version.id,
+    version: { canonicalName: version.canonicalName },
+  };
 }
 
 /**

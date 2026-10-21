@@ -4,9 +4,9 @@ import { PlatformEnum, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   alohaResponseSchema,
-  cpeSchema,
   createIntegrationInputSchema,
   deviceGroupMatchingResponseSchema,
+  deviceInputSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
@@ -49,8 +49,12 @@ const removedVulnerabilityIdSchema = z
   .describe("Removed. Use vulnerabilityIds.");
 
 export const remediationInputSchema = z.object({
-  // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
-  cpes: z.array(cpeSchema).optional(),
+  devices: z
+    .array(deviceInputSchema)
+    .optional()
+    .describe(
+      "The devices that the remediation applies to. Each one names its version, a VERS range, or every version with vers:all/*.",
+    ),
   vulnerabilityIds: z.array(z.string()).optional(),
   vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
@@ -69,7 +73,7 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 
 export const remediationUpdateSchema = z.object({
   id: z.string(),
-  cpes: z.array(cpeSchema).optional(),
+  devices: z.array(deviceInputSchema).optional(),
   // Replaces the whole set when present. An empty array clears every link.
   vulnerabilityIds: z.array(z.string()).optional(),
   vulnerabilityId: removedVulnerabilityIdSchema,

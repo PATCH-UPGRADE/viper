@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   processIntegrationSync: vi.fn(),
-  cpesToMatchingConnect: vi.fn(async () => [{ id: "m-1" }]),
+  devicesToMatchingConnect: vi.fn(async () => [{ id: "m-1" }]),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,12 +14,15 @@ vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: mocks.processIntegrationSync,
 }));
 vi.mock("@/lib/router-utils", () => ({
-  cpesToMatchingConnect: mocks.cpesToMatchingConnect,
+  devicesToMatchingConnect: mocks.devicesToMatchingConnect,
 }));
 
 import { processVulnerabilityIntegrationSync } from "../integration-sync";
 
-const CPE = "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*";
+const DEVICE = {
+  manufacturer: { name: "Philips" },
+  product: { name: "IntelliVue MX800" },
+};
 
 async function transform(item: Record<string, unknown>) {
   await processVulnerabilityIntegrationSync({ items: [] }, "shadow-1", "int-1");
@@ -32,12 +35,18 @@ beforeEach(() => vi.clearAllMocks());
 describe("processVulnerabilityIntegrationSync", () => {
   // Vulnerability.sarif is a required Json column.
   it("creates a vulnerability with {} when the source gives no SARIF", async () => {
-    const { createData } = await transform({ externalId: "v-1", cpes: [CPE] });
+    const { createData } = await transform({
+      externalId: "v-1",
+      devices: [DEVICE],
+    });
     expect(createData.sarif).toEqual({});
   });
 
   it("leaves stored SARIF alone on update when the source gives none", async () => {
-    const { updateData } = await transform({ externalId: "v-1", cpes: [CPE] });
+    const { updateData } = await transform({
+      externalId: "v-1",
+      devices: [DEVICE],
+    });
     expect(updateData.sarif).toBeUndefined();
   });
 
@@ -45,7 +54,7 @@ describe("processVulnerabilityIntegrationSync", () => {
     const sarif = { version: "2.1.0", runs: [] };
     const { createData, updateData } = await transform({
       externalId: "v-1",
-      cpes: [CPE],
+      devices: [DEVICE],
       sarif,
     });
     expect(createData.sarif).toBe(sarif);

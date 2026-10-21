@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  baselineIssueStatus,
   matchingAppliesToDevice,
+  matchingVersionFields,
   parseVers,
   resolveMatches,
   versSatisfies,
@@ -235,5 +237,51 @@ describe("resolveMatches", () => {
         devices,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("matchingVersionFields", () => {
+  it("is UNKNOWN for a product with no version and no range", () => {
+    expect(
+      matchingVersionFields({ hasProduct: true, hasVersion: false }),
+    ).toEqual({ versionRange: null, versionStatus: "UNKNOWN" });
+  });
+
+  it("is KNOWN for a version, a range, or no product", () => {
+    expect(
+      matchingVersionFields({ hasProduct: true, hasVersion: true }),
+    ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+    expect(
+      matchingVersionFields({
+        hasProduct: true,
+        hasVersion: false,
+        versionRange: " vers:semver/<2.0 ",
+      }),
+    ).toEqual({ versionRange: "vers:semver/<2.0", versionStatus: "KNOWN" });
+    expect(
+      matchingVersionFields({ hasProduct: false, hasVersion: false }),
+    ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+  });
+
+  it("stores a range of every version as no range, KNOWN", () => {
+    expect(
+      matchingVersionFields({
+        hasProduct: true,
+        hasVersion: false,
+        versionRange: "vers:all/*",
+      }),
+    ).toEqual({ versionRange: null, versionStatus: "KNOWN" });
+  });
+});
+
+describe("baselineIssueStatus", () => {
+  it("opens an UNKNOWN matching's issue under investigation", () => {
+    expect(baselineIssueStatus("UNKNOWN")).toBe("UNDER_INVESTIGATION");
+  });
+
+  it("opens every other matching's issue as affected", () => {
+    for (const status of ["KNOWN", "NOT_APPLICABLE", "UNSURE"] as const) {
+      expect(baselineIssueStatus(status)).toBe("AFFECTED");
+    }
   });
 });

@@ -23,7 +23,7 @@ export const suggestedPlatforms = async (): Promise<SuggestedPlatform[]> => {
   );
 
   const results = await Promise.allSettled(
-    hooks.map(({ suggest }) => suggest({ integrations })),
+    hooks.map(async ({ suggest }) => suggest({ integrations })),
   );
 
   return results.flatMap((result, i) => {

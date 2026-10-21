@@ -73,7 +73,9 @@ export const parseCveIds = (value: string | null | undefined): string[] =>
   value ? value.split(/[,;\s]+/).filter(Boolean) : [];
 
 // For the list of advisories
-export async function fetchAdvisories(session: Session): Promise<FleetAdvisory[]> {
+export async function fetchAdvisories(
+  session: Session,
+): Promise<FleetAdvisory[]> {
   const res = await session.request(ADVISORIES_URL);
   if (!res.ok) {
     throw new Error(

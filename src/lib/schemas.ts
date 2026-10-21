@@ -63,9 +63,10 @@ export const deviceInputSchema = z.object({
           .trim()
           .regex(/^vers:/, "A range is a VERS string that starts with vers:"),
       }),
+      z.strictObject({ status: z.enum(["UNKNOWN", "NOT_APPLICABLE"]) }),
     ])
     .describe(
-      'One version, or { range } with a VERS string, for example "vers:semver/>=8.0|<8.2". Use { "range": "vers:all/*" } for every version.',
+      'One version, or { range } with a VERS string, for example "vers:semver/>=8.0|<8.2". Use { "range": "vers:all/*" } for every version, { "status": "UNKNOWN" } when the source gives no version, and { "status": "NOT_APPLICABLE" } for a product that has no versions.',
     ),
 });
 export type DeviceInput = z.infer<typeof deviceInputSchema>;
@@ -104,6 +105,7 @@ export const deviceGroupMatchingResponseSchema = z.object({
   product: canonicalRefSchema.nullable(),
   version: canonicalRefSchema.nullable(),
   versionRange: z.string().nullable(),
+  versionStatus: versionStatusSchema,
 });
 export type DeviceGroupMatchingResponse = z.infer<
   typeof deviceGroupMatchingResponseSchema

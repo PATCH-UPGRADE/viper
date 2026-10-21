@@ -411,6 +411,9 @@ model DeviceGroupMatching {
   version        Version?     @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   versionRange String?
+  // UNKNOWN or NOT_APPLICABLE when the source gives no version: the matching has
+  // no versionId and no versionRange, and matches like a product-level rule.
+  versionStatus VersionStatus @default(KNOWN)
 
   vulnerabilities      Vulnerability[]                  @relation("VulnerabilityMatchings")
   remediations         Remediation[]                    @relation("RemediationMatchings")
@@ -424,7 +427,7 @@ model DeviceGroupMatching {
 
   // One row per identity to prevent duplicate race condition;
   // migration creates this with NULLS NOT DISTINCT
-  @@unique([manufacturerId, productId, versionId, versionRange], name: "device_group_matching_identity", map: "device_group_matching_identity_key")
+  @@unique([manufacturerId, productId, versionId, versionRange, versionStatus], name: "device_group_matching_identity", map: "device_group_matching_identity_key")
   @@index([manufacturerId, productId])
   @@map("device_group_matching")
 }

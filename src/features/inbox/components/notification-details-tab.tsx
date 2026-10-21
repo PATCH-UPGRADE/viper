@@ -38,7 +38,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { UtilizationGridList } from "@/features/assets/components/asset-utilization-grid";
 import type { MatchFeedbackTargetType } from "@/generated/prisma";
-import { deviceGroupMatchingLabel } from "@/lib/markdown";
+import { deviceGroupMatchingLabel, matchingVersionLabel } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import {
   useAffectedfAssetUtilization,
@@ -292,8 +292,7 @@ export function NotificationDetailsTab({
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary">
-                            {displayName(m.deviceGroupMatching.version) ??
-                              m.deviceGroupMatching.versionRange}
+                            {matchingVersionLabel(m.deviceGroupMatching)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-bold">

@@ -68,6 +68,7 @@ describe("findDeviceGroupMatching", () => {
         },
         versionId: null,
         versionRange: "vers:semver/<8.8",
+        versionStatus: "KNOWN",
       },
       select: { id: true },
     });

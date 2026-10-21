@@ -53,7 +53,24 @@ type DeviceGroupMatchingDisplay = {
   product?: CanonicalRef;
   version?: CanonicalRef;
   versionRange?: string | null;
+  versionStatus?: string | null;
 };
+
+const VERSION_STATUS_LABELS: Record<string, string> = {
+  UNKNOWN: "version unknown",
+  NOT_APPLICABLE: "no versions",
+};
+
+/** The version part of a matching's label: its version, its range, or its status. */
+export function matchingVersionLabel(
+  m: DeviceGroupMatchingDisplay,
+): string | undefined {
+  return (
+    displayName(m.version) ??
+    m.versionRange ??
+    (m.versionStatus ? VERSION_STATUS_LABELS[m.versionStatus] : undefined)
+  );
+}
 
 /**
  * Human-readable label for a device-group matching, e.g. "Acme Radiator 2.1.3"
@@ -70,7 +87,7 @@ export function deviceGroupMatchingLabel(
   const parts = [
     displayName(m.manufacturer),
     displayName(m.product),
-    !opts?.hideVersion ? (displayName(m.version) ?? m.versionRange) : undefined,
+    !opts?.hideVersion ? matchingVersionLabel(m) : undefined,
   ].filter(Boolean);
   return parts.join(" ");
 }

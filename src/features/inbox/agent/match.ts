@@ -429,6 +429,7 @@ export async function applyDecisions(
               manufacturerId: true,
               productId: true,
               versionId: true,
+              versionStatus: true,
             },
           });
 
@@ -437,7 +438,8 @@ export async function applyDecisions(
             targetMatching &&
             !targetMatching.versionRange
           ) {
-            // The identity (manufacturer, product, version, versionRange) is
+            // The identity (manufacturer, product, version, versionRange,
+            // versionStatus) is
             // unique. If another matching already has the ranged identity, adding
             // the range here would throw P2002 and abort this transaction, so
             // leave this matching as it is.
@@ -447,6 +449,7 @@ export async function applyDecisions(
                 productId: targetMatching.productId,
                 versionId: targetMatching.versionId,
                 versionRange: data.versionRange,
+                versionStatus: targetMatching.versionStatus,
               },
               select: { id: true },
             });

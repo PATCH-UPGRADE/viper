@@ -362,11 +362,40 @@ describe("Vulnerabilities Endpoint version input", () => {
     });
   });
 
+  it("POST /vulnerabilities - an UNKNOWN version matches the product's assets", async () => {
+    const asset = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send({ ip: "10.0.8.1", device: device({ name: "8.1" }) });
+    expect(asset.status).toBe(200);
+    onTestFinished(async () => {
+      await request(BASE_URL)
+        .delete(`/assets/${asset.body.id}`)
+        .set(authHeader);
+    });
+
+    const res = await create([device({ status: "UNKNOWN" })]);
+    cleanUp(res.body.id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroupMatchings[0]).toMatchObject({
+      version: null,
+      versionRange: null,
+      versionStatus: "UNKNOWN",
+    });
+    const affecting = await request(BASE_URL)
+      .get(`/assets/${asset.body.id}/vulnerabilities`)
+      .set(authHeader);
+    expect(affecting.body.items.map((v: { id: string }) => v.id)).toContain(
+      res.body.id,
+    );
+  });
+
   it.each([
     ["no version", undefined],
     ["a range that is not VERS", { range: ">=8.0" }],
     ["a range that does not parse", { range: "vers:semver" }],
-    ["a version status", { status: "UNKNOWN" }],
+    ["an asset-only version status", { status: "UNSURE" }],
   ])("POST /vulnerabilities - %s is a 400", async (_label, version) => {
     const res = await create([device(version)]);
 

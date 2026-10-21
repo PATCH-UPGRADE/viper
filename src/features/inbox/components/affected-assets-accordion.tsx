@@ -27,7 +27,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getAssetDisplayName } from "@/features/assets/utils";
-import { deviceGroupMatchingLabel, parseLocation } from "@/lib/markdown";
+import {
+  deviceGroupMatchingLabel,
+  matchingVersionLabel,
+  parseLocation,
+} from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import { cn } from "@/lib/utils";
 import {
@@ -382,8 +386,7 @@ export function BucketAccordion({
                         <span className="text-xs font-normal text-muted-foreground">
                           {[
                             displayName(matching.manufacturer),
-                            displayName(matching.version) ??
-                              matching.versionRange,
+                            matchingVersionLabel(matching),
                           ]
                             .filter(Boolean)
                             .join(" · ")}

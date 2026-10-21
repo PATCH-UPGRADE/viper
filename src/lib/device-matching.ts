@@ -176,7 +176,9 @@ export function matchingAppliesToDevice(
     );
   }
 
-  // No version constraint => product-level match.
+  // No version constraint => product-level match. A matching whose versionStatus
+  // is UNKNOWN or NOT_APPLICABLE has no version and no range, so it lands here
+  // too: an advisory with no version shows every asset of the product.
   return true;
 }
 

@@ -5,8 +5,9 @@ import {
   impactStateSelect,
   statedImpactFields,
 } from "@/features/remediations/impact";
-import type { Prisma } from "@/generated/prisma";
+import { type Prisma, VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { matchingVersionLabel } from "@/lib/markdown";
 import { isUniqueViolation, nameOrClauses } from "@/lib/router-utils";
 import type {
   ExtractedAsset,
@@ -100,6 +101,7 @@ async function searchDeviceGroupMatching(
         manufacturerId: owned.manufacturerId,
         productId: owned.productId,
         versionId: owned.versionId,
+        versionStatus: VersionStatus.KNOWN,
       };
 
       const findMatching = () =>
@@ -160,6 +162,7 @@ async function searchDeviceGroupMatching(
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalDisplayName: true } },
       versionRange: true,
+      versionStatus: true,
     },
     take: TOP_K,
   });
@@ -169,7 +172,10 @@ async function searchDeviceGroupMatching(
       id: row.id,
       manufacturer: row.manufacturer?.canonicalDisplayName ?? null,
       modelName: row.product?.canonicalDisplayName ?? null,
-      version: row.version?.canonicalDisplayName ?? null,
+      version:
+        row.version?.canonicalDisplayName ??
+        matchingVersionLabel({ versionStatus: row.versionStatus }) ??
+        null,
       versionRange: row.versionRange,
     });
   }

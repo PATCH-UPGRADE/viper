@@ -453,6 +453,7 @@ export async function resolveMatchingId(
     productId: productRow?.id ?? null,
     versionId: versionRow?.id ?? null,
     versionRange: input.versionRange ?? null,
+    versionStatus: VersionStatus.KNOWN,
   });
 }
 
@@ -463,7 +464,9 @@ export async function resolveMatchingId(
  * create that loses the race throws P2002; we re-read the winner's row. Runs on
  * the autocommit client for the same reason as resolveManufacturer.
  */
-async function findOrCreateMatching(where: MatchingLike): Promise<string> {
+async function findOrCreateMatching(
+  where: MatchingLike & { versionStatus: VersionStatus },
+): Promise<string> {
   const find = () => prisma.deviceGroupMatching.findFirst({ where });
   const existing = await find();
   if (existing) return existing.id;
@@ -493,9 +496,11 @@ export async function devicesToMatchingConnect(devices: DeviceInput[]) {
 export async function resolveMatchingIdForDevice(
   device: DeviceInput,
 ): Promise<string> {
+  const { version } = device;
   return findOrCreateMatching({
     ...(await resolveDeviceInput(device)),
-    versionRange: matchingVersionRange(device.version),
+    versionRange: matchingVersionRange(version),
+    versionStatus: "status" in version ? version.status : VersionStatus.KNOWN,
   });
 }
 

@@ -57,6 +57,19 @@ describe("deviceInputSchema", () => {
     ).toBe(false);
   });
 
+  it("takes UNKNOWN or NOT_APPLICABLE, but not an asset-only status", () => {
+    const withStatus = (status: string) =>
+      deviceInputSchema.safeParse({
+        manufacturer: { name: "Baxter" },
+        product: { name: "Sigma" },
+        version: { status },
+      }).success;
+
+    expect(withStatus("UNKNOWN")).toBe(true);
+    expect(withStatus("NOT_APPLICABLE")).toBe(true);
+    expect(withStatus("UNSURE")).toBe(false);
+  });
+
   it("rejects a range that is not a VERS string", () => {
     expect(
       deviceInputSchema.safeParse({
@@ -103,12 +116,14 @@ describe("assetDeviceInputSchema", () => {
   });
 
   it("rejects a status that only matchings can have", () => {
-    expect(
-      assetDeviceInputSchema.safeParse({
-        manufacturer: { name: "Baxter" },
-        version: { status: "KNOWN" },
-      }).success,
-    ).toBe(false);
+    for (const status of ["KNOWN", "NOT_APPLICABLE"]) {
+      expect(
+        assetDeviceInputSchema.safeParse({
+          manufacturer: { name: "Baxter" },
+          version: { status },
+        }).success,
+      ).toBe(false);
+    }
   });
 });
 
@@ -274,6 +289,29 @@ describe("devicesToMatchingConnect", () => {
         productId: "p-1",
         versionId: null,
         versionRange: null,
+        versionStatus: "KNOWN",
+      },
+    });
+  });
+
+  it("stores a version status on its own matching", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({ id: "dgm-3" });
+
+    await devicesToMatchingConnect([
+      {
+        manufacturer: { id: "m-1" },
+        product: { id: "p-1" },
+        version: { status: "UNKNOWN" },
+      },
+    ]);
+
+    expect(mockPrisma.deviceGroupMatching.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        productId: "p-1",
+        versionId: null,
+        versionRange: null,
+        versionStatus: "UNKNOWN",
       },
     });
   });
@@ -295,6 +333,7 @@ describe("devicesToMatchingConnect", () => {
         productId: "p-1",
         versionId: null,
         versionRange: "vers:semver/>=8.0|<8.2",
+        versionStatus: "KNOWN",
       },
     });
   });

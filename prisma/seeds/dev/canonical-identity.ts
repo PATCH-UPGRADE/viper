@@ -61,6 +61,7 @@ export async function matchingForDevice(
     productId: device.productId,
     versionId: device.versionId,
     versionRange: null,
+    versionStatus: "KNOWN" as const,
   };
   const existing = await prisma.deviceGroupMatching.findFirst({ where });
   const matching =

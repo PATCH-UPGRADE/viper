@@ -13,6 +13,7 @@ export {
   deviceLabel,
   deviceToMarkdown,
   type ExtractedDeviceIdentity,
+  matchingVersionLabel,
 } from "./device-group";
 export {
   type NoteRow,

@@ -24,6 +24,7 @@ const identity = {
   productId: "p-1",
   versionId: "v-1",
   versionRange: null,
+  versionStatus: "KNOWN",
 };
 
 beforeEach(() => {
@@ -102,6 +103,7 @@ describe("resolveMatchingId", () => {
         productId: null,
         versionId: null,
         versionRange: null,
+        versionStatus: "KNOWN",
       },
     });
   });

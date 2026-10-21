@@ -3,7 +3,7 @@ import {
   assetAgentNameSelect,
   getAssetNameForAgent,
 } from "@/features/assets/utils";
-import type { ScopeTargetModel } from "@/generated/prisma";
+import { type ScopeTargetModel, VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import {
@@ -46,6 +46,7 @@ export async function resolveNoteTargetLabel(
         where: { id: instanceId },
         select: {
           versionRange: true,
+          versionStatus: true,
           manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalDisplayName: true } },
@@ -108,6 +109,7 @@ export async function findDeviceGroupMatching(
         ? { version: { canonicalName: normalizeName(version) } }
         : { versionId: null }),
       versionRange,
+      versionStatus: VersionStatus.KNOWN,
     },
     select: { id: true },
   });
@@ -138,6 +140,7 @@ export async function findDeviceGroupMatching(
     },
     select: {
       versionRange: true,
+      versionStatus: true,
       manufacturer: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalDisplayName: true } },

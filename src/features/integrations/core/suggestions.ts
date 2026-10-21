@@ -23,6 +23,7 @@ export const suggestedPlatforms = async (): Promise<SuggestedPlatform[]> => {
   );
 
   const results = await Promise.allSettled(
+    // `async` turns a hook's synchronous throw into a rejection, so allSettled catches it too.
     hooks.map(async ({ suggest }) => suggest({ integrations })),
   );
 

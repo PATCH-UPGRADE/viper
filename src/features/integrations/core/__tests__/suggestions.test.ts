@@ -78,4 +78,28 @@ describe("suggestedPlatforms", () => {
       tags: { platform: PlatformEnum.FLEET },
     });
   });
+
+  it("also isolates a hook that throws before it returns a promise", async () => {
+    mockFindMany.mockResolvedValue([]);
+    const error = new Error("sync boom");
+    Object.assign(mockRegistry, {
+      FLEET: moduleFor(
+        PlatformEnum.FLEET,
+        vi.fn(() => {
+          throw error;
+        }),
+      ),
+      MEDISAO: moduleFor(
+        PlatformEnum.MEDISAO,
+        vi.fn().mockResolvedValue({ reason: "medisao" }),
+      ),
+    });
+
+    await expect(suggestedPlatforms()).resolves.toEqual([
+      { platform: PlatformEnum.MEDISAO, reason: "medisao" },
+    ]);
+    expect(mockCaptureException).toHaveBeenCalledWith(error, {
+      tags: { platform: PlatformEnum.FLEET },
+    });
+  });
 });

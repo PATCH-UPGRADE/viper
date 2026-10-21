@@ -186,6 +186,7 @@ export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
       />
       <div className="flex flex-col gap-10 flex-1 min-w-0">
         <EnabledIntegrations catalog={catalog} />
+        {/* Suggestions are optional: if they fail or load slowly, the rest of the page still renders. */}
         <ReportingErrorBoundary fallback={null}>
           <Suspense fallback={null}>
             <SuggestedIntegrations catalog={catalog} />

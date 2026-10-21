@@ -7,8 +7,9 @@ type IdentifierRow = {
   vulnerabilityId: string;
 };
 
-const { db, identifiers } = vi.hoisted(() => {
+const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
   const identifiers: IdentifierRow[] = [];
+  const SUBMITTED_AT = new Date("2026-10-21T12:00:00.000Z");
   const matches = (
     row: IdentifierRow,
     where: {
@@ -59,7 +60,12 @@ const { db, identifiers } = vi.hoisted(() => {
       deleteMany: vi.fn(async () => ({ count: 0 })),
     },
     vulnerabilityRecord: {
-      create: vi.fn(async ({ data }) => ({ id: "rec-1", ...data })),
+      // With the include createVulnerabilityRecord asks for: the submission's createdAt.
+      create: vi.fn(async ({ data }) => ({
+        id: "rec-1",
+        ...data,
+        ta3Submission: data.ta3Submission ? { createdAt: SUBMITTED_AT } : null,
+      })),
       update: vi.fn(async ({ data }) => ({ id: "rec-1", ...data })),
       findUnique: vi.fn(),
       deleteMany: vi.fn(async () => ({ count: 1 })),
@@ -70,16 +76,23 @@ const { db, identifiers } = vi.hoisted(() => {
     },
     tA3Submission: {
       findFirst: vi.fn(async () => null),
-      upsert: vi.fn(async () => ({})),
+      findUnique: vi.fn(async (): Promise<{ id: string } | null> => null),
+      upsert: vi.fn(async () => ({ createdAt: SUBMITTED_AT })),
     },
     issue: { createMany: vi.fn(async () => ({ count: 0 })) },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
   };
-  return { db, identifiers };
+  return {
+    db,
+    identifiers,
+    sendWebhooks: vi.fn(async () => {}),
+    SUBMITTED_AT,
+  };
 });
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: db }));
+vi.mock("@/lib/prisma-client-extensions", () => ({ sendWebhooks }));
 
 import {
   createVulnerabilityRecord,
@@ -265,6 +278,60 @@ describe("createVulnerabilityRecord", () => {
     expect(db.vulnerability.deleteMany).toHaveBeenCalledWith({
       where: { id: "v-1" },
     });
+  });
+});
+
+describe("the TA3Submission_Created webhook", () => {
+  it("fires once a new record's TA3 submission is written", async () => {
+    createsVulnerability("v-1");
+
+    await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
+
+    expect(sendWebhooks).toHaveBeenCalledWith(
+      "TA3Submission_Created",
+      SUBMITTED_AT,
+    );
+  });
+
+  it("doesn't fire for a record without a TA3 submission", async () => {
+    createsVulnerability("v-1");
+
+    await createVulnerabilityRecord(
+      ta3({ source: "OTHER", ta3Submission: undefined }),
+      { actingUserId: "user-1" },
+    );
+
+    expect(sendWebhooks).not.toHaveBeenCalled();
+  });
+
+  it("fires when an update adds the record's first submission", async () => {
+    db.vulnerabilityRecord.findUnique.mockResolvedValueOnce({
+      vulnerabilityId: "v-1",
+      source: "TA3",
+    });
+
+    await updateVulnerabilityRecord("rec-1", {
+      ta3Submission: { sarif: SARIF },
+    });
+
+    expect(sendWebhooks).toHaveBeenCalledWith(
+      "TA3Submission_Created",
+      SUBMITTED_AT,
+    );
+  });
+
+  it("doesn't fire when an update changes an existing submission", async () => {
+    db.vulnerabilityRecord.findUnique.mockResolvedValueOnce({
+      vulnerabilityId: "v-1",
+      source: "TA3",
+    });
+    db.tA3Submission.findUnique.mockResolvedValueOnce({ id: "sub-1" });
+
+    await updateVulnerabilityRecord("rec-1", {
+      ta3Submission: { sarif: SARIF },
+    });
+
+    expect(sendWebhooks).not.toHaveBeenCalled();
   });
 });
 

@@ -31,6 +31,7 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
   const sarif = { tool: { driver: { name: "TestScanner" } } };
   const payload = {
     devices: [generateDevice("vuln_v1")],
+    sourceId: "MOCK-TA3-0001",
     details: "Mock -- Buffer overflow in device X",
     metrics: [{ type: "CVSS_V3_1", score: 8.1 }],
     ta3Submission: {
@@ -81,6 +82,8 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
         devices: [generateDevice("vuln_integration_v11")],
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         details: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
+        // The source's own ID for the advisory, separate from the integration's item key.
+        sourceId: "GHSA-mock-0002",
         externalId: "mockVuln-2",
       },
     ],
@@ -150,6 +153,7 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
 
     // Omitted source with a TA3 submission is a TA3 record, owned by the caller.
     expect(res.body.source).toBe("TA3");
+    expect(res.body.sourceId).toBe(payload.sourceId);
     expect(res.body.userId).not.toBeNull();
     expect(res.body.metrics).toEqual([
       expect.objectContaining({
@@ -429,6 +433,10 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
 
     expect(mapping2.item.source).toBe("OTHER");
     expect(mapping2.item.ta3Submission).toBeNull();
+    // The item's sourceId lands on the record; its externalId keys the mapping.
+    expect(mapping2.item.sourceId).toBe(item2.sourceId);
+    expect(mapping2.externalId).toBe(item2.externalId);
+    expect(mapping1.item.sourceId).toBeNull();
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");

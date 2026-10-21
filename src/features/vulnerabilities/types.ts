@@ -78,7 +78,7 @@ export const vulnerabilityRecordInputSchema = z.object({
   source: z
     .enum([VulnerabilitySource.TA3, VulnerabilitySource.OTHER])
     .optional(),
-  externalId: z.string().min(1).nullish(), // the statement's ID inside its source
+  sourceId: z.string().min(1).nullish(), // the statement's ID inside its source, e.g. GHSA-…
   identifiers: z.array(z.string().min(1)).optional(), // CVE, GHSA, or other public IDs
   summary: z.string().min(1).nullish(),
   details: z.string().min(1).nullish(),
@@ -136,7 +136,7 @@ export const vulnerabilityRecordResponseSchema = z.object({
   id: z.string(),
   vulnerabilityId: z.string(),
   source: z.enum(VulnerabilitySource),
-  externalId: z.string().nullable(),
+  sourceId: z.string().nullable(),
   summary: z.string().nullable(),
   details: z.string().nullable(),
   publishedAt: z.date().nullable(),

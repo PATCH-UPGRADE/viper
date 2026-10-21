@@ -6,10 +6,12 @@ import {
   MetricType,
   type Prisma,
   type Severity,
+  TriggerEnum,
   VulnerabilitySource,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { baselineIssueStatus } from "@/lib/device-matching";
+import { sendWebhooks } from "@/lib/prisma-client-extensions";
 import { isUniqueViolation } from "@/lib/router-utils";
 import { requireExistence } from "@/trpc/middleware";
 import {
@@ -109,6 +111,15 @@ function toMetricCreate(
   };
 }
 
+/**
+ * Tell webhook subscribers (ALOHA) about a new TA3 submission. Called after its transaction
+ * commits, so a subscriber that queries GET /ta3Submissions straight away finds it. The query
+ * extension in prisma-client-extensions can't do this: the submission is a nested write.
+ */
+function announceSubmission(createdAt: Date) {
+  void sendWebhooks(TriggerEnum.TA3Submission_Created, createdAt);
+}
+
 function toSubmissionCreate(
   submission: Ta3SubmissionInput,
 ): Prisma.TA3SubmissionUncheckedCreateWithoutRecordInput {
@@ -141,11 +152,11 @@ export async function createVulnerabilityRecord(
     actingUserId,
   );
 
-  let record: Awaited<ReturnType<typeof prisma.vulnerabilityRecord.create>>;
-  try {
-    record = await prisma.$transaction(async (tx) => {
+  const record = await prisma
+    .$transaction(async (tx) => {
       if (!created) await upsertIdentifiers(tx, vulnerabilityId, identifiers);
       return tx.vulnerabilityRecord.create({
+        include: { ta3Submission: { select: { createdAt: true } } },
         data: {
           vulnerabilityId,
           source: data.source,
@@ -164,17 +175,18 @@ export async function createVulnerabilityRecord(
             : {}),
         },
       });
+    })
+    .catch(async (error) => {
+      // Don't leave behind a vulnerability with no records.
+      if (created) {
+        await prisma.vulnerability
+          .deleteMany({ where: { id: vulnerabilityId } })
+          .catch(() => undefined);
+      }
+      throw error;
     });
-  } catch (error) {
-    // Don't leave behind a vulnerability with no records.
-    if (created) {
-      await prisma.vulnerability
-        .deleteMany({ where: { id: vulnerabilityId } })
-        .catch(() => undefined);
-    }
-    throw error;
-  }
 
+  if (record.ta3Submission) announceSubmission(record.ta3Submission.createdAt);
   await refreshVulnerability(vulnerabilityId, data.deviceGroupMatchingIds);
   return { record, vulnerabilityId, vulnerabilityCreated: created };
 }
@@ -197,7 +209,7 @@ export async function updateVulnerabilityRecord(
   assertSubmissionMatchesSource(existing.source, patch.ta3Submission);
   const { vulnerabilityId } = existing;
 
-  const record = await prisma.$transaction(async (tx) => {
+  const { record, newSubmission } = await prisma.$transaction(async (tx) => {
     if (patch.identifiers) {
       await upsertIdentifiers(
         tx,
@@ -206,15 +218,22 @@ export async function updateVulnerabilityRecord(
       );
     }
     if (patch.metrics) await tx.metric.deleteMany({ where: { recordId } });
+    let newSubmission: { createdAt: Date } | null = null;
     if (patch.ta3Submission) {
       const submission = toSubmissionCreate(patch.ta3Submission);
-      await tx.tA3Submission.upsert({
+      const existing = await tx.tA3Submission.findUnique({
+        where: { recordId },
+        select: { id: true },
+      });
+      const row = await tx.tA3Submission.upsert({
         where: { recordId },
         create: { recordId, ...submission },
         update: submission,
+        select: { createdAt: true },
       });
+      if (!existing) newSubmission = row;
     }
-    return tx.vulnerabilityRecord.update({
+    const updated = await tx.vulnerabilityRecord.update({
       where: { id: recordId },
       data: {
         sourceId: patch.sourceId,
@@ -226,8 +245,10 @@ export async function updateVulnerabilityRecord(
           : {}),
       },
     });
+    return { record: updated, newSubmission };
   });
 
+  if (newSubmission) announceSubmission(newSubmission.createdAt);
   // TODO: VW-541 devices are only ever added: they sit on the vulnerability, not the record,
   // so one record can't remove a device another record added. Affected fixes this.
   await refreshVulnerability(vulnerabilityId, patch.deviceGroupMatchingIds);

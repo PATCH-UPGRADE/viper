@@ -67,7 +67,7 @@ export async function recordDataFromInput(
   const source = options.source ?? resolveSource(input);
   return {
     source,
-    externalId: input.externalId,
+    sourceId: input.sourceId,
     identifiers: input.identifiers,
     summary: input.summary,
     details: input.details,
@@ -83,7 +83,7 @@ export async function recordPatchFromInput(
   input: VulnerabilityRecordUpdateInput,
 ): Promise<VulnerabilityRecordPatch> {
   return {
-    externalId: input.externalId,
+    sourceId: input.sourceId,
     identifiers: input.identifiers,
     summary: input.summary,
     details: input.details,

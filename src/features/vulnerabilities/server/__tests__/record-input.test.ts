@@ -71,6 +71,14 @@ describe("recordDataFromInput", () => {
     expect(data.deviceGroupMatchingIds).toEqual(["m-Baxter"]);
   });
 
+  it("keeps the source's own ID for the statement", async () => {
+    const data = await recordDataFromInput(
+      { devices, sourceId: "GHSA-jfh8-c2jp-5v3q" },
+      { userId: "user-1" },
+    );
+    expect(data.sourceId).toBe("GHSA-jfh8-c2jp-5v3q");
+  });
+
   it("parses publishedAt", async () => {
     const data = await recordDataFromInput(
       { devices, publishedAt: "2024-05-01T12:00:00Z" },

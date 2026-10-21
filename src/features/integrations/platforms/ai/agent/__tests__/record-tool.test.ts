@@ -105,6 +105,7 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
   },
   [ResourceType.Vulnerability]: {
     externalId: "vuln-77",
+    sourceId: "BAXTER-2024-07",
     identifiers: ["CVE-2024-12345"],
     summary: "Hard-coded credentials in the Sigma Spectrum web service",
     details: "Hard-coded credentials in the pump web service.",

@@ -16,18 +16,19 @@ API keys can be created on the VIPER user settings page (`/user/settings`). Ever
 
 ## Step 1: Configure Webhooks in VIPER
 
-The IV&V team configures a webhook in the VIPER frontend to receive notifications when vulnerabilities or remediations are created or updated.
+The IV&V team configures a webhook in the VIPER frontend to receive notifications when TA3 submissions are uploaded, or remediations are created or updated.
 
 1. Navigate to **Settings > Webhooks** (`/settings/webhooks`).
 2. Click **Add Webhook** and fill in:
    - **Name**: A descriptive label (e.g. "ALOHA IV&V Notifications").
    - **Webhook URL**: The ALOHA callback endpoint that will receive event notifications.
    - **Authentication**: Choose an auth type (`None`, `Basic`, `Bearer`, or `Header`) depending on how ALOHA authenticates inbound requests.
-   - **Triggers**: Select one or more of the following:
-     - `Vulnerability_Created` -- fires when a new vulnerability is created.
-     - `Vulnerability_Updated` -- fires when an existing vulnerability is modified.
+   - **Triggers**: Select the ones ALOHA tests:
+     - `TA3Submission_Created` -- fires when a TA3 performer uploads a new submission. This is the trigger for vulnerability testing.
      - `Remediation_Created` -- fires when a new remediation is created.
      - `Remediation_Updated` -- fires when an existing remediation is modified.
+
+     `Vulnerability_Created` and `Vulnerability_Updated` also exist, but they fire for any change to a vulnerability, such as enrichment or a vendor advisory, not only for a new TA3 submission.
 3. Save the webhook.
 
 VIPER will now POST to the configured URL whenever a matching database event occurs.
@@ -40,14 +41,14 @@ When a trigger fires, VIPER sends an HTTP `POST` to the configured callback URL.
 
 ```json
 {
-  "webhookTrigger": "Vulnerability_Created",
+  "webhookTrigger": "TA3Submission_Created",
   "timestamp": "2026-03-03T12:00:00.000Z"
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `webhookTrigger` | `string` | The event that fired. One of: `Vulnerability_Created`, `Vulnerability_Updated`, `Remediation_Created`, `Remediation_Updated`. |
+| `webhookTrigger` | `string` | The event that fired, e.g. `TA3Submission_Created`, `Remediation_Created`, or `Remediation_Updated`. |
 | `timestamp` | `string` (ISO 8601) | The time the database mutation occurred. Use this value for subsequent queries. |
 
 The request includes a `Content-Type: application/json` header and any authentication headers configured on the webhook.
@@ -57,6 +58,8 @@ The request includes a `Content-Type: application/json` header and any authentic
 Use the `lastUpdatedStartTime` query parameter set to the webhook `timestamp` to retrieve only items created or modified since that point.
 
 ### Vulnerabilities (TA3 submissions)
+
+After a `TA3Submission_Created` webhook:
 
 ```http
 GET /api/v1/ta3Submissions?lastUpdatedStartTime=2026-03-03T12:00:00.000Z&lastUpdatedEndTime=2026-03-03T22:00:00.000Z

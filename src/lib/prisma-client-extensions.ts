@@ -167,7 +167,14 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
   }),
 );
 
-const sendWebhooks = async (triggerType: TriggerEnum, timestamp: Date) => {
+/**
+ * Send `triggerType` to every webhook subscribed to it. Never throws: failures are logged.
+ * Exported for writes the query extensions below can't see, such as nested creates.
+ */
+export const sendWebhooks = async (
+  triggerType: TriggerEnum,
+  timestamp: Date,
+) => {
   try {
     const webhooks = await prisma.webhook.findMany({
       where: { triggers: { has: triggerType } },

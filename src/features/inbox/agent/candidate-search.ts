@@ -1,12 +1,13 @@
-// Match extracted items from notification to VIPER db items (e.g, DeviceGroup)
+// Match extracted items from notification to VIPER db items (e.g., DeviceGroupMatching)
 
 import "server-only";
 import {
   impactStateSelect,
   statedImpactFields,
 } from "@/features/remediations/impact";
-import type { Prisma } from "@/generated/prisma";
+import { type Prisma, VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { matchingVersionLabel } from "@/lib/markdown";
 import { isUniqueViolation, nameOrClauses } from "@/lib/router-utils";
 import type {
   ExtractedAsset,
@@ -80,22 +81,14 @@ async function searchDeviceGroupMatching(
 ): Promise<DeviceGroupMatchingCandidate[]> {
   const matched = new Map<string, DeviceGroupMatchingCandidate>();
 
-  // find the owned DeviceGrop with the identifier first, then surface the DeviceGroupMatching
-  // sharing its identy as match
-  const identifierWhere: Prisma.DeviceGroupWhereInput[] = [];
-  if (extracted.cpe) {
-    identifierWhere.push({ cpe: { has: extracted.cpe } });
-  }
+  // find the owned asset whose version has the UDI first, then surface the
+  // DeviceGroupMatching sharing its identity as match
   if (extracted.udi) {
-    identifierWhere.push({ udi: extracted.udi });
-  }
-
-  if (identifierWhere.length > 0) {
-    const deviceGroup = await prisma.deviceGroup.findFirst({
-      where: { OR: identifierWhere },
+    const owned = await prisma.asset.findFirst({
+      where: { version: { udiDi: extracted.udi } },
       select: { manufacturerId: true, productId: true, versionId: true },
     });
-    if (deviceGroup?.manufacturerId) {
+    if (owned?.manufacturerId) {
       const matchingSelect = {
         id: true,
         manufacturer: { select: { canonicalDisplayName: true } },
@@ -105,9 +98,10 @@ async function searchDeviceGroupMatching(
       } as const;
 
       const identity = {
-        manufacturerId: deviceGroup.manufacturerId,
-        productId: deviceGroup.productId,
-        versionId: deviceGroup.versionId,
+        manufacturerId: owned.manufacturerId,
+        productId: owned.productId,
+        versionId: owned.versionId,
+        versionStatus: VersionStatus.KNOWN,
       };
 
       const findMatching = () =>
@@ -154,8 +148,6 @@ async function searchDeviceGroupMatching(
   // TODO: consider something like a fuzzy search?
   // or an embedding. For example, if the identified manufacturer is Draeger Inc, and the db manufactuerer is "Draeger", this contains fails
   for (const term of terms) {
-    // Identity now lives in canonical Manufacturer/Product rows and the cpe[] array.
-    // cpe is a String[], which supports exact-element `has` (not substring).
     or.push(
       { manufacturer: { OR: manufacturerNameOr(term) } },
       { product: { OR: productNameOr(term) } },
@@ -170,6 +162,7 @@ async function searchDeviceGroupMatching(
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalDisplayName: true } },
       versionRange: true,
+      versionStatus: true,
     },
     take: TOP_K,
   });
@@ -179,7 +172,10 @@ async function searchDeviceGroupMatching(
       id: row.id,
       manufacturer: row.manufacturer?.canonicalDisplayName ?? null,
       modelName: row.product?.canonicalDisplayName ?? null,
-      version: row.version?.canonicalDisplayName ?? null,
+      version:
+        row.version?.canonicalDisplayName ??
+        matchingVersionLabel({ versionStatus: row.versionStatus }) ??
+        null,
       versionRange: row.versionRange,
     });
   }
@@ -293,12 +289,6 @@ async function searchAsset(
       hostname: true,
       macAddress: true,
       serialNumber: true,
-      deviceGroup: {
-        select: {
-          manufacturer: { select: { canonicalDisplayName: true } },
-          product: { select: { canonicalDisplayName: true } },
-        },
-      },
     },
     take: TOP_K,
   });

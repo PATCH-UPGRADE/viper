@@ -142,11 +142,11 @@ describe("aiSync", () => {
     mocks.asset.mockResolvedValueOnce({
       ...mocks.ok,
       shouldRetry: true,
-      message: "1 of 1 items failed: bad cpe",
+      message: "1 of 1 items failed: bad device",
     });
 
     await expect(aiSync(makeCtx(ResourceType.Asset))).rejects.toThrow(
-      "The AI crawler failed: overloaded. 1 of 1 items failed: bad cpe",
+      "The AI crawler failed: overloaded. 1 of 1 items failed: bad device",
     );
   });
 
@@ -154,11 +154,11 @@ describe("aiSync", () => {
     mocks.asset.mockResolvedValueOnce({
       ...mocks.ok,
       shouldRetry: true,
-      message: "1 of 1 items failed: bad cpe",
+      message: "1 of 1 items failed: bad device",
     });
 
     await expect(aiSync(makeCtx(ResourceType.Asset))).rejects.toThrow(
-      "1 of 1 items failed: bad cpe",
+      "1 of 1 items failed: bad device",
     );
   });
 

@@ -1,7 +1,9 @@
 import "server-only";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { impactScalarData } from "@/features/remediations/impact";
+import { releaseScalarData } from "@/features/remediations/release";
 import { ResourceType } from "@/generated/prisma";
+import { asDate } from "@/lib/date-utils";
 import prisma from "@/lib/db";
 import { resolveMatchingId } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
@@ -13,12 +15,7 @@ import {
   normalizeIdentifier,
   resolveOrMintVulnerabilities,
 } from "../vulnerabilities";
-import {
-  asDate,
-  type ChannelWatermarks,
-  parseCursor,
-  sinceFor,
-} from "../watermarks";
+import { type ChannelWatermarks, parseCursor, sinceFor } from "../watermarks";
 import { listChanged, type MedIsaoRemediationItem } from "./feed";
 
 /**
@@ -112,6 +109,8 @@ async function ingestRemediations(
         const fields = {
           description: describeRemediation(item),
           narrative: item.narrative,
+          isManufacturerRemediation: true,
+          ...releaseScalarData(item.release, "stated"),
           ...impactScalarData(item.impact, "stated"),
           // `connect` is idempotent, so on re-sync a matching or vulnerability
           // already attached stays attached exactly once, and a link a user

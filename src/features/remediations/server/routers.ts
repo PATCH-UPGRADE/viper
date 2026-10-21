@@ -21,8 +21,8 @@ import prisma from "@/lib/db";
 import { hospitalIdentifier } from "@/lib/hospital";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
-  cpesToMatchingConnect,
   createArtifactWrappers,
+  devicesToMatchingConnect,
   fetchPaginated,
   processIntegrationToken,
   transformArtifactWrapper,
@@ -36,6 +36,7 @@ import {
 } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import { impactRowsUpdate, impactScalarData } from "../impact";
+import { releaseScalarData } from "../release";
 import {
   integrationRemediationInputSchema,
   paginatedRemediationResponseSchema,
@@ -361,13 +362,15 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { artifacts, cpes, vulnerabilityIds, impacts, ...dataInput } =
+      const { artifacts, devices, vulnerabilityIds, impacts, ...dataInput } =
         input;
       const userId = ctx.auth.user.id;
       const vulnerabilities = await vulnerabilityConnect(
         vulnerabilityIds ?? [],
       );
-      const matchingConnect = cpes ? await cpesToMatchingConnect(cpes) : [];
+      const matchingConnect = devices
+        ? await devicesToMatchingConnect(devices)
+        : [];
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
       const { processedArtifacts, uploadInstructions } =
@@ -566,6 +569,7 @@ export const remediationsRouter = createTRPCRouter({
           ...(updateData.description !== undefined && {
             description: updateData.description,
           }),
+          ...releaseScalarData(updateData, "replace"),
           ...impactScalarData(updateData, "replace"),
           ...(vulnerabilities && {
             vulnerabilities: { set: vulnerabilities },
@@ -575,10 +579,10 @@ export const remediationsRouter = createTRPCRouter({
         const impactRows = impactRowsUpdate(impacts, "replace");
         if (impactRows) data.impacts = impactRows;
 
-        // Replace matchings when CPEs are provided.
-        if (updateData.cpes) {
+        // Replace matchings when devices are provided.
+        if (updateData.devices) {
           data.deviceGroupMatchings = {
-            set: await cpesToMatchingConnect(updateData.cpes),
+            set: await devicesToMatchingConnect(updateData.devices),
           };
         }
 

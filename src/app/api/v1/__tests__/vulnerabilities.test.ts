@@ -12,7 +12,8 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
-  generateCPE,
+  deleteAssetsForDevices,
+  generateDevice,
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
@@ -20,7 +21,7 @@ import {
 describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   const payload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("vuln_v1")],
+    devices: [generateDevice("vuln_v1")],
     exploitUri: "https://exploit-db.com/1234",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Buffer overflow in device X",
@@ -30,7 +31,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
   const assetPayload = {
     ip: "192.168.1.100",
-    cpe: generateCPE("vuln_v1"),
+    device: generateDevice("vuln_v1"),
     role: "Primary Server",
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
@@ -54,7 +55,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     items: [
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: [generateCPE("vuln_integration_v10")],
+        devices: [generateDevice("vuln_integration_v10")],
         exploitUri: "https://mock-exploit-db.com/vuln-001",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
@@ -64,7 +65,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       },
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: [generateCPE("vuln_integration_v11")],
+        devices: [generateDevice("vuln_integration_v11")],
         exploitUri: "https://mock-exploit-db.com/vuln-002",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
@@ -165,13 +166,12 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     );
 
     // Check that the single object in the array has the correct match values
-    // (resolved from the uploaded CPE: cpe:2.3:<part>:<vendor>:<product>:<version>)
-    const [, , , cpeManufacturer, cpeProduct, cpeVersion] =
-      payload.cpes[0].split(":");
+    // (resolved from the uploaded device input)
+    const [device] = payload.devices;
     const matching = detailRes.body.deviceGroupMatchings[0];
-    expect(matching.manufacturer.canonicalName).toBe(cpeManufacturer);
-    expect(matching.product?.canonicalName).toBe(cpeProduct);
-    expect(matching.version?.canonicalName).toBe(cpeVersion);
+    expect(matching.manufacturer.canonicalName).toBe(device.manufacturer.name);
+    expect(matching.product?.canonicalName).toBe(device.product?.name);
+    expect(matching.version?.canonicalName).toBe(device.version?.name);
 
     const deleteRes = await request(BASE_URL)
       .delete(`/vulnerabilities/${vulnerabilityId}`)
@@ -223,16 +223,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
           },
         },
       });
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            hasSome: [
-              generateCPE("vuln_integration_v10"),
-              generateCPE("vuln_integration_v11"),
-            ],
-          },
-        },
-      });
+      await deleteAssetsForDevices([
+        generateDevice("vuln_integration_v10"),
+        generateDevice("vuln_integration_v11"),
+      ]);
     });
 
     expect(integrationRes.status).toBe(200);
@@ -268,10 +262,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln1.exploitUri).toBe(vulnPayload1.exploitUri);
     expect(foundVuln1.sarif).toStrictEqual(vulnPayload1.sarif);
     expect(foundVuln1.deviceGroupMatchings.length).toBe(
-      vulnPayload1.cpes.length,
+      vulnPayload1.devices.length,
     );
     expect(foundVuln1.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      vulnPayload1.cpes[0].split(":")[5],
+      vulnPayload1.devices[0].version?.name,
     );
 
     const vulnPayload2 = vulnerabilityIntegrationPayload.items[1];
@@ -301,10 +295,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln2.exploitUri).toBe(vulnPayload2.exploitUri);
     expect(foundVuln2.sarif).toStrictEqual(vulnPayload2.sarif);
     expect(foundVuln2.deviceGroupMatchings.length).toBe(
-      vulnPayload2.cpes.length,
+      vulnPayload2.devices.length,
     );
     expect(foundVuln2.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      vulnPayload2.cpes[0].split(":")[5],
+      vulnPayload2.devices[0].version?.name,
     );
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
@@ -324,5 +318,94 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
+  });
+});
+
+describe("Vulnerabilities Endpoint version input", () => {
+  const stamp = Date.now();
+  const device = (version: unknown) => ({
+    manufacturer: { name: "vitest" },
+    product: { name: `range_${stamp}` },
+    version,
+  });
+  const create = (devices: unknown[]) =>
+    request(BASE_URL).post("/vulnerabilities").set(authHeader).send({
+      sarif: {},
+      description: "Mock -- version input",
+      devices,
+    });
+  const cleanUp = (id: string) =>
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/vulnerabilities/${id}`).set(authHeader);
+    });
+
+  it("POST /vulnerabilities - stores a VERS range on the matching", async () => {
+    const res = await create([device({ range: "vers:semver/>=8.0|<8.2" })]);
+    cleanUp(res.body.id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroupMatchings).toHaveLength(1);
+    expect(res.body.deviceGroupMatchings[0]).toMatchObject({
+      version: null,
+      versionRange: "vers:semver/>=8.0|<8.2",
+    });
+  });
+
+  it("POST /vulnerabilities - vers:all/* is a product-level matching", async () => {
+    const res = await create([device({ range: "vers:all/*" })]);
+    cleanUp(res.body.id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroupMatchings[0]).toMatchObject({
+      version: null,
+      versionRange: null,
+    });
+  });
+
+  it("POST /vulnerabilities - an UNKNOWN version matches the product's assets", async () => {
+    const asset = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send({ ip: "10.0.8.1", device: device({ name: "8.1" }) });
+    expect(asset.status).toBe(200);
+    onTestFinished(async () => {
+      await request(BASE_URL)
+        .delete(`/assets/${asset.body.id}`)
+        .set(authHeader);
+    });
+
+    const res = await create([device({ status: "UNKNOWN" })]);
+    cleanUp(res.body.id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroupMatchings[0]).toMatchObject({
+      version: null,
+      versionRange: null,
+      versionStatus: "UNKNOWN",
+    });
+    const affecting = await request(BASE_URL)
+      .get(`/assets/${asset.body.id}/vulnerabilities`)
+      .set(authHeader);
+    expect(affecting.body.items.map((v: { id: string }) => v.id)).toContain(
+      res.body.id,
+    );
+    // Possibly at risk, not known to be: the baseline issue opens under
+    // investigation.
+    const issue = await prisma.issue.findFirst({
+      where: { vulnerabilityId: res.body.id },
+      select: { status: true },
+    });
+    expect(issue?.status).toBe("UNDER_INVESTIGATION");
+  });
+
+  it.each([
+    ["no version", undefined],
+    ["a range that is not VERS", { range: ">=8.0" }],
+    ["a range that does not parse", { range: "vers:semver" }],
+    ["an asset-only version status", { status: "UNSURE" }],
+  ])("POST /vulnerabilities - %s is a 400", async (_label, version) => {
+    const res = await create([device(version)]);
+
+    expect(res.status).toBe(400);
   });
 });

@@ -32,9 +32,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { AssetWithDevice } from "@/features/assets/types";
 import { getAssetTitle } from "@/features/assets/utils";
 import type { Vulnerability } from "@/generated/prisma";
-import type { AssetWithDeviceGroup } from "@/lib/db";
 import { deviceLabel } from "@/lib/markdown";
 import { DeviceIconType, getIconByType } from "../types";
 import type { AssetNodeData } from "./node";
@@ -59,7 +59,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   defaultValues?: AssetNodeData;
-  assets: AssetWithDeviceGroup[];
+  assets: AssetWithDevice[];
   vulnerabilities: Vulnerability[];
 }
 
@@ -316,8 +316,8 @@ export const AssetDialog = ({
               <ul className="pl-4">
                 {assets.map((asset, idx) => (
                   <li className="list-disc" key={idx}>
-                    {getAssetTitle(asset)} &bull;{" "}
-                    {deviceLabel(asset.deviceGroup)} &bull; {asset.id}
+                    {getAssetTitle(asset)} &bull; {deviceLabel(asset)} &bull;{" "}
+                    {asset.id}
                   </li>
                 ))}
               </ul>

@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { cpesToMatchingConnect } from "@/lib/router-utils";
+import { devicesToMatchingConnect } from "@/lib/router-utils";
 import type { integrationVulnerabilityInputSchema } from "../types";
 
 type IntegrationVulnerabilityItem = z.infer<
@@ -28,14 +28,14 @@ export function processVulnerabilityIntegrationSync(
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
       transformInputItem: async (item, userId) => {
         const {
-          cpes,
+          devices,
           sarif,
           externalId: _externalId,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           ...itemData
         } = item;
-        const connect = cpes ? await cpesToMatchingConnect(cpes) : [];
+        const connect = devices ? await devicesToMatchingConnect(devices) : [];
 
         return {
           createData: {
@@ -49,9 +49,9 @@ export function processVulnerabilityIntegrationSync(
           updateData: {
             ...itemData,
             sarif,
-            // Only replace matchings when CPEs were provided; omitting them
+            // Only replace matchings when devices were provided; omitting them
             // on re-sync must not clear a vulnerability's existing matchings.
-            ...(cpes ? { deviceGroupMatchings: { set: connect } } : {}),
+            ...(devices ? { deviceGroupMatchings: { set: connect } } : {}),
           },
           uniqueFieldConditions: [],
           // ^always create unmapped vulns

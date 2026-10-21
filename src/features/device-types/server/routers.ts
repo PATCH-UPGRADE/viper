@@ -29,24 +29,25 @@ const countedAssetWhere: Prisma.AssetWhereInput = {
 export async function countAssetsByDeviceType(): Promise<
   z.infer<typeof deviceTypeCountsSchema>
 > {
-  const [deviceTypes, groups] = await Promise.all([
+  const [deviceTypes, products, assetsWithoutProduct] = await Promise.all([
     prisma.deviceType.findMany({
       select: { id: true, slug: true, displayName: true },
       orderBy: { displayName: "asc" },
     }),
-    prisma.deviceGroup.findMany({
+    prisma.product.findMany({
       select: {
-        product: { select: { deviceTypeId: true } },
+        deviceTypeId: true,
         _count: { select: { assets: { where: countedAssetWhere } } },
       },
     }),
+    prisma.asset.count({ where: { ...countedAssetWhere, productId: null } }),
   ]);
 
   const countByTypeId = new Map<string, number>();
-  let untypedAssetCount = 0;
-  for (const group of groups) {
-    const count = group._count.assets;
-    const deviceTypeId = group.product?.deviceTypeId;
+  let untypedAssetCount = assetsWithoutProduct;
+  for (const product of products) {
+    const count = product._count.assets;
+    const deviceTypeId = product.deviceTypeId;
     if (deviceTypeId) {
       countByTypeId.set(
         deviceTypeId,

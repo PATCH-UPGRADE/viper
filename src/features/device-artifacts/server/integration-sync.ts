@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { resolveMatchingIdFromCpe } from "@/lib/router-utils";
+import { resolveMatchingIdForDevice } from "@/lib/router-utils";
 import type { integrationDeviceArtifactInputSchema } from "../types";
 import { requestArtifactNoteExtraction } from "./request-note-extraction";
 
@@ -25,14 +25,14 @@ export function processDeviceArtifactIntegrationSync(
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
       transformInputItem: async (item, userId) => {
         const {
-          cpe,
+          device,
           externalId: _externalId,
           artifacts,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           ...itemData
         } = item;
-        const identityMatchingId = await resolveMatchingIdFromCpe(cpe);
+        const identityMatchingId = await resolveMatchingIdForDevice(device);
         const matchingConnect = [{ id: identityMatchingId }];
 
         return {

@@ -1,6 +1,10 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import {
+  linkedRefSchema,
+  linkedRefSelect,
+} from "@/features/device-catalog/types";
+import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
 } from "@/features/integrations/core/urls";
@@ -8,16 +12,13 @@ import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
-  cpeSchema,
+  assetDeviceInputSchema,
   createIntegrationInputSchema,
   userIncludeSelect,
   userSchema,
+  versionStatusSchema,
 } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
-import {
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-} from "../device-groups/types";
 import { scopedNoteSchema } from "../notes/schemas";
 import { remediationCardInclude } from "../remediations/types";
 
@@ -37,10 +38,22 @@ export const assetUtilizationSchema = z.array(
   z.record(utilizationHourKeySchema, z.number().int()),
 );
 
+// Zod drops unknown keys, so without this a client that still sends the old
+// field gets a 200 and an asset whose status is silently UNKNOWN.
+const removedVersionStatusSchema = z
+  .never({ error: "versionStatus moved to device.version.status." })
+  .optional()
+  .describe("Removed. Use device.version.status.");
+
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
-  cpe: cpeSchema.nullish(),
+  device: assetDeviceInputSchema
+    .nullish()
+    .describe(
+      "The asset's manufacturer, product, and version. Without it, the asset has no device.",
+    ),
+  versionStatus: removedVersionStatusSchema,
   role: z
     .string()
     .min(1)
@@ -62,8 +75,6 @@ export const assetInputSchema = z.object({
   location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
   utilization: assetUtilizationSchema.nullish(),
-  version: z.string().trim().min(1).max(64).optional(),
-  versionStatus: z.enum(["UNKNOWN", "UNSURE"]).optional(),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({
@@ -80,7 +91,17 @@ export const assetArrayInputSchema = z.object({
 export const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string().nullable(),
-  deviceGroup: deviceGroupWithUrlsSchema,
+  manufacturer: linkedRefSchema.nullable(),
+  product: linkedRefSchema
+    .extend({
+      deviceType: z
+        .object({ slug: z.string(), displayName: z.string() })
+        .nullable(),
+    })
+    .nullable(),
+  version: linkedRefSchema.extend({ udiDi: z.string().nullable() }).nullable(),
+  versionStatus: versionStatusSchema,
+  vulnerabilitiesUrl: z.string(),
   role: z.string().nullable(),
   externalMappings: z.array(
     z.object({
@@ -175,18 +196,31 @@ export const managesRelationshipSelect = {
   },
 } satisfies Prisma.Asset$managedByArgs;
 
+/** An asset's manufacturer, product (with its device type), and version. */
+export const assetDeviceInclude = {
+  manufacturer: { select: linkedRefSelect },
+  product: {
+    select: {
+      ...linkedRefSelect,
+      deviceType: { select: { slug: true, displayName: true } },
+    },
+  },
+  version: { select: { ...linkedRefSelect, udiDi: true } },
+} as const;
+
+export type AssetWithDevice = Prisma.Result<
+  ExtendedPrismaClient["asset"],
+  { include: typeof assetDeviceInclude },
+  "findUniqueOrThrow"
+>;
+
 export const assetInclude = {
   user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
+  ...assetDeviceInclude,
   externalMappings: externalMappingSelect,
   managedBy: managesRelationshipSelect,
 } satisfies Prisma.AssetInclude;
 
-/**
- * Derived from the *extended* client, not `Prisma.AssetGetPayload` — the device
- * group's `url` / `sbomUrl` / ... are computed by `deviceGroupExtension`, and
- * the base payload helper resolves them to `never`.
- */
 export type AssetWithRelations = Prisma.Result<
   ExtendedPrismaClient["asset"],
   { include: typeof assetInclude },
@@ -195,7 +229,7 @@ export type AssetWithRelations = Prisma.Result<
 
 export const assetDashboardInclude = {
   user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
+  ...assetDeviceInclude,
   externalMappings: externalMappingWithSyncSelect,
   issues: {
     include: {

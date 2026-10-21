@@ -370,7 +370,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Class
                   </div>
-                  <CopyCode>{deviceLabel(asset.deviceGroup)}</CopyCode>
+                  <CopyCode>{deviceLabel(asset)}</CopyCode>
                 </div>
               </div>
             </div>

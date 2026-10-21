@@ -14,8 +14,8 @@ import prisma from "@/lib/db";
 // allowlist before it is ever handed to Prisma.
 //
 // The allowlist intentionally exposes only indexed / cheap-to-filter scalar
-// fields, plus relation hops where they earn their keep: Asset -> deviceGroup
-// -> product -> deviceType lets a note target "all infusion pumps". Unknown
+// fields, plus relation hops where they earn their keep: Asset -> product ->
+// deviceType lets a note target "all infusion pumps". Unknown
 // fields or operators are rejected.
 
 /** Thrown when a filter is malformed, disallowed, or its query fails. */
@@ -125,16 +125,7 @@ const productWhere = buildWhereSchema(
   { deviceType: buildWhereSchema({ slug: stringFilter }) },
 );
 
-const deviceGroupWhere = buildWhereSchema(
-  {
-    manufacturerId: stringFilter,
-    productId: stringFilter,
-    versionId: stringFilter,
-    versionStatus: stringFilter,
-    udi: stringFilter,
-  },
-  { product: productWhere },
-);
+const versionWhere = buildWhereSchema({ udiDi: stringFilter });
 
 const assetFilterSchema = buildWhereSchema(
   {
@@ -145,11 +136,14 @@ const assetFilterSchema = buildWhereSchema(
     macAddress: stringFilter,
     serialNumber: stringFilter,
     status: stringFilter,
-    deviceGroupId: stringFilter,
+    manufacturerId: stringFilter,
+    productId: stringFilter,
+    versionId: stringFilter,
+    versionStatus: stringFilter,
     createdAt: dateFilter,
     updatedAt: dateFilter,
   },
-  { deviceGroup: deviceGroupWhere },
+  { product: productWhere, version: versionWhere },
 );
 
 const vulnerabilityFilterSchema = buildWhereSchema({

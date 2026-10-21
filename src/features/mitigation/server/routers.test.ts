@@ -356,23 +356,17 @@ describe("mitigationRouter.accept", () => {
     mockPrisma.asset.findMany.mockResolvedValue([
       {
         id: "asset-1",
-        deviceGroup: {
-          id: "dg-1",
-          manufacturerId: "manufacturer-icu",
-          productId: "product-plum",
-          versionId: null,
-          version: null,
-        },
+        manufacturerId: "manufacturer-icu",
+        productId: "product-plum",
+        versionId: null,
+        version: null,
       },
       {
         id: "asset-2",
-        deviceGroup: {
-          id: "dg-2",
-          manufacturerId: "manufacturer-other",
-          productId: null,
-          versionId: null,
-          version: null,
-        },
+        manufacturerId: "manufacturer-other",
+        productId: null,
+        versionId: null,
+        version: null,
       },
     ]);
     mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
@@ -436,13 +430,10 @@ describe("mitigationRouter.accept", () => {
     // the attachedAssetIds guard directly rather than relying on that.
     const sameAsset = {
       id: "asset-1",
-      deviceGroup: {
-        id: "dg-1",
-        manufacturerId: "manufacturer-icu",
-        productId: "product-plum",
-        versionId: null,
-        version: null,
-      },
+      manufacturerId: "manufacturer-icu",
+      productId: "product-plum",
+      versionId: null,
+      version: null,
     };
     mockPrisma.asset.findMany.mockResolvedValue([sameAsset, sameAsset]);
     mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({

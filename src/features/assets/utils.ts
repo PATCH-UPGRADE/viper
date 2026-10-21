@@ -5,13 +5,13 @@ import { IssueStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
 export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";
 
-type DeviceGroupWithType = {
-  product?: { deviceType?: { displayName: string } | null } | null;
+type ProductWithType = {
+  deviceType?: { displayName: string } | null;
 } | null;
 
-// deviceGroup is required, so that a caller cannot leave out the device type
-// by mistake. Pass `deviceGroup: null` when an asset has none to give.
-export type DeviceTypeSource = { deviceGroup: DeviceGroupWithType };
+// product is required, so that a caller cannot leave out the device type
+// by mistake. Pass `product: null` when an asset has none to give.
+export type DeviceTypeSource = { product: ProductWithType };
 
 /** Selects what getAssetDeviceTypeLabel reads, under a product select. */
 export const deviceTypeLabelSelect = {
@@ -26,7 +26,7 @@ export const deviceTypeLabelSchema = z
 export function getAssetDeviceTypeLabel(
   asset: DeviceTypeSource | null | undefined,
 ): string | null {
-  return asset?.deviceGroup?.product?.deviceType?.displayName ?? null;
+  return asset?.product?.deviceType?.displayName ?? null;
 }
 
 /**
@@ -37,11 +37,7 @@ export const assetNameSearchTerms = (match: Prisma.StringFilter) => [
   { hostname: match },
   { ip: match },
   { serialNumber: match },
-  {
-    deviceGroup: {
-      is: { product: { is: { deviceType: { is: { displayName: match } } } } },
-    },
-  },
+  { product: { is: { deviceType: { is: { displayName: match } } } } },
 ];
 
 // The UI names an asset by what it is, never by Asset.role: the role is free
@@ -68,7 +64,7 @@ type AssetNameFields = {
 
 export const assetNameSelect = {
   ...assetNameFieldsSelect,
-  deviceGroup: { select: { product: { select: deviceTypeLabelSelect } } },
+  product: { select: deviceTypeLabelSelect },
 } as const;
 
 export type AssetNameSource = AssetNameFields & DeviceTypeSource;

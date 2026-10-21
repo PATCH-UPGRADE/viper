@@ -42,7 +42,6 @@ const candidates: Candidates = {
   deviceGroups: [
     {
       extracted: {
-        cpe: null,
         manufacturer: "Acme",
         modelName: "X1",
         version: null,
@@ -160,6 +159,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
       manufacturerId: "m-1",
       productId: "p-1",
       versionId: null,
+      versionStatus: "UNKNOWN",
     });
   });
 
@@ -175,7 +175,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     expect(summary.updated).toBe(1);
     expect(mockPrisma.deviceGroupMatching.update).toHaveBeenCalledWith({
       where: { id: "dg-1" },
-      data: { versionRange: "vers:semver/<2.0.0" },
+      data: { versionRange: "vers:semver/<2.0.0", versionStatus: "KNOWN" },
     });
   });
 
@@ -199,6 +199,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
         productId: "p-1",
         versionId: null,
         versionRange: "vers:semver/<2.0.0",
+        versionStatus: "KNOWN",
       },
       select: { id: true },
     });
@@ -206,6 +207,39 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     expect(
       mockPrisma.notificationDeviceGroupMapping.upsert,
     ).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns an UNKNOWN matching KNOWN for a range of every version", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue(null);
+
+    await applyDecisions(
+      { notificationId: "n-1" },
+      [{ ...updateDecision, fields: { versionRange: "vers:all/*" } }],
+      candidates,
+    );
+
+    expect(mockPrisma.deviceGroupMatching.update).toHaveBeenCalledWith({
+      where: { id: "dg-1" },
+      data: { versionRange: null, versionStatus: "KNOWN" },
+    });
+  });
+
+  it("leaves a KNOWN matching alone for a range of every version", async () => {
+    mockPrisma.deviceGroupMatching.findUnique.mockResolvedValue({
+      versionRange: null,
+      manufacturerId: "m-1",
+      productId: "p-1",
+      versionId: null,
+      versionStatus: "KNOWN",
+    });
+
+    await applyDecisions(
+      { notificationId: "n-1" },
+      [{ ...updateDecision, fields: { versionRange: "vers:all/*" } }],
+      candidates,
+    );
+
+    expect(mockPrisma.deviceGroupMatching.update).not.toHaveBeenCalled();
   });
 });
 

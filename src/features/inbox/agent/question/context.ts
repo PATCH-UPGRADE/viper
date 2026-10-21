@@ -1,11 +1,7 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import prisma from "@/lib/db";
-import {
-  deviceGroupWhereForMatching,
-  type MatchingLike,
-  matchingAppliesToDevice,
-} from "@/lib/device-matching";
+import type { MatchingLike } from "@/lib/device-matching";
 import {
   deviceGroupMatchingLabel,
   type NoteRow,
@@ -14,6 +10,7 @@ import {
 } from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
 import { notRejected } from "../../types";
+import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
 
@@ -210,28 +207,13 @@ export async function gatherQuestionContext(
   }
   const matchings = [...matchingsById.values()];
 
-  const candidateGroups =
-    matchings.length > 0
-      ? await prisma.deviceGroup.findMany({
-          where: { OR: matchings.map(deviceGroupWhereForMatching) },
-          select: {
-            id: true,
-            manufacturerId: true,
-            productId: true,
-            versionId: true,
-            version: { select: { canonicalName: true } },
-            assets: {
-              select: { id: true, hostname: true, ip: true },
-            },
-          },
-        })
-      : [];
+  const candidateGroups = await deviceAssetGroupsForMatchings(matchings);
 
   const groupsByMatching = new Map<string, typeof candidateGroups>();
   for (const matching of matchings) {
     groupsByMatching.set(
       matching.id,
-      candidateGroups.filter((grp) => matchingAppliesToDevice(matching, grp)),
+      candidateGroups.filter((grp) => grp.matchingIds.includes(matching.id)),
     );
   }
 
@@ -337,21 +319,7 @@ export async function gatherQuestionContextForIssue(
 
   if (!matching) return null;
 
-  const candidateGroups = await prisma.deviceGroup.findMany({
-    where: deviceGroupWhereForMatching(matching),
-    select: {
-      id: true,
-      manufacturerId: true,
-      productId: true,
-      versionId: true,
-      version: { select: { canonicalName: true } },
-      assets: { select: { id: true, hostname: true, ip: true } },
-    },
-  });
-
-  const groups = candidateGroups.filter((g) =>
-    matchingAppliesToDevice(matching, g),
-  );
+  const groups = await deviceAssetGroupsForMatchings([matching]);
   const assetIds = [
     ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),
   ];

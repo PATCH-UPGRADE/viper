@@ -8,8 +8,7 @@ export function normalizeVersion(v?: string | null): string | null {
   return v;
 }
 
-// Mirror of router-utils' CPE-token → versionStatus mapping so seeded device
-// groups carry the same semantics as ones resolved from CPEs at runtime:
+// The versionStatus of a sample CPE's version token:
 // "-" => NOT_APPLICABLE, "*"/empty => UNKNOWN, any value => KNOWN.
 export function cpeVersionStatus(
   cpe: string,
@@ -37,58 +36,42 @@ export async function upsertManufacturer(name: string) {
   });
 }
 
-export function upsertVersion(name: string) {
+export function upsertVersion(productId: string, name: string) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.version.upsert({
-    where: { canonicalName },
+    where: { productId_canonicalName: { productId, canonicalName } },
     update: {},
-    create: { canonicalName, canonicalDisplayName: name },
+    create: { productId, canonicalName, canonicalDisplayName: name },
   });
 }
 
-type GroupIdentity = {
+export type DeviceIds = {
   manufacturerId: string | null;
   productId: string | null;
   versionId: string | null;
 };
 
-// Find-or-create a shared DeviceGroupMatching for a device-group identity.
-export async function matchingForGroup(
-  dg: GroupIdentity,
+// Find-or-create a shared DeviceGroupMatching for a device identity. A product
+// with no version takes the sample's versionStatus: NOT_APPLICABLE for a "-"
+// version token, otherwise UNKNOWN.
+export async function matchingForDevice(
+  device: DeviceIds & { versionStatus?: ReturnType<typeof cpeVersionStatus> },
 ): Promise<string | null> {
-  if (!dg.manufacturerId) return null;
+  if (!device.manufacturerId) return null;
+  const noVersion = device.productId !== null && device.versionId === null;
   const where = {
-    manufacturerId: dg.manufacturerId,
-    productId: dg.productId,
-    versionId: dg.versionId,
+    manufacturerId: device.manufacturerId,
+    productId: device.productId,
+    versionId: device.versionId,
     versionRange: null,
+    versionStatus: !noVersion
+      ? ("KNOWN" as const)
+      : device.versionStatus === "NOT_APPLICABLE"
+        ? ("NOT_APPLICABLE" as const)
+        : ("UNKNOWN" as const),
   };
   const existing = await prisma.deviceGroupMatching.findFirst({ where });
   const matching =
     existing ?? (await prisma.deviceGroupMatching.create({ data: where }));
   return matching.id;
-}
-
-// Resolve CPE strings to shared DeviceGroupMatching ids (via their device group)
-// so workflow ASSET nodes can link a device class relationally instead of by CPE.
-export async function matchingIdsForCpes(cpes: string[]): Promise<string[]> {
-  const ids: string[] = [];
-  for (const cpe of cpes) {
-    const dg = await prisma.deviceGroup.findFirst({
-      where: { cpe: { has: cpe } },
-      select: {
-        id: true,
-        manufacturerId: true,
-        productId: true,
-        versionId: true,
-      },
-    });
-    if (!dg) {
-      console.warn(`⚠️  No device group for CPE ${cpe}; skipping matching link`);
-      continue;
-    }
-    const matchingId = await matchingForGroup(dg);
-    if (matchingId) ids.push(matchingId);
-  }
-  return [...new Set(ids)];
 }

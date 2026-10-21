@@ -1,5 +1,5 @@
 import semver from "semver";
-import { type Prisma, VersionStatus } from "@/generated/prisma";
+import { IssueStatus, type Prisma, VersionStatus } from "@/generated/prisma";
 
 // ============================================================================
 // VERS version-range support
@@ -111,7 +111,7 @@ export function versSatisfies(version: string | null, range: string): boolean {
 }
 
 // ============================================================================
-// Match status + device-group resolution (canonical-id based)
+// Match status + device resolution (canonical-id based)
 // ============================================================================
 
 export type MatchingLike = {
@@ -121,6 +121,7 @@ export type MatchingLike = {
   versionRange: string | null;
 };
 
+/** A device's canonical ids. An asset has exactly these fields. */
 export type DeviceIdentity = {
   id: string;
   manufacturerId: string | null;
@@ -130,50 +131,98 @@ export type DeviceIdentity = {
   version?: { canonicalName: string } | null;
 };
 
+/** Selects a DeviceIdentity from an asset. */
+export const deviceIdentitySelect = {
+  id: true,
+  manufacturerId: true,
+  productId: true,
+  versionId: true,
+  version: { select: { canonicalName: true } },
+} as const satisfies Prisma.AssetSelect;
+
+/** One key per manufacturer/product/version, shared by the assets that have it. */
+export const deviceKey = (device: Omit<DeviceIdentity, "id">): string =>
+  `${device.manufacturerId}:${device.productId}:${device.versionId}`;
+
 /**
- * Whether a matching applies to a concrete device, that is, any row with a
- * DeviceIdentity. Manufacturer/product/exact-version comparisons use canonical
- * FK ids; version-range checks use the version's canonical string.
+ * The versionRange and versionStatus to store for a matching from a source
+ * that names versions. A product with no version and no range is UNKNOWN: the
+ * source gave no version, which is not the same as every version. A range that
+ * matches every version is stored as no range, KNOWN, as the API stores it.
+ */
+export function matchingVersionFields(matching: {
+  hasProduct: boolean;
+  hasVersion: boolean;
+  versionRange?: string | null;
+}): { versionRange: string | null; versionStatus: VersionStatus } {
+  const range = matching.versionRange?.trim() || null;
+  if (range && parseVers(range)?.matchesAll) {
+    return { versionRange: null, versionStatus: VersionStatus.KNOWN };
+  }
+  const noVersion = matching.hasProduct && !matching.hasVersion && !range;
+  return {
+    versionRange: range,
+    versionStatus: noVersion ? VersionStatus.UNKNOWN : VersionStatus.KNOWN,
+  };
+}
+
+/**
+ * The status that a matching's baseline issue opens with. An UNKNOWN matching
+ * means the source gave no version, so its devices are possibly at risk, not
+ * known to be at risk: they show under investigation instead of affected.
+ */
+export function baselineIssueStatus(versionStatus: VersionStatus): IssueStatus {
+  return versionStatus === VersionStatus.UNKNOWN
+    ? IssueStatus.UNDER_INVESTIGATION
+    : IssueStatus.AFFECTED;
+}
+
+/**
+ * Whether a matching applies to a concrete device. Manufacturer/product/exact-
+ * version comparisons use canonical FK ids; version-range checks use the
+ * version's canonical string.
  */
 export function matchingAppliesToDevice(
   matching: MatchingLike,
-  deviceGroup: DeviceIdentity,
+  device: DeviceIdentity,
 ): boolean {
   if (
-    !deviceGroup.manufacturerId ||
-    matching.manufacturerId !== deviceGroup.manufacturerId
+    !device.manufacturerId ||
+    matching.manufacturerId !== device.manufacturerId
   ) {
     return false;
   }
 
   // Wildcard product (null) matches every product of the manufacturer.
   if (matching.productId === null) return true;
-  if (matching.productId !== deviceGroup.productId) return false;
+  if (matching.productId !== device.productId) return false;
 
   // Manufacturer + product match. Now resolve the version constraint.
   if (matching.versionId !== null) {
-    return matching.versionId === deviceGroup.versionId;
+    return matching.versionId === device.versionId;
   }
 
   if (matching.versionRange !== null) {
     return versSatisfies(
-      deviceGroup.version?.canonicalName ?? null,
+      device.version?.canonicalName ?? null,
       matching.versionRange,
     );
   }
 
-  // No version constraint => product-level match.
+  // No version constraint => product-level match. A matching whose versionStatus
+  // is UNKNOWN or NOT_APPLICABLE has no version and no range, so it lands here
+  // too: an advisory with no version shows every asset of the product.
   return true;
 }
 
 /**
- * Prisma `where` selecting device groups a matching could apply to (manufacturer +
+ * Prisma `where` selecting assets a matching could apply to (manufacturer +
  * optional product). Version filtering is done in memory via
  * matchingAppliesToDevice.
  */
-export function deviceGroupWhereForMatching(
+export function assetWhereForMatching(
   matching: MatchingLike,
-): Prisma.DeviceGroupWhereInput {
+): Prisma.AssetWhereInput {
   return {
     manufacturerId: matching.manufacturerId,
     ...(matching.productId !== null ? { productId: matching.productId } : {}),
@@ -181,11 +230,44 @@ export function deviceGroupWhereForMatching(
 }
 
 /**
- * Prisma `where` selecting device groups whose reversion is still (UNKNOWN or UNSURE)
+ * Prisma `where` for the assets that matchingAppliesToDevice accepts, as far as
+ * SQL can tell. Only a product's VERS range still needs the in-memory check.
  */
-export function unknownVersionDeviceGroupWhere(
+export function strictAssetWhereForMatching(
   matching: MatchingLike,
-): Prisma.DeviceGroupWhereInput | null {
+): Prisma.AssetWhereInput {
+  const exactVersion =
+    matching.productId !== null && matching.versionId !== null;
+  return {
+    ...assetWhereForMatching(matching),
+    ...(exactVersion ? { versionId: matching.versionId } : {}),
+  };
+}
+
+/**
+ * The assets that any matching applies to, by matchingAppliesToDevice: an
+ * unknown-version asset does not match a version-constrained rule. `find` runs
+ * the query, so each caller picks its select and its client.
+ */
+export async function findAssetsStrictlyMatching<T extends DeviceIdentity>(
+  matchings: MatchingLike[],
+  find: (where: Prisma.AssetWhereInput) => Promise<T[]>,
+): Promise<T[]> {
+  if (matchings.length === 0) return [];
+  const candidates = await find({
+    OR: matchings.map(strictAssetWhereForMatching),
+  });
+  return candidates.filter((asset) =>
+    matchings.some((matching) => matchingAppliesToDevice(matching, asset)),
+  );
+}
+
+/**
+ * Prisma `where` selecting assets whose version is still UNKNOWN or UNSURE
+ */
+export function unknownVersionAssetWhere(
+  matching: MatchingLike,
+): Prisma.AssetWhereInput | null {
   if (matching.versionId === null && matching.versionRange === null)
     return null;
 
@@ -201,13 +283,13 @@ export function unknownVersionDeviceGroupWhere(
  * manufacturer, and either a wildcard product or the same product (the naive
  * same-manufacturer/product scan). Caller must pass a device that has a manufacturerId.
  */
-export function matchingWhereForDevice(deviceGroup: {
+export function matchingWhereForDevice(device: {
   manufacturerId: string;
   productId: string | null;
 }): Prisma.DeviceGroupMatchingWhereInput {
   return {
-    manufacturerId: deviceGroup.manufacturerId,
-    OR: [{ productId: null }, { productId: deviceGroup.productId }],
+    manufacturerId: device.manufacturerId,
+    OR: [{ productId: null }, { productId: device.productId }],
   };
 }
 
@@ -217,14 +299,14 @@ export function matchingWhereForDevice(deviceGroup: {
  */
 export function resolveMatches<T extends DeviceIdentity>(
   matchings: MatchingLike[],
-  deviceGroups: T[],
+  devices: T[],
 ): T[] {
   const matched = new Map<string, T>();
 
   for (const matching of matchings) {
-    for (const deviceGroup of deviceGroups) {
-      if (matchingAppliesToDevice(matching, deviceGroup)) {
-        matched.set(deviceGroup.id, deviceGroup);
+    for (const device of devices) {
+      if (matchingAppliesToDevice(matching, device)) {
+        matched.set(device.id, device);
       }
     }
   }

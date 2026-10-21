@@ -17,8 +17,12 @@
     - Example payload:
         ```json
         {
-            "cpes": [
-                "cpe:2.3:h:tester:dummy:*:*:*:*:*:*:*:*"
+            "devices": [
+                {
+                    "manufacturer": { "name": "Tester" },
+                    "product": { "name": "Dummy" },
+                    "version": { "range": "vers:all/*" }
+                }
             ],
             "vulnerabilityIds": ["cmkojdbok001sy95b18ad1q4t"],
             "description": "Dummy remediation to test artifact upload",
@@ -38,10 +42,13 @@
         {
         "remediation": {
             "id": "cmlr2yahd000sov7rgv3yyel7",
-            "affectedDeviceGroups": [
+            "deviceGroupMatchings": [
             {
                 "id": "cmlqzpxr5000yovqzgfoagpvj",
-                "cpe": "cpe:2.3:h:tester:dummy:*:*:*:*:*:*:*:*"
+                "manufacturer": { "canonicalName": "tester", "canonicalDisplayName": "Tester" },
+                "product": { "canonicalName": "dummy", "canonicalDisplayName": "Dummy" },
+                "version": null,
+                "versionRange": null
             }
             ],
             "upstreamApi": null,
@@ -123,10 +130,13 @@
         {
             "remediation": {
                 "id": "cmkojdbwb002iy95bcw2ujerl",
-                "affectedDeviceGroups": [
+                "deviceGroupMatchings": [
                 {
                     "id": "cmkojdbjv000fy95b3hfqai5f",
-                    "cpe": "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*"
+                    "manufacturer": { "canonicalName": "epic", "canonicalDisplayName": "Epic" },
+                    "product": { "canonicalName": "emr", "canonicalDisplayName": "EMR" },
+                    "version": { "canonicalName": "2023", "canonicalDisplayName": "2023" },
+                    "versionRange": null
                 }
                 ],
                 "upstreamApi": "https://www.epic.com/software",

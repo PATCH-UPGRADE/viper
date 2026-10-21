@@ -13,21 +13,25 @@ import {
   authHeader,
   BASE_URL,
   createIntegrationToken,
-  generateCPE,
+  deleteAssetsForDevices,
+  expectDevice,
+  generateDevice,
   jsonHeader,
+  namedDevice,
   setupMockIntegration,
+  VERSION_UNKNOWN,
 } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
   const payload = {
     ip: "192.168.1.100",
-    cpe: generateCPE("asset_v1"),
+    device: generateDevice("asset_v1"),
     role: "Primary Server",
   };
 
   const payload2 = {
     ip: "192.168.1.101",
-    cpe: generateCPE("asset_v2"),
+    device: generateDevice("asset_v2"),
     role: "Primary Server",
   };
 
@@ -53,7 +57,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.244",
         networkSegment: "Mock Medical Imaging VLAN",
-        cpe: "cpe:2.3:h:mock:asset_integration_v10:*:*:*:*:*:*:*",
+        device: namedDevice("mock", "asset_integration_v10", VERSION_UNKNOWN),
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-mock-00001.hospital.local",
@@ -71,7 +75,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.245",
         networkSegment: "Mock Medical Imaging VLAN",
-        cpe: "cpe:2.3:h:mock:asset_integration_v11:*:*:*:*:*:*:*",
+        device: namedDevice("mock", "asset_integration_v11", VERSION_UNKNOWN),
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-mock-00002.hospital.local",
@@ -179,20 +183,12 @@ describe("Assets Endpoint (/assets)", () => {
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(assetId);
 
-    const deviceGroupId = detailRes.body.deviceGroup.id;
-
-    const listByDeviceGroupRes = await request(BASE_URL)
-      .get(`/deviceGroups/${deviceGroupId}/assets`)
-      .set(authHeader);
-
-    expect(listByDeviceGroupRes.status).toBe(200);
-    expect(listByDeviceGroupRes.body.items[0].deviceGroup.id).toBe(
-      deviceGroupId,
-    );
+    expectDevice(detailRes.body, payload.device);
+    expect(detailRes.body).not.toHaveProperty("deviceGroup");
 
     const updatePayload = {
       ip: "192.168.1.105", // Updated field
-      cpe: generateCPE("asset_v1"),
+      device: generateDevice("asset_v1"),
       role: "Backup Server",
     };
 
@@ -227,18 +223,14 @@ describe("Assets Endpoint (/assets)", () => {
     const bodyFirst = res.body.at(0);
     expect(bodyFirst).toHaveProperty("id");
     expect(bodyFirst.ip).toBe(payload.ip);
-    expect(bodyFirst.deviceGroup.cpe.includes(payload.cpe)).toBe(true);
-    expect(bodyFirst.deviceGroup).toHaveProperty("url");
-    expect(bodyFirst.deviceGroup).toHaveProperty("sbomUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("vulnerabilitiesUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("deviceArtifactsUrl");
+    expectDevice(bodyFirst, payload.device);
+    expect(bodyFirst.versionStatus).toBe("KNOWN");
     expect(bodyFirst.role).toBe(payload.role);
 
     const bodySecond = res.body.at(1);
     expect(bodySecond).toHaveProperty("id");
     expect(bodySecond.ip).toBe(payload2.ip);
-    expect(bodySecond.deviceGroup.cpe.includes(payload2.cpe)).toBe(true);
+    expectDevice(bodySecond, payload2.device);
     expect(bodySecond.role).toBe(payload2.role);
 
     // GET first payload from DB
@@ -250,10 +242,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(firstAssetId);
     expect(firstDetailRes.body.ip).toBe(payload.ip);
-    expect(firstDetailRes.body.deviceGroup.cpe.includes(payload.cpe)).toBe(
-      true,
-    );
-    expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
+    expectDevice(firstDetailRes.body, payload.device);
     expect(firstDetailRes.body.role).toBe(payload.role);
 
     // GET second payload from DB
@@ -265,9 +254,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(secondDetailRes.status).toBe(200);
     expect(secondDetailRes.body.id).toBe(secondAssetId);
     expect(secondDetailRes.body.ip).toBe(payload2.ip);
-    expect(secondDetailRes.body.deviceGroup.cpe.includes(payload2.cpe)).toBe(
-      true,
-    );
+    expectDevice(secondDetailRes.body, payload2.device);
     expect(secondDetailRes.body.role).toBe(payload2.role);
 
     // DELETE the assets
@@ -400,16 +387,10 @@ describe("Assets Endpoint (/assets)", () => {
     assetIntegrationPayloadCopy.items[0].externalId = "mockAssetIntegration-1";
     assetIntegrationPayloadCopy.items[1].externalId = "mockAssetIntegration-2";
 
-    await prisma.deviceGroup.deleteMany({
-      where: {
-        cpe: {
-          hasSome: [
-            assetIntegrationPayload.items[0].cpe,
-            assetIntegrationPayload.items[1].cpe,
-          ],
-        },
-      },
-    });
+    await deleteAssetsForDevices([
+      assetIntegrationPayload.items[0].device,
+      assetIntegrationPayload.items[1].device,
+    ]);
 
     const integrationRes = await request(BASE_URL)
       .post(`/assets/integrationUpload/${createToken}`)
@@ -433,9 +414,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping1.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
@@ -448,7 +427,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
     expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
     expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe.includes(assetPayload1.cpe)).toBe(true);
+    expectDevice(foundAsset1, assetPayload1.device);
 
     const assetPayload2 = assetIntegrationPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
@@ -461,9 +440,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping2.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
@@ -476,7 +453,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
     expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
     expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
+    expectDevice(foundAsset2, assetPayload2.device);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");
@@ -566,9 +543,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping1.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
@@ -581,7 +556,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
     expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
     expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe.includes(assetPayload1.cpe)).toBe(true);
+    expectDevice(foundAsset1, assetPayload1.device);
 
     const assetPayload2 = updateAssetsPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
@@ -594,9 +569,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping2.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
@@ -615,7 +588,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
     expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
     expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
+    expectDevice(foundAsset2, assetPayload2.device);
 
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
@@ -700,9 +673,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping1.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
@@ -715,7 +686,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
     expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
     expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe.includes(assetPayload1.cpe)).toBe(true);
+    expectDevice(foundAsset1, assetPayload1.device);
 
     const assetPayload2 = assetIntegrationPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
@@ -728,9 +699,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping2.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
@@ -743,7 +712,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
     expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
     expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
+    expectDevice(foundAsset2, assetPayload2.device);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");
@@ -834,9 +803,7 @@ describe("Assets Endpoint (/assets)", () => {
       where: {
         id: mapping1.itemId,
       },
-      include: {
-        deviceGroup: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     });
 
     expect(mapping1.itemId).toBe(foundAsset1.id);
@@ -850,7 +817,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(updatedAsset.serialNumber);
     expect(foundAsset1.location).toStrictEqual(updatedAsset.location);
     expect(foundAsset1.status).toBe(updatedAsset.status);
-    expect(foundAsset1.deviceGroup.cpe.includes(updatedAsset.cpe)).toBe(true);
+    expectDevice(foundAsset1, updatedAsset.device);
 
     if (!mapping1.lastSynced) {
       fail("lastSynced value should not be null");
@@ -1020,6 +987,82 @@ describe("Assets Endpoint (/assets)", () => {
   });
 });
 
+describe("Assets Endpoint version status input", () => {
+  const stamp = Date.now();
+  const product = `status_${stamp}`;
+  const createAsset = (body: Record<string, unknown>) =>
+    request(BASE_URL).post("/assets").set(authHeader).send(body);
+
+  it("POST /assets - a version with a status is a 400", async () => {
+    const res = await createAsset({
+      ip: "10.0.7.1",
+      device: {
+        ...namedDevice("vitest", product),
+        version: { name: "2.0", status: "UNKNOWN" },
+      },
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /assets - the old top-level versionStatus is a 400", async () => {
+    const res = await createAsset({
+      ip: "10.0.7.2",
+      device: namedDevice("vitest", product, VERSION_UNKNOWN),
+      versionStatus: "UNSURE",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /assets - takes a version status in place of a version", async () => {
+    const unsure = {
+      ...namedDevice("vitest", product),
+      version: { status: "UNSURE" },
+    };
+    const res = await createAsset({ ip: "10.0.7.3", device: unsure });
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/assets/${res.body.id}`).set(authHeader);
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBeNull();
+    expect(res.body.versionStatus).toBe("UNSURE");
+
+    const versioned = await request(BASE_URL)
+      .patch(`/assets/${res.body.id}`)
+      .set(authHeader)
+      .send({ device: namedDevice("vitest", product, "2.0") });
+    expect(versioned.status).toBe(200);
+    expect(versioned.body.versionStatus).toBe("KNOWN");
+
+    const cleared = await request(BASE_URL)
+      .patch(`/assets/${res.body.id}`)
+      .set(authHeader)
+      .send({
+        device: {
+          ...namedDevice("vitest", product),
+          version: { status: "UNKNOWN" },
+        },
+      });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.version).toBeNull();
+    expect(cleared.body.versionStatus).toBe("UNKNOWN");
+  });
+
+  it("POST /assets - without a device, the asset has no device", async () => {
+    const res = await createAsset({ ip: "10.0.7.4" });
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/assets/${res.body.id}`).set(authHeader);
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.manufacturer).toBeNull();
+    expect(res.body.product).toBeNull();
+    expect(res.body.versionStatus).toBe("UNKNOWN");
+  });
+});
+
 describe("Assets Endpoint deviceType input", () => {
   const createDeviceType = async () => {
     const deviceType = await prisma.deviceType.create({
@@ -1042,7 +1085,7 @@ describe("Assets Endpoint deviceType input", () => {
       .set(authHeader)
       .send({
         ip: "10.0.0.50",
-        cpe: `cpe:2.3:h:vitest:device_type_${Date.now()}:1.0`,
+        device: namedDevice("vitest", `device_type_${Date.now()}`, "1.0"),
         deviceType: deviceType.slug,
       });
     onTestFinished(async () => {
@@ -1050,7 +1093,7 @@ describe("Assets Endpoint deviceType input", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.deviceGroup.product.deviceType).toEqual({
+    expect(res.body.product.deviceType).toEqual({
       slug: deviceType.slug,
       displayName: deviceType.displayName,
     });
@@ -1062,7 +1105,7 @@ describe("Assets Endpoint deviceType input", () => {
       .set(authHeader)
       .send({
         ip: "10.0.0.54",
-        cpe: `cpe:2.3:h:vitest:device_type_null_${Date.now()}:1.0`,
+        device: namedDevice("vitest", `device_type_null_${Date.now()}`, "1.0"),
         deviceType: null,
       });
     onTestFinished(async () => {
@@ -1070,7 +1113,7 @@ describe("Assets Endpoint deviceType input", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.deviceGroup.product.deviceType).toBeNull();
+    expect(res.body.product.deviceType).toBeNull();
   });
 
   it("POST /assets - rejects an unknown device type with a 400", async () => {
@@ -1094,7 +1137,11 @@ describe("Assets Endpoint deviceType input", () => {
       .set(authHeader)
       .send({
         ip: "10.0.0.53",
-        cpe: `cpe:2.3:h:vitest:device_type_search_${Date.now()}:1.0`,
+        device: namedDevice(
+          "vitest",
+          `device_type_search_${Date.now()}`,
+          "1.0",
+        ),
         role,
         deviceType: deviceType.slug,
       });
@@ -1120,7 +1167,7 @@ describe("Assets Endpoint deviceType input", () => {
     expect(byRole.body.items).toEqual([]);
   });
 
-  it("POST /assets - never types the shared unknown product", async () => {
+  it("POST /assets - a device type without a device types no product", async () => {
     const deviceType = await createDeviceType();
 
     const res = await request(BASE_URL)
@@ -1132,7 +1179,6 @@ describe("Assets Endpoint deviceType input", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.deviceGroup.product.canonicalName).toBe("-");
-    expect(res.body.deviceGroup.product.deviceType).toBeNull();
+    expect(res.body.product).toBeNull();
   });
 });

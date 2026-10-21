@@ -13,6 +13,7 @@ import {
 } from "@/features/remediations/impact";
 import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { matchingVersionFields } from "@/lib/device-matching";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
 import { notRejected } from "../types";
@@ -20,7 +21,7 @@ import {
   addManufacturerAlias,
   addProductAlias,
   enrichAssetIdentifiers,
-  enrichDeviceGroupIdentifiers,
+  enrichVersionUdi,
   enrichVulnerabilityCvss,
 } from "../utils";
 import type { Candidates } from "./candidate-search";
@@ -31,7 +32,6 @@ const MODEL = "gpt-6-luna";
 // Fields the LLM may set when creating/updating a device group. Kept flat and
 // optional so the schema stays a top-level object (tool-schema requirement).
 const detailsFieldsSchema = z.object({
-  cpe: z.string().nullish(),
   udi: z.string().nullish(),
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
@@ -224,7 +224,6 @@ function cleanFields(fields: Decision["fields"]): {
   modelName?: string;
   version?: string;
   versionRange?: string;
-  cpe?: string;
   udi?: string;
   cveId?: string;
   description?: string;
@@ -241,7 +240,6 @@ function cleanFields(fields: Decision["fields"]): {
     "version",
     "versionRange",
     "cveId",
-    "cpe",
     "udi",
     "description",
     "cvssScore",
@@ -290,9 +288,9 @@ export async function matchAndLinkEntities(
  * Deterministically apply a list of matching decisions to the database.
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
- * Idempotent: mappings are upserted on (owner, deviceGroupId) and new device
- * groups are resolved to their canonical (manufacturer/product/version) identity via
- * resolveDeviceGroup, so replaying does not duplicate rows.
+ * Idempotent: mappings are upserted on (owner, deviceGroupMatchingId) and new
+ * matchings are resolved to their canonical (manufacturer/product/version)
+ * identity via resolveMatchingId, so replaying does not duplicate rows.
  */
 export async function applyDecisions(
   owner: MatchOwner,
@@ -382,21 +380,16 @@ export async function applyDecisions(
           });
         };
 
-        const enrichDeviceGroup = async (
+        const enrichOwnedVersion = async (
           deviceGroupMatchingId: string,
           data: ReturnType<typeof cleanFields>,
         ) => {
-          if (!data.cpe && !data.udi) return;
+          if (!data.udi) return;
           const matching = await tx.deviceGroupMatching.findUnique({
             where: { id: deviceGroupMatchingId },
-            select: { manufacturerId: true, productId: true, versionId: true },
+            select: { versionId: true },
           });
-          if (matching) {
-            await enrichDeviceGroupIdentifiers(matching, {
-              cpe: data.cpe,
-              udi: data.udi,
-            });
-          }
+          if (matching) await enrichVersionUdi(matching.versionId, data.udi);
         };
 
         // link the device group to the notification
@@ -409,7 +402,7 @@ export async function applyDecisions(
             continue;
           }
           await upsertMapping(decision.targetId);
-          await enrichDeviceGroup(
+          await enrichOwnedVersion(
             decision.targetId,
             cleanFields(decision.fields),
           );
@@ -425,9 +418,9 @@ export async function applyDecisions(
             summary.skipped++;
             continue;
           }
-          // Manufacturer/product/version are part of a device group's identity now and
-          // can't be mutated in place; the only safe enrichment is unioning a new
-          // CPE into the existing group's cpe[] array.
+          // Manufacturer/product/version are a matching's identity and cannot
+          // change in place. An update only adds a missing version range,
+          // name aliases, and a UDI on the owned version.
           const data = cleanFields(decision.fields);
 
           const targetMatching = await tx.deviceGroupMatching.findUnique({
@@ -437,6 +430,7 @@ export async function applyDecisions(
               manufacturerId: true,
               productId: true,
               versionId: true,
+              versionStatus: true,
             },
           });
 
@@ -445,23 +439,35 @@ export async function applyDecisions(
             targetMatching &&
             !targetMatching.versionRange
           ) {
-            // The identity (manufacturer, product, version, versionRange) is
-            // unique. If another matching already has the ranged identity, adding
-            // the range here would throw P2002 and abort this transaction, so
-            // leave this matching as it is.
-            const rangedTwin = await tx.deviceGroupMatching.findFirst({
-              where: {
-                manufacturerId: targetMatching.manufacturerId,
-                productId: targetMatching.productId,
-                versionId: targetMatching.versionId,
-                versionRange: data.versionRange,
-              },
-              select: { id: true },
+            // A range is version information, so an UNKNOWN matching that
+            // gets one becomes KNOWN.
+            const next = matchingVersionFields({
+              hasProduct: targetMatching.productId !== null,
+              hasVersion: targetMatching.versionId !== null,
+              versionRange: data.versionRange,
             });
-            if (!rangedTwin) {
+            const changes =
+              next.versionRange !== null ||
+              next.versionStatus !== targetMatching.versionStatus;
+            // The identity (manufacturer, product, version, versionRange,
+            // versionStatus) is unique. If another matching already has the new
+            // identity, the update would throw P2002 and abort this
+            // transaction, so leave this matching as it is.
+            const twin = changes
+              ? await tx.deviceGroupMatching.findFirst({
+                  where: {
+                    manufacturerId: targetMatching.manufacturerId,
+                    productId: targetMatching.productId,
+                    versionId: targetMatching.versionId,
+                    ...next,
+                  },
+                  select: { id: true },
+                })
+              : null;
+            if (changes && !twin) {
               await tx.deviceGroupMatching.update({
                 where: { id: decision.targetId },
-                data: { versionRange: data.versionRange },
+                data: next,
               });
             }
           }
@@ -477,7 +483,7 @@ export async function applyDecisions(
             }
           }
           await upsertMapping(decision.targetId);
-          await enrichDeviceGroup(decision.targetId, data);
+          await enrichOwnedVersion(decision.targetId, data);
           summary.updated++;
         } else {
           // create
@@ -499,7 +505,7 @@ export async function applyDecisions(
           }
 
           await upsertMapping(matchingId);
-          await enrichDeviceGroup(matchingId, data);
+          await enrichOwnedVersion(matchingId, data);
           summary.created++;
         }
       } else if (decision.kind === "vulnerability") {

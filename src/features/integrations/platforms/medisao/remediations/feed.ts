@@ -1,5 +1,8 @@
 import { z } from "zod";
 import type { RemediationImpactInput } from "@/features/remediations/impact";
+import type { ReleaseScalars } from "@/features/remediations/release";
+import { RemediationCategory } from "@/generated/prisma";
+import { asDate } from "@/lib/date-utils";
 import type { Session } from "../../../core/types";
 import { walkPages, withSince } from "../paginate";
 import { channelRemediationsUrl } from "../urls";
@@ -35,6 +38,7 @@ export const rawRemediationSchema = z.object({
   workflow_impact: z.string().nullish(),
   clinical_impact_notes: z.string().nullish(),
   files: z.array(z.unknown()).nullish(),
+  published_at: z.string().nullish(),
   updated_at: z.string(),
 });
 export type RawMedIsaoRemediation = z.infer<typeof rawRemediationSchema>;
@@ -58,6 +62,7 @@ export interface MedIsaoRemediationItem {
   advisoryId: string | null;
   /** viper shape manufacturer-stated impact */
   impact: RemediationImpactInput;
+  release: ReleaseScalars;
   updatedAt: string;
   raw: RawMedIsaoRemediation;
 }
@@ -73,6 +78,15 @@ export const toRemediationImpact = (
       : null,
   disablesFeatures: raw.disables_features ?? null,
 });
+
+const MEDISAO_CATEGORY = new Map<string, RemediationCategory>([
+  ["firmware_patch", RemediationCategory.HARDWARE_PATCH],
+]);
+
+export const toRemediationCategory = (
+  raw: RawMedIsaoRemediation,
+): RemediationCategory | null =>
+  MEDISAO_CATEGORY.get(raw.mechanism ?? "") ?? null;
 
 export const toCanonical = (
   raw: RawMedIsaoRemediation,
@@ -93,7 +107,10 @@ export const toCanonical = (
   fixedVulnerabilities: raw.fixed_vulnerabilities ?? [],
   advisoryId: raw.advisory_id ?? null,
   impact: toRemediationImpact(raw),
-
+  release: {
+    category: toRemediationCategory(raw),
+    publishedAt: asDate(raw.published_at)?.toISOString() ?? null,
+  },
   updatedAt: raw.updated_at,
   raw,
 });

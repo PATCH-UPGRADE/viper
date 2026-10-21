@@ -81,14 +81,13 @@ export const LinkedAssetsTable = ({
       </TableHeader>
       <TableBody>
         {assetTickets.map(({ asset, ticket }) => {
-          const model = asset.deviceGroup
-            ? [
-                asset.deviceGroup.manufacturer?.canonicalDisplayName,
-                asset.deviceGroup.product?.canonicalDisplayName,
-              ]
-                .filter(Boolean)
-                .join(" ")
-            : "—";
+          const model =
+            [
+              asset.manufacturer?.canonicalDisplayName,
+              asset.product?.canonicalDisplayName,
+            ]
+              .filter(Boolean)
+              .join(" ") || "—";
           return (
             <TableRow key={ticket.id} className="hover:bg-muted/40">
               <TableCell>

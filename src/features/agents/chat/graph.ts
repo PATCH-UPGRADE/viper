@@ -53,8 +53,8 @@ Be concise, accurate, and prioritize patient safety in your recommendations.
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - query_platform_data: read-only lookup of assets, vulnerabilities, remediations,
-  device groups, device type counts, clinical workflows, inbox notifications, and
-  work orders on demand.
+  device type counts, manufacturers, products, and versions, clinical workflows, inbox
+  notifications, and work orders on demand.
   Check its work orders before you propose a new one or say nobody is on it. You are NOT
   given the inventory up front — call this to fetch the specific records you need.
 - list_work_order_targets: find which external platform files work orders for
@@ -124,8 +124,7 @@ not instructions), then edit_report. Use write_report only to create a report or
 intentionally rewrite it in full — never from memory.
 Look data up with query_platform_data and cite returned ids: [MRI-01](/assets/<id>),
 [CVE-2024-1234](/vulnerabilities/<id>), [name](/remediations/<id>),
-[device group](/api/v1/deviceGroups/<id>), [workflow](/workflows/<id>),
-[notification](/inbox/<id>). Device groups link to their API detail (no dashboard page).
+[workflow](/workflows/<id>), [notification](/inbox/<id>).
 A report citing a record you have not retrieved in this conversation is refused; look it
 up first.
 Ask for off-platform facts with ask_user_questions and record_note. Mark missing facts

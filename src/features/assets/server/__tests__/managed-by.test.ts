@@ -102,27 +102,17 @@ const makeAssetRow = (managedBy: ManagedByRow[]) => ({
     email: "test@example.com",
     image: null,
   },
-  deviceGroup: {
-    id: "dg-1",
-    manufacturer: {
-      canonicalName: "siemens healthineers",
-      canonicalDisplayName: "Siemens Healthineers",
-    },
-    product: null,
-    version: null,
-    versionStatus: "KNOWN",
-    cpe: [],
-    udi: null,
-    url: "http://localhost:3000/api/v1/deviceGroups/dg-1",
-    sbomUrl: null,
-    vulnerabilitiesUrl:
-      "http://localhost:3000/api/v1/deviceGroups/dg-1/vulnerabilities",
-    deviceArtifactsUrl:
-      "http://localhost:3000/api/v1/deviceGroups/dg-1/emulators",
-    assetsUrl: "http://localhost:3000/api/v1/deviceGroups/dg-1/assets",
-    createdAt: new Date("2026-01-01"),
-    updatedAt: new Date("2026-01-01"),
+  manufacturer: {
+    id: "mf-siemens",
+    canonicalName: "siemens healthineers",
+    canonicalDisplayName: "Siemens Healthineers",
+    url: "http://localhost:3000/api/v1/manufacturers/mf-siemens",
   },
+  product: null,
+  version: null,
+  versionStatus: "KNOWN",
+  vulnerabilitiesUrl:
+    "http://localhost:3000/api/v1/assets/asset-1/vulnerabilities",
   externalMappings: [],
   managedBy,
 });

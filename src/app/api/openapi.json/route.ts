@@ -17,8 +17,10 @@ export async function GET() {
       "Remediations",
       "DeviceArtifacts",
       "Artifacts",
-      "DeviceGroups",
       "DeviceTypes",
+      "Manufacturers",
+      "Products",
+      "Versions",
     ],
   });
 

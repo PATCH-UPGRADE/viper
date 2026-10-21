@@ -13,11 +13,11 @@ const { assetOrderBy } = await import("../routers");
 describe("assetOrderBy", () => {
   it("sorts the device type column by the product's device type", () => {
     expect(assetOrderBy("deviceType")).toEqual([
-      { deviceGroup: { product: { deviceType: { displayName: "asc" } } } },
+      { product: { deviceType: { displayName: "asc" } } },
       { updatedAt: "desc" },
     ]);
     expect(assetOrderBy("-deviceType")[0]).toEqual({
-      deviceGroup: { product: { deviceType: { displayName: "desc" } } },
+      product: { deviceType: { displayName: "desc" } },
     });
   });
 

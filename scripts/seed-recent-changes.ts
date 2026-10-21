@@ -61,21 +61,15 @@ async function seed() {
     select: { id: true },
   });
 
-  // A device group that genuinely holds assets — notifications pointed at it
-  // must survive the inventory filter.
-  const owned = await prisma.deviceGroup.findFirstOrThrow({
-    where: {
-      assets: { some: {} },
-      manufacturerId: { not: null },
-      productId: { not: null },
-    },
+  // A device that an asset genuinely has — notifications pointed at it must
+  // survive the inventory filter.
+  const owned = await prisma.asset.findFirstOrThrow({
+    where: { manufacturerId: { not: null }, productId: { not: null } },
     select: {
-      id: true,
       manufacturerId: true,
       productId: true,
       manufacturer: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
-      _count: { select: { assets: true } },
     },
   });
 
@@ -224,12 +218,12 @@ async function seed() {
   }
 
   // New assets, two models, so the card can collapse them into "N× model".
-  const groups = await prisma.deviceGroup.findMany({
-    where: { manufacturerId: { not: null } },
+  const groups = await prisma.product.findMany({
     select: {
       id: true,
+      manufacturerId: true,
       manufacturer: { select: { canonicalDisplayName: true } },
-      product: { select: { canonicalDisplayName: true } },
+      canonicalDisplayName: true,
     },
     take: 2,
   });
@@ -243,7 +237,8 @@ async function seed() {
         data: {
           ip: `10.90.${groupIndex}.${i + 10}`,
           hostname: `${TAG} seeded-${groupIndex}-${i}`,
-          deviceGroupId: group.id,
+          manufacturerId: group.manufacturerId,
+          productId: group.id,
           userId: user.id,
           createdAt: hoursAgo(groupIndex + 1),
           ...(integration
@@ -261,7 +256,7 @@ async function seed() {
       });
     }
     console.log(
-      `  ✅ ${perGroup[groupIndex]}× asset      ${group.manufacturer?.canonicalDisplayName} ${group.product?.canonicalDisplayName ?? ""}`.trimEnd(),
+      `  ✅ ${perGroup[groupIndex]}× asset      ${group.manufacturer.canonicalDisplayName} ${group.canonicalDisplayName}`,
     );
   }
 

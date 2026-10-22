@@ -24,7 +24,7 @@ const describeFix = (products: FleetAffectedProduct[]): string | null => {
     .filter((p) => p.fixedVersion)
     .map(
       (p) =>
-        `Update ${p.product}${p.versionLine ? `${p.versionLine}` : ""} to ${p.fixedVersion} or later.`,
+        `Update ${p.product}${p.versionLine ? ` ${p.versionLine}` : ""} to ${p.fixedVersion} or later.`,
     );
   return lines.length > 0 ? lines.join("\n") : null;
 };
@@ -35,7 +35,7 @@ export function toRemediationItem(raw: FleetAdvisory): FleetRemediationItem {
   const title = buildText(raw.title) ?? `Fleet advisory ${raw.id}`;
   return {
     externalId: externalIdOf(raw),
-    description: label ? `${label} : ${title}` : title,
+    description: label ? `${label}: ${title}` : title,
     narrative: describeFix(products),
     products,
     cveIds: [...new Set(parseCveIds(raw.cveIds).map(normalizeIdentifier))],

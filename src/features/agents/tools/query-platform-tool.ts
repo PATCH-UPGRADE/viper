@@ -46,10 +46,38 @@ REQUIRES_APPROVAL means it waits for sign-off. A work order with "relation":
 related work, not work filed for that item. "direct" means it was filed for that item.`;
 
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
-export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
-- assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
+export const PLATFORM_CATALOG = `Paging, sorting, and dates for query_platform_data:
+A getMany returns one page: { items, page, pageSize, totalCount, totalPages, hasNextPage }.
+pageSize is 10 by default and at most 100 unless a procedure says otherwise. totalCount
+counts every matching row, not only this page.
+sort is a comma-separated list of fields, with "-" in front of a field for descending.
+Each procedure below lists the sort fields it accepts. Severity and priority sort from
+most to least urgent in ascending order: "severity" puts Critical first and "-severity"
+puts Low first; "priority" puts Critical first and Unsorted last.
+lastUpdatedStartTime and lastUpdatedEndTime are ISO 8601 datetimes, for example
+"2026-10-20T00:00:00Z". They keep only rows whose updatedAt is in that range; a row
+counts as updated when it is created. Work out the datetime from the current date you
+were given.
+For a highest, lowest, most, newest, or "since" question, send sort or the date fields
+and read page 1. Do not rank an unsorted page yourself, and do not page through
+everything to find the top rows. Page 1 of a sorted query is the answer: the rows after
+it are never higher or lower. If page 1 ends in a tie and you need every tied row, ask
+again with a larger pageSize, not for the next pages. Only notifications.getMany (at
+10) and tracking.getManyForLlm (at 20) cap pageSize: for those two, read the next pages
+with the same sort until the tie ends. Leave search out to rank across the whole
+hospital.
+
+Available read-only procedures for query_platform_data:
+- assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? }
   search matches hostname, ip, serial number, device type, manufacturer or product,
   never the role. To find an asset you know by its role, search its device type.
+  Each row carries "affectedIssueCounts": { total, Critical, High, Medium, Low }, the
+  vulnerabilities that affect the asset, by severity. sort fields: affectedIssues,
+  severity_Critical, severity_High, severity_Medium, severity_Low (counts of affecting
+  vulnerabilities), hostname, ip, role, status, deviceType, networkSegment,
+  serialNumber, macAddress, createdAt, updatedAt (others are ignored). Most issues:
+  { sort: "-affectedIssues" }. Most
+  critical issues: { sort: "-severity_Critical,-severity_High,-severity_Medium" }.
 - assets.getOne — one asset by id. input: { id }
   Both carry "managedBy": who services the asset, as a vendor or a department, with
   their responsibilities. An entry whose "workOrderIntegration" is set names the
@@ -60,10 +88,13 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - assets.getManyByWorkflow — assets used in a clinical workflow. input: { id } (workflow id)
 - assets.getManyByVersion — assets that run one product version. input: { id, search?, page?, pageSize? } (version id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
-- vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
+- vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? }
+  sort fields: severity, epss, inKEV, priority, cveId, description, createdAt, updatedAt
+  (others are ignored). Most severe: { sort: "severity,-epss" }. Least severe: { sort: "-severity,epss" }.
+  Known exploited first: { sort: "-inKEV,severity" }. Rows with no EPSS sort last.
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
-- vulnerabilities.getManyByAsset — vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version. input: { id, search?, page?, pageSize? } (asset id)
-- vulnerabilities.getManyByVersion — vulnerabilities whose matching rules apply to one product version. input: { id, search?, page?, pageSize? } (version id)
+- vulnerabilities.getManyByAsset — vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version. input: { id, search?, page?, pageSize?, sort? } (asset id) — sort fields as for vulnerabilities.getMany.
+- vulnerabilities.getManyByVersion — vulnerabilities whose matching rules apply to one product version. input: { id, search?, page?, pageSize?, sort? } (version id) — sort fields as for vulnerabilities.getMany.
   For the vulnerabilities of several assets on the same version, call this once with
   their version.id, not vulnerabilities.getManyByAsset for each asset.
 - remediations.getMany — list/search remediations. input: { search?, page?, pageSize? }
@@ -81,7 +112,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
   send an id to manufacturers.getOne, products.getOne, or versions.getOne.
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
-- notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page.
+- notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. sort fields: priority, createdAt, updatedAt (default: newest update first). pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page. Most urgent: { sort: "priority" }. New or changed since a time: { lastUpdatedStartTime: "<ISO datetime>", sort: "priority" }.
 - notifications.getOne — one notification by id, with the affected-asset counts per matching rule and the ids of the vulnerabilities it references. input: { id }
 - tracking.getManyForLlm — list top-level work orders (the hospital's tickets for work being done). A sub-ticket is listed in its parent's "children", not as its own row, except with a departmentId that its parent does not have. input: { notificationId?, vulnerabilityId?, assetId?, departmentId?, status?, search?, page?, pageSize? } — status is an optional array of TO_DO, IN_PROGRESS, REQUIRES_APPROVAL, DONE; omit it to get every work order that is not DONE. pageSize is capped at 20. Each row lists at most 5 vulnerabilities (_count.vulnerabilities is the total) and up to 10 sub-tickets that are not DONE (_count.children counts every sub-ticket).
 - tracking.getOneForLlm — one work order by id, with its description, sub-tickets, up to 20 assets (each with its own status and external ticket ids; _count.assets is the total), remediations, external ticket ids, and its 5 newest comments, newest first. input: { id }
@@ -459,7 +490,7 @@ ${PLATFORM_CATALOG}`,
           .record(z.string(), z.any())
           .optional()
           .describe(
-            "Procedure input. getOne: { id }. getMany: { search?, page?, pageSize? } — all optional; omit to get the first page of everything.",
+            "Procedure input. getOne: { id }. getMany: { search?, page?, pageSize?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? } plus the fields its catalog line lists — all optional; omit to get the first page of everything. Use sort, not paging, to find the top or bottom rows.",
           ),
       }),
     },

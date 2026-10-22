@@ -1,5 +1,9 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AFFECTED_ISSUE_SORT_KEYS } from "@/features/assets/server/effective-issue-sort";
+import { ASSET_SORT_KEYS } from "@/features/assets/server/routers";
+import { NOTIFICATION_SORT_FIELDS } from "@/features/inbox/server/routers";
+import { VULNERABILITY_SORT_FIELDS } from "@/features/vulnerabilities/server/routers";
 import { createAgentCaller } from "@/trpc/agent-caller";
 import {
   addNavigationLinks,
@@ -11,6 +15,13 @@ import {
 
 /** Every catalog bullet starts `- <router>.<procedure> — …`. */
 const CATALOG_LINE = /^- ([a-zA-Z]+\.[a-zA-Z]+) —/gm;
+
+/** One procedure's catalog bullet, up to the next bullet. */
+function catalogEntry(procedure: string): string {
+  const start = PLATFORM_CATALOG.indexOf(`- ${procedure} —`);
+  const end = PLATFORM_CATALOG.indexOf("\n- ", start + 1);
+  return PLATFORM_CATALOG.slice(start, end === -1 ? undefined : end);
+}
 
 function documentedProcedures(): string[] {
   return [...PLATFORM_CATALOG.matchAll(CATALOG_LINE)].map((m) => m[1]);
@@ -550,5 +561,59 @@ describe("addNavigationLinks — work orders", () => {
     }) as { _links?: unknown };
 
     expect(result._links).toBeUndefined();
+  });
+});
+
+describe("PLATFORM_CATALOG teaches ranking", () => {
+  it("names every asset sort key that needs effective issues", () => {
+    for (const key of AFFECTED_ISSUE_SORT_KEYS) {
+      expect(PLATFORM_CATALOG).toContain(key);
+    }
+    expect(PLATFORM_CATALOG).toContain("affectedIssueCounts");
+  });
+
+  it("names the vulnerability sort fields and the date filter", () => {
+    expect(PLATFORM_CATALOG).toMatch(/sort fields: severity, epss/);
+    expect(PLATFORM_CATALOG).toContain("lastUpdatedStartTime");
+    expect(PLATFORM_CATALOG).toContain("lastUpdatedEndTime");
+  });
+
+  // Postgres sorts the Severity and Priority enums in declaration order,
+  // Critical first, which is the reverse of what a model guesses.
+  it("says which direction puts Critical first", () => {
+    expect(PLATFORM_CATALOG).toContain('"severity" puts Critical first');
+    expect(PLATFORM_CATALOG).toContain('"priority" puts Critical first');
+  });
+
+  // Each router keeps its own allowed set; a field missing here is one the
+  // model can never use.
+  it.each([
+    ["assets.getMany", ASSET_SORT_KEYS],
+    ["vulnerabilities.getMany", VULNERABILITY_SORT_FIELDS],
+    ["notifications.getMany", NOTIFICATION_SORT_FIELDS],
+  ] as const)("lists every sort field %s accepts", (procedure, fields) => {
+    const entry = catalogEntry(procedure);
+    for (const field of fields) {
+      expect(entry).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+  });
+
+  it("names exactly the procedures that cap pageSize, with their caps", () => {
+    const capped = PLATFORM_QUERY_PROCEDURES.flatMap((procedure) => {
+      const pageSize = capPageSize(procedure, { pageSize: 10_000 })?.pageSize;
+      const name = procedure.replace(".", "\\.");
+      return pageSize === 10_000 ? [] : [`${name} \\(at\\s+${pageSize}\\)`];
+    });
+    expect(capped).toHaveLength(2);
+    expect(PLATFORM_CATALOG).toMatch(
+      new RegExp(`Only ${capped.join(" and ")} cap pageSize`),
+    );
+  });
+
+  it("answers a ranking from page 1 and widens pageSize for a tie", () => {
+    expect(PLATFORM_CATALOG).toContain(
+      "Page 1 of a sorted query is the answer",
+    );
+    expect(PLATFORM_CATALOG).toMatch(/larger pageSize, not for the next pages/);
   });
 });

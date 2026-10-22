@@ -23,7 +23,11 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { assetWhereForMatchings, resolvedAssetCount } from "@/lib/router-utils";
+import {
+  assetWhereForMatchings,
+  buildUpdatedAtFilter,
+  resolvedAssetCount,
+} from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   fieldCorrectionInclude,
@@ -69,7 +73,11 @@ type AffectedMatchingContext = {
   // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
 
-const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
+export const NOTIFICATION_SORT_FIELDS = new Set([
+  "priority",
+  "updatedAt",
+  "createdAt",
+]);
 
 function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
@@ -243,13 +251,14 @@ export const notificationsRouter = createTRPCRouter({
           createSearchFilter(search),
           priority.length > 0 ? { priority: { in: priority } } : {},
           type.length > 0 ? { type: { in: type } } : {},
+          buildUpdatedAtFilter(input),
         ],
       };
 
       const sortClauses = sort
         ? sort.split(",").flatMap((s) => {
             const field = s.replace("-", "");
-            if (!ALLOWED_SORT_FIELDS.has(field)) return [];
+            if (!NOTIFICATION_SORT_FIELDS.has(field)) return [];
             return [{ [field]: getSortValue(s) }];
           })
         : [];

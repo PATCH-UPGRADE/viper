@@ -3,7 +3,12 @@ import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
-import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
+import {
+  type AlohaStatus,
+  Priority,
+  type Prisma,
+  ResourceType,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   type DeviceIdentity,
@@ -61,10 +66,12 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
-const ALLOWED_SORT_FIELDS = new Set([
+export const VULNERABILITY_SORT_FIELDS = new Set([
   "createdAt",
   "updatedAt",
   "priority",
+  "severity",
+  "epss",
   "cveId",
   "description",
   "inKEV",
@@ -74,6 +81,27 @@ function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
 }
 
+/**
+ * The sort clauses for a comma-separated sort string, with unknown fields
+ * dropped. EPSS sorts nulls last in both directions: Postgres puts nulls first
+ * on a descending sort, so "-epss" would otherwise start with the unscored rows.
+ */
+export function vulnerabilitySortClauses(
+  sort: string,
+): Prisma.VulnerabilityOrderByWithRelationInput[] {
+  return sort
+    .split(",")
+    .flatMap<Prisma.VulnerabilityOrderByWithRelationInput>((s) => {
+      const field = s.replace("-", "");
+      if (!VULNERABILITY_SORT_FIELDS.has(field as never)) return [];
+      const direction = getSortValue(s);
+      if (field === "epss") {
+        return [{ epss: { sort: direction, nulls: "last" } }];
+      }
+      return [{ [field]: direction }];
+    });
+}
+
 /** One page of the vulnerabilities whose matchings apply to a device. */
 async function paginateVulnerabilitiesForDevice(
   device: DeviceIdentity,
@@ -81,11 +109,15 @@ async function paginateVulnerabilitiesForDevice(
 ) {
   const matchedVulns = await findVulnerabilitiesMatchingDevices([device]);
   const idFilter = { id: { in: matchedVulns.map((vuln) => vuln.id) } };
+  const sortClauses = vulnerabilitySortClauses(input.sort);
   const result = await fetchPaginated(prisma.vulnerability, input, {
     where: input.search
       ? { AND: [createSearchFilter(input.search), idFilter] }
       : idFilter,
     include: vulnerabilityInclude,
+    ...(sortClauses.length > 0 && {
+      orderBy: [...sortClauses, { updatedAt: "desc" as const }],
+    }),
   });
   return {
     ...result,
@@ -114,13 +146,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const searchFilter = createSearchFilter(search);
 
       // TODO: sorting should eventually be moved to fetchPaginated, right?
-      const sortClauses = sort
-        ? sort.split(",").flatMap((s) => {
-            const field = s.replace("-", "");
-            if (!ALLOWED_SORT_FIELDS.has(field as never)) return [];
-            return [{ [field]: getSortValue(s) }];
-          })
-        : [];
+      const sortClauses = vulnerabilitySortClauses(sort);
 
       const result = await fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,

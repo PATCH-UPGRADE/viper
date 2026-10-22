@@ -1,15 +1,15 @@
 import "server-only";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
-import { resolveOrMintVulnerabilities } from "../../medisao/vulnerabilities";
+import type {
+  ResourceSyncCtx,
+  SyncOutcome,
+} from "@/features/integrations/core/types";
 import { releaseScalarData } from "@/features/remediations/release";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 import { resolveMatchingId } from "@/lib/router-utils";
-import type {
-  ResourceSyncCtx,
-  SyncOutcome,
-} from "@/features/integrations/core/types";
+import { resolveOrMintVulnerabilities } from "../../medisao/vulnerabilities";
 import { fetchAdvisories } from "../advisories/advisories";
 import type { FleetConfig, FleetCreds } from "../config";
 import { type FleetRemediationItem, toRemediationItem } from "./feed";
@@ -50,7 +50,7 @@ export async function syncRemediations(
             integrationId,
             integrationUserId,
             deviceGroupMatchingId,
-            context: `Named by templay Fleet advisory ${item.description}.`,
+            context: `Named by teamplay Fleet advisory ${item.description}.`,
           });
           for (const id of ids.values()) vulnerabilityIds.add(id);
         }
@@ -68,7 +68,7 @@ export async function syncRemediations(
           ...releaseScalarData(item.release, "stated"),
           deviceGroupMatchings: { connect: matchingIds.map((id) => ({ id })) },
           vulnerabilities: {
-            connect: [vulnerabilityIds].map((id) => ({ id })),
+            connect: [...vulnerabilityIds].map((id) => ({ id })),
           },
         };
         return {

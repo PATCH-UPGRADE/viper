@@ -37,7 +37,7 @@ describe("toRemediationItem", () => {
 
   it("states the fixed version per product", () => {
     expect(item.narrative).toBe(
-      "Update syngo.plaza VB30E to VB30_HF01 or later",
+      "Update syngo.plaza VB30E to VB30E_HF01 or later.",
     );
   });
 
@@ -48,7 +48,7 @@ describe("toRemediationItem", () => {
   it("is a security software update, released on its activation date", () => {
     expect(item.release).toEqual({
       category: "SOFTWARE_UPDATE",
-      isSecurityUpdated: true,
+      isSecurityUpdate: true,
       publishedAt: "2026-02-10T00:00:00.000Z",
     });
   });

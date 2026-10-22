@@ -280,7 +280,7 @@ TA3 MUST provide comprehensive textual descriptions to enable clinical risk asse
   optional typed fields describing what applying the remediation does to the device.
   Send only what you know; an omitted field means "not stated".
 - **Release fields** `POST /remediations` and `PUT /remediations/{id}` also accept
-  `category` (`SOFTWARE_UPDATE` | `HARDWARE_PATCH` | `FIREWALl_RULE` | `OTHER`),
+  `category` (`SOFTWARE_UPDATE` | `HARDWARE_PATCH` | `FIREWALL_RULE` | `OTHER`),
   `publishedAt` (ISO 8601, when the manufacturer released it) and `isSecurityUpdate`
   (boolean). Omit what you don't know; a remediation linked to a vulnerability
   already counts as a security update

@@ -56,15 +56,17 @@ most to least urgent in ascending order: "severity" puts Critical first and "-se
 puts Low first; "priority" puts Critical first and Unsorted last.
 lastUpdatedStartTime and lastUpdatedEndTime are ISO 8601 datetimes, for example
 "2026-10-20T00:00:00Z". They keep only rows whose updatedAt is in that range; a row
-counts as updated when it is created. Work out the datetime from the current date you
-were given.
+counts as updated when it is created. Work out the datetime from the current date or
+time you were given. If you have only a date, use whole UTC days: "since yesterday"
+starts at 00:00 UTC on the day before today.
 For a highest, lowest, most, newest, or "since" question, send sort or the date fields
 and read page 1. Do not rank an unsorted page yourself, and do not page through
 everything to find the top rows. Page 1 of a sorted query is the answer: the rows after
 it are never higher or lower. If page 1 ends in a tie and you need every tied row, ask
 again with a larger pageSize, not for the next pages. Only notifications.getMany (at
-10) and tracking.getManyForLlm (at 20) cap pageSize: for those two, read the next pages
-with the same sort until the tie ends. Leave search out to rank across the whole
+10) and tracking.getManyForLlm (at 20) cap pageSize below 100. If a tie, or the number
+of rows you need, runs past the largest pageSize a procedure allows, read the next pages
+with the same sort until you have them all. Leave search out to rank across the whole
 hospital.
 
 Available read-only procedures for query_platform_data:

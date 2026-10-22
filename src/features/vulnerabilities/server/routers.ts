@@ -116,7 +116,11 @@ async function paginateVulnerabilitiesForDevice(
       : idFilter,
     include: vulnerabilityInclude,
     ...(sortClauses.length > 0 && {
-      orderBy: [...sortClauses, { updatedAt: "desc" as const }],
+      orderBy: [
+        ...sortClauses,
+        { updatedAt: "desc" as const },
+        { id: "asc" as const },
+      ],
     }),
   });
   return {
@@ -153,7 +157,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
         orderBy:
           sortClauses.length > 0
-            ? [...sortClauses, { updatedAt: "desc" }]
+            ? [...sortClauses, { updatedAt: "desc" }, { id: "asc" }]
             : { updatedAt: "desc" },
       });
 

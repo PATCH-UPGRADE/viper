@@ -616,4 +616,18 @@ describe("PLATFORM_CATALOG teaches ranking", () => {
     );
     expect(PLATFORM_CATALOG).toMatch(/larger pageSize, not for the next pages/);
   });
+
+  it("pages on with the same sort past the largest pageSize", () => {
+    expect(PLATFORM_CATALOG).toMatch(
+      /runs past the largest pageSize a procedure allows, read the next pages\s+with the same sort/,
+    );
+  });
+
+  // The chat prompts give a date with no time, so a rolling cutoff such as
+  // "the last 24 hours" cannot be computed there.
+  it("tells a model with only a date to use whole UTC days", () => {
+    expect(PLATFORM_CATALOG).toMatch(
+      /If you have only a date, use whole UTC days/,
+    );
+  });
 });

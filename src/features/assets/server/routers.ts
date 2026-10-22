@@ -162,8 +162,8 @@ function assetColumnSortValue(
   return String(val ?? "");
 }
 
-// TODO: VW-82 -- loads every matching asset to sort in memory, like
-// getManyDashboardInternal
+// Loads every matching asset and sorts in memory, as getManyDashboardInternal
+// does: effective issues are resolved in JavaScript, so SQL cannot order by them.
 async function fetchAssetsSortedByAffectedIssues(
   where: Prisma.AssetWhereInput,
   input: PaginationInput,

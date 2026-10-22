@@ -72,7 +72,7 @@ describe("vulnerabilitySortClauses", () => {
 
 // An asset with no manufacturer matches no rule, so the page query runs on an
 // empty id list and needs no matching mocks.
-describe("vulnerabilities.getManyByAsset sort", () => {
+describe("vulnerabilities.getManyByAsset and getMany sort", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.asset.findUnique.mockResolvedValue({
@@ -90,7 +90,11 @@ describe("vulnerabilities.getManyByAsset sort", () => {
     await setup().getManyByAsset({ id: "asset-1", sort: "severity" });
 
     const [args] = mockPrisma.vulnerability.findMany.mock.calls[0];
-    expect(args.orderBy).toEqual([{ severity: "asc" }, { updatedAt: "desc" }]);
+    expect(args.orderBy).toEqual([
+      { severity: "asc" },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ]);
   });
 
   it("keeps the newest-created order with no sort", async () => {
@@ -98,5 +102,18 @@ describe("vulnerabilities.getManyByAsset sort", () => {
 
     const [args] = mockPrisma.vulnerability.findMany.mock.calls[0];
     expect(args.orderBy).toEqual({ createdAt: "desc" });
+  });
+
+  // Rows that tie on every sorted field and on updatedAt need a unique last
+  // key, or a row can move between pages.
+  it("ends a sorted getMany with the id, so pages do not overlap", async () => {
+    await setup().getMany({ sort: "-severity" });
+
+    const [args] = mockPrisma.vulnerability.findMany.mock.calls[0];
+    expect(args.orderBy).toEqual([
+      { severity: "desc" },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ]);
   });
 });

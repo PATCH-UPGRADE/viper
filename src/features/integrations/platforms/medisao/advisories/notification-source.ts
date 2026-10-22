@@ -27,8 +27,9 @@ const SOURCE_LABEL = "MedISAO";
  * Vulnerability and its Issue on the matching stay. A user who also judges the
  * devices safe sets that Issue to `NOT_AFFECTED`.
  *
- * TODO VW-540: remove bad identifiers through a durable VulnerabilityIdentifier
- * model.
+ * TODO: VW-583 a stub whose identifier NVD/GHSA does not know is still minted,
+ * and is minted again after a user deletes it. Decide there whether to keep a
+ * rejected identifier.
  */
 export const linkAdvisoryEntities =
   (advisory: MedIsaoAdvisoryItem): LinkEntities =>

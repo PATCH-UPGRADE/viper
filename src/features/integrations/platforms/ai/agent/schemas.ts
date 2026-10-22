@@ -20,10 +20,7 @@ export const CRAWLER_ITEM_SCHEMAS = {
     }),
   ),
   [ResourceType.Remediation]: createIntegrationItemSchema(
-    remediationInputSchema.omit({
-      vulnerabilityIds: true,
-      vulnerabilityId: true,
-    }),
+    remediationInputSchema.omit({ vulnerabilityIds: true }),
   ),
   [ResourceType.DeviceArtifact]: createIntegrationItemSchema(
     deviceArtifactInputSchema,

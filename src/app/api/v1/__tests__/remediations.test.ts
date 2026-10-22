@@ -371,31 +371,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(res.body.message).toContain("Vulnerability not found");
   });
 
-  it("POST /remediations - Rejects the removed vulnerabilityId field", async () => {
-    const res = await request(BASE_URL)
-      .post("/remediations")
-      .set(authHeader)
-      .send({ ...payload, vulnerabilityId: "any-vuln-id" });
-
-    expect(res.status).toBe(400);
-    expect(res.body.issues).toContainEqual(
-      expect.objectContaining({ path: ["vulnerabilityId"] }),
-    );
-  });
-
-  it("PUT /remediations/{id} - Rejects the removed vulnerabilityId field", async () => {
-    // Input validation runs before the ownership check, so any id reaches it.
-    const res = await request(BASE_URL)
-      .put("/remediations/any-remediation-id")
-      .set(authHeader)
-      .send({ vulnerabilityId: null });
-
-    expect(res.status).toBe(400);
-    expect(res.body.issues).toContainEqual(
-      expect.objectContaining({ path: ["vulnerabilityId"] }),
-    );
-  });
-
   it("POST /remediations - Create with multiple artifacts", async () => {
     const multiArtifactPayload = {
       ...payload,

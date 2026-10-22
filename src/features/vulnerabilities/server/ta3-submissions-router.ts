@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AlohaStatus, Prisma } from "@/generated/prisma";
+import { type AlohaStatus, type Prisma, TriggerEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
@@ -11,6 +11,7 @@ import {
   ta3SubmissionAlohaResponseSchema,
   ta3SubmissionInclude,
 } from "../types";
+import { announceSubmission } from "./records";
 
 type SubmissionWithRecord = Prisma.TA3SubmissionGetPayload<{
   include: typeof ta3SubmissionInclude;
@@ -102,6 +103,10 @@ export const ta3SubmissionsRouter = createTRPCRouter({
         },
         include: ta3SubmissionInclude,
       });
+      announceSubmission(
+        TriggerEnum.TA3Submission_Updated,
+        submission.updatedAt,
+      );
       return toAlohaResponse(submission);
     }),
 });

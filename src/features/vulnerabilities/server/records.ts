@@ -111,13 +111,17 @@ function toMetricCreate(
   };
 }
 
+type SubmissionTrigger =
+  | typeof TriggerEnum.TA3Submission_Created
+  | typeof TriggerEnum.TA3Submission_Updated;
+
 /**
- * Tell webhook subscribers (ALOHA) about a new TA3 submission. Called after its transaction
- * commits, so a subscriber that queries GET /ta3Submissions straight away finds it. The query
- * extension in prisma-client-extensions can't do this: the submission is a nested write.
+ * Tell webhook subscribers (ALOHA) a TA3 submission was uploaded or changed. Called after its
+ * transaction commits, so a subscriber that queries GET /ta3Submissions straight away finds it.
+ * The query extension in prisma-client-extensions can't do this: the submission is a nested write.
  */
-function announceSubmission(createdAt: Date) {
-  void sendWebhooks(TriggerEnum.TA3Submission_Created, createdAt);
+export function announceSubmission(trigger: SubmissionTrigger, at: Date) {
+  void sendWebhooks(trigger, at);
 }
 
 function toSubmissionCreate(
@@ -186,7 +190,12 @@ export async function createVulnerabilityRecord(
       throw error;
     });
 
-  if (record.ta3Submission) announceSubmission(record.ta3Submission.createdAt);
+  if (record.ta3Submission) {
+    announceSubmission(
+      TriggerEnum.TA3Submission_Created,
+      record.ta3Submission.createdAt,
+    );
+  }
   await refreshVulnerability(vulnerabilityId, data.deviceGroupMatchingIds);
   return { record, vulnerabilityId, vulnerabilityCreated: created };
 }
@@ -209,7 +218,7 @@ export async function updateVulnerabilityRecord(
   assertSubmissionMatchesSource(existing.source, patch.ta3Submission);
   const { vulnerabilityId } = existing;
 
-  const { record, newSubmission } = await prisma.$transaction(async (tx) => {
+  const { record, submissionChange } = await prisma.$transaction(async (tx) => {
     if (patch.identifiers) {
       await upsertIdentifiers(
         tx,
@@ -218,7 +227,8 @@ export async function updateVulnerabilityRecord(
       );
     }
     if (patch.metrics) await tx.metric.deleteMany({ where: { recordId } });
-    let newSubmission: { createdAt: Date } | null = null;
+    let submissionChange: { trigger: SubmissionTrigger; at: Date } | null =
+      null;
     if (patch.ta3Submission) {
       const submission = toSubmissionCreate(patch.ta3Submission);
       const existing = await tx.tA3Submission.findUnique({
@@ -229,9 +239,11 @@ export async function updateVulnerabilityRecord(
         where: { recordId },
         create: { recordId, ...submission },
         update: submission,
-        select: { createdAt: true },
+        select: { createdAt: true, updatedAt: true },
       });
-      if (!existing) newSubmission = row;
+      submissionChange = existing
+        ? { trigger: TriggerEnum.TA3Submission_Updated, at: row.updatedAt }
+        : { trigger: TriggerEnum.TA3Submission_Created, at: row.createdAt };
     }
     const updated = await tx.vulnerabilityRecord.update({
       where: { id: recordId },
@@ -245,10 +257,12 @@ export async function updateVulnerabilityRecord(
           : {}),
       },
     });
-    return { record: updated, newSubmission };
+    return { record: updated, submissionChange };
   });
 
-  if (newSubmission) announceSubmission(newSubmission.createdAt);
+  if (submissionChange) {
+    announceSubmission(submissionChange.trigger, submissionChange.at);
+  }
   // TODO: VW-541 devices are only ever added: they sit on the vulnerability, not the record,
   // so one record can't remove a device another record added. Affected fixes this.
   await refreshVulnerability(vulnerabilityId, patch.deviceGroupMatchingIds);

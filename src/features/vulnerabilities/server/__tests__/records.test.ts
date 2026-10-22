@@ -77,7 +77,10 @@ const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
     tA3Submission: {
       findFirst: vi.fn(async () => null),
       findUnique: vi.fn(async (): Promise<{ id: string } | null> => null),
-      upsert: vi.fn(async () => ({ createdAt: SUBMITTED_AT })),
+      upsert: vi.fn(async () => ({
+        createdAt: SUBMITTED_AT,
+        updatedAt: SUBMITTED_AT,
+      })),
     },
     issue: { createMany: vi.fn(async () => ({ count: 0 })) },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
@@ -281,7 +284,9 @@ describe("createVulnerabilityRecord", () => {
   });
 });
 
-describe("the TA3Submission_Created webhook", () => {
+describe("the TA3 submission webhooks", () => {
+  const EDITED_AT = new Date("2026-10-22T12:00:00.000Z");
+
   it("fires once a new record's TA3 submission is written", async () => {
     createsVulnerability("v-1");
 
@@ -320,16 +325,35 @@ describe("the TA3Submission_Created webhook", () => {
     );
   });
 
-  it("doesn't fire when an update changes an existing submission", async () => {
+  it("fires TA3Submission_Updated when an update changes an existing submission", async () => {
     db.vulnerabilityRecord.findUnique.mockResolvedValueOnce({
       vulnerabilityId: "v-1",
       source: "TA3",
     });
     db.tA3Submission.findUnique.mockResolvedValueOnce({ id: "sub-1" });
+    db.tA3Submission.upsert.mockResolvedValueOnce({
+      createdAt: SUBMITTED_AT,
+      updatedAt: EDITED_AT,
+    });
 
     await updateVulnerabilityRecord("rec-1", {
       ta3Submission: { sarif: SARIF },
     });
+
+    expect(sendWebhooks).toHaveBeenCalledTimes(1);
+    expect(sendWebhooks).toHaveBeenCalledWith(
+      "TA3Submission_Updated",
+      EDITED_AT,
+    );
+  });
+
+  it("doesn't fire when an update leaves the submission alone", async () => {
+    db.vulnerabilityRecord.findUnique.mockResolvedValueOnce({
+      vulnerabilityId: "v-1",
+      source: "TA3",
+    });
+
+    await updateVulnerabilityRecord("rec-1", { summary: "New summary" });
 
     expect(sendWebhooks).not.toHaveBeenCalled();
   });

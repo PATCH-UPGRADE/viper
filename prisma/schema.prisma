@@ -1343,6 +1343,7 @@ enum TriggerEnum {
   Vulnerability_Created
   Vulnerability_Updated
   TA3Submission_Created
+  TA3Submission_Updated
 }
 
 enum AuthType {

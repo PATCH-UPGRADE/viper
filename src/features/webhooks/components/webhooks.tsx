@@ -116,6 +116,14 @@ export const triggerDescriptions = {
       </span>
     </>
   ),
+  [TriggerEnum.TA3Submission_Updated]: (
+    <>
+      <BugIcon size={15} />{" "}
+      <span>
+        A <b>TA3 Submission</b> is updated
+      </span>
+    </>
+  ),
 };
 
 export const WebhooksSearch = () => {

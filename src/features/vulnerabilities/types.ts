@@ -189,12 +189,46 @@ export function toVulnerabilityRecordResponse(
   };
 }
 
+export const vulnerabilityIdentifierResponseSchema = z.object({
+  value: z.string(), // trimmed + upper-cased, for lookup
+  displayValue: z.string(), // as published
+});
+
+/** A record as it appears nested in a vulnerability response. */
+export const vulnerabilityRecordWithUserResponseSchema =
+  vulnerabilityRecordResponseSchema.extend({
+    user: userSchema.nullable(),
+  });
+
 export const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   displayId: z.string(), // best human-facing ID: CVE > GHSA > other > VIPER-
+  description: z.string().nullable(),
+  narrative: z.string().nullable(),
+  impact: z.string().nullable(),
+  severity: severitySchema,
+  identifiers: z.array(vulnerabilityIdentifierResponseSchema),
+  // TODO: VW-541 show metrics per product (Affected) instead of per record
+  records: z.array(vulnerabilityRecordWithUserResponseSchema),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  notes: z.array(scopedNoteSchema).optional(),
+
+  // <Getting removed in VW-540>
+  // Legacy flat fields, kept until the UI and other consumers read identifiers and records.
+  cveId: z.string().nullable(),
+  cvssScore: z.number().nullable(),
+  cvssVector: z.string().nullable(),
+  epss: z.number().nullable(),
+  updatedEpss: z.date().nullable(),
+  inKEV: z.boolean(),
+  updatedInKev: z.date().nullable(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   exploitUri: z.string().nullable(),
+  affectedComponents: z.array(z.string()),
+  userId: z.string(),
+  user: userSchema,
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   externalMappings: z.array(
     z.object({
       externalId: z.string(),
@@ -207,23 +241,7 @@ export const vulnerabilityResponseSchema = z.object({
       }),
     }),
   ),
-  description: z.string().nullable(),
-  narrative: z.string().nullable(),
-  impact: z.string().nullable(),
-  cveId: z.string().nullable(),
-  cvssScore: z.number().nullable(),
-  severity: severitySchema,
-  affectedComponents: z.array(z.string()),
-  cvssVector: z.string().nullable(),
-  epss: z.number().nullable(),
-  updatedEpss: z.date().nullable(),
-  inKEV: z.boolean(),
-  updatedInKev: z.date().nullable(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-  notes: z.array(scopedNoteSchema).optional(),
+  // </Getting removed in VW-540>
 });
 export type VulnerabilityResponse = z.infer<typeof vulnerabilityResponseSchema>;
 
@@ -244,10 +262,34 @@ export const vulnerabilitiesByPriorityInputSchema =
   });
 
 export const vulnerabilityInclude = {
+  identifiers: {
+    select: { value: true, displayValue: true },
+    orderBy: { createdAt: "asc" },
+  },
+  records: {
+    include: { ...vulnerabilityRecordInclude, user: userIncludeSelect },
+    orderBy: { createdAt: "asc" },
+  },
+  // TODO: VW-540 legacy relations, removed with the flat fields above
   user: userIncludeSelect,
   deviceGroupMatchings: deviceGroupMatchingInclude,
   externalMappings: externalMappingSelect,
-};
+} satisfies Prisma.VulnerabilityInclude;
+
+/** Converts each record's metric Decimals; the output schema strips the rest. */
+export function toVulnerabilityResponse(
+  vulnerability: Prisma.VulnerabilityGetPayload<{
+    include: typeof vulnerabilityInclude;
+  }>,
+) {
+  return {
+    ...vulnerability,
+    records: vulnerability.records.map((record) => ({
+      ...toVulnerabilityRecordResponse(record),
+      user: record.user,
+    })),
+  };
+}
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,

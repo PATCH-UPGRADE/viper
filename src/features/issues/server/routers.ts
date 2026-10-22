@@ -1,7 +1,10 @@
 import "server-only";
 import { z } from "zod";
 import { assetDeviceInclude, assetInclude } from "@/features/assets/types";
-import { vulnerabilityInclude } from "@/features/vulnerabilities/types";
+import {
+  toVulnerabilityResponse,
+  vulnerabilityInclude,
+} from "@/features/vulnerabilities/types";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceIdentitySelect } from "@/lib/device-matching";
@@ -34,7 +37,11 @@ export const issuesRouter = createTRPCRouter({
           },
         },
       });
-      return requireExistence(issue, "Issue");
+      const found = requireExistence(issue, "Issue");
+      return {
+        ...found,
+        vulnerability: toVulnerabilityResponse(found.vulnerability),
+      };
     }),
 
   getManyByIds: protectedProcedure

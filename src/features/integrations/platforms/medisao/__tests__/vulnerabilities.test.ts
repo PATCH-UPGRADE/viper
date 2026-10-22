@@ -9,10 +9,7 @@ const prismaMock = {
 };
 vi.mock("@/lib/db", () => ({ default: prismaMock }));
 
-const records = {
-  createVulnerabilityRecord: vi.fn(),
-  updateVulnerabilityRecord: vi.fn(),
-};
+const records = { createVulnerabilityRecord: vi.fn() };
 vi.mock("@/features/vulnerabilities/server/records", () => records);
 
 const { normalizeIdentifier, resolveOrMintVulnerabilities } = await import(
@@ -22,23 +19,14 @@ const { normalizeIdentifier, resolveOrMintVulnerabilities } = await import(
 const resolve = (names: string[]) =>
   resolveOrMintVulnerabilities({
     names,
-    integrationId: "int-1",
     integrationUserId: "shadow-user",
     deviceGroupMatchingId: "matching-1",
   });
 
 /** One vulnerabilityIdentifier row as findHeld selects it. */
-const heldRow = (
-  value: string,
-  vulnerabilityId: string,
-  { stub, onMatching }: { stub: boolean; onMatching: boolean },
-) => ({
+const heldRow = (value: string, vulnerabilityId: string) => ({
   value,
   vulnerabilityId,
-  vulnerability: {
-    records: stub ? [{ id: `stub-${value}`, sourceId: value }] : [],
-    deviceGroupMatchings: onMatching ? [{ id: "matching-1" }] : [],
-  },
 });
 
 const uniqueViolation = () =>
@@ -62,7 +50,7 @@ beforeEach(() => {
 describe("resolveOrMintVulnerabilities", () => {
   it("resolves a held CVE without writing anything", async () => {
     prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
-      heldRow("CVE-2026-0001", "vuln-1", { stub: false, onMatching: false }),
+      heldRow("CVE-2026-0001", "vuln-1"),
     ]);
 
     const { ids, created } = await resolve(["CVE-2026-0001"]);
@@ -70,7 +58,6 @@ describe("resolveOrMintVulnerabilities", () => {
     expect(ids).toEqual(new Map([["CVE-2026-0001", "vuln-1"]]));
     expect(created).toBe(0);
     expect(records.createVulnerabilityRecord).not.toHaveBeenCalled();
-    expect(records.updateVulnerabilityRecord).not.toHaveBeenCalled();
   });
 
   it("looks identifiers up by their upper-cased value", async () => {
@@ -115,48 +102,12 @@ describe("resolveOrMintVulnerabilities", () => {
 
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("without a CVE or GHSA ID"),
-      { name: "VENDOR-7", integrationId: "int-1" },
+      { name: "VENDOR-7" },
     );
     expect([...ids.keys()]).toEqual(["CVE-2026-0002"]);
     expect(created).toBe(1);
     expect(records.createVulnerabilityRecord).toHaveBeenCalledTimes(1);
     warn.mockRestore();
-  });
-
-  it("attaches an earlier stub to a second channel", async () => {
-    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
-      heldRow("CVE-2026-0001", "stub-vuln", { stub: true, onMatching: false }),
-    ]);
-
-    const { ids, created } = await resolve(["CVE-2026-0001"]);
-
-    expect(ids.get("CVE-2026-0001")).toBe("stub-vuln");
-    expect(created).toBe(0);
-    expect(records.updateVulnerabilityRecord).toHaveBeenCalledWith(
-      "stub-CVE-2026-0001",
-      { deviceGroupMatchingIds: ["matching-1"] },
-    );
-  });
-
-  it("leaves a stub alone when it is already on the channel", async () => {
-    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
-      heldRow("CVE-2026-0001", "stub-vuln", { stub: true, onMatching: true }),
-    ]);
-
-    await resolve(["CVE-2026-0001"]);
-
-    expect(records.updateVulnerabilityRecord).not.toHaveBeenCalled();
-  });
-
-  it("links a vulnerability another source holds but leaves its devices alone", async () => {
-    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
-      heldRow("CVE-2026-0001", "vuln-1", { stub: false, onMatching: false }),
-    ]);
-
-    const { ids } = await resolve(["CVE-2026-0001"]);
-
-    expect(ids.get("CVE-2026-0001")).toBe("vuln-1");
-    expect(records.updateVulnerabilityRecord).not.toHaveBeenCalled();
   });
 
   it("does not count a mint that joined an existing vulnerability", async () => {
@@ -176,19 +127,19 @@ describe("resolveOrMintVulnerabilities", () => {
     records.createVulnerabilityRecord.mockRejectedValue(uniqueViolation());
     prismaMock.vulnerabilityIdentifier.findMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        heldRow("CVE-2026-0003", "winner-1", { stub: true, onMatching: false }),
-      ]);
+      .mockResolvedValueOnce([heldRow("CVE-2026-0003", "winner-1")]);
 
     const { ids, created } = await resolve(["CVE-2026-0003"]);
 
     expect(ids.get("CVE-2026-0003")).toBe("winner-1");
     expect(created).toBe(0);
-    // The winner can have minted it for another channel.
-    expect(records.updateVulnerabilityRecord).toHaveBeenCalledWith(
-      "stub-CVE-2026-0003",
-      { deviceGroupMatchingIds: ["matching-1"] },
-    );
+  });
+
+  it("rethrows a lost race when the identifier still cannot be found", async () => {
+    const violation = uniqueViolation();
+    records.createVulnerabilityRecord.mockRejectedValue(violation);
+
+    await expect(resolve(["CVE-2026-0003"])).rejects.toBe(violation);
   });
 
   it("rethrows a failure that is not a lost race", async () => {

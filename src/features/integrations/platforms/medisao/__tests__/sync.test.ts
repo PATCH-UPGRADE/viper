@@ -17,14 +17,12 @@ const createVulnerabilityRecord = vi.fn();
 vi.mock("@/features/vulnerabilities/server/records", () => ({
   createVulnerabilityRecord: (...args: unknown[]) =>
     createVulnerabilityRecord(...args),
-  updateVulnerabilityRecord: vi.fn(),
 }));
 
-/** A vulnerabilityIdentifier row for a vulnerability another source holds. */
+/** A vulnerabilityIdentifier row for a vulnerability Viper already holds. */
 const heldRow = (value: string, vulnerabilityId: string) => ({
   value,
   vulnerabilityId,
-  vulnerability: { records: [], deviceGroupMatchings: [] },
 });
 
 const processIntegrationSync = vi.fn();

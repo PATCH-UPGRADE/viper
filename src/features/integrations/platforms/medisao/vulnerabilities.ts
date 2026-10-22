@@ -4,10 +4,7 @@ import {
   isGlobalVulnerabilityIdentifier,
   normalizeIdentifier as normalizeVulnerabilityIdentifier,
 } from "@/features/vulnerabilities/server/identity";
-import {
-  createVulnerabilityRecord,
-  updateVulnerabilityRecord,
-} from "@/features/vulnerabilities/server/records";
+import { createVulnerabilityRecord } from "@/features/vulnerabilities/server/records";
 import { VulnerabilitySource } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { isUniqueViolation } from "@/lib/router-utils";
@@ -19,12 +16,13 @@ export const normalizeIdentifier = (name: string): string => {
 };
 
 interface ResolveOrMintInput {
-  /** Identifiers exactly as MedISAO sent them. Only CVE and GHSA IDs are used. */
+  /** Identifiers exactly as MedISAO sent them */
   names: string[];
-  integrationId: string;
   /** The integration's shadow user. Only fills the legacy Vulnerability.userId column. */
+  // TODO: VW-540 Vulnerability.userId will be removed later in this stack of PRs; drop this field
+  // (and the actingUserId it feeds) then.
   integrationUserId: string;
-  /** The channel's matching. Every stub minted here is attached to it. */
+  /** The channel's matching. A stub minted here is attached to it; a held vulnerability is not. */
   deviceGroupMatchingId: string;
 }
 
@@ -34,46 +32,42 @@ interface ResolveOrMintResult {
   created: number;
 }
 
-/** A vulnerability found by one identifier. */
-interface Held {
-  vulnerabilityId: string;
-  /** The OTHER record a MedISAO mint left for this identifier, when the row is a stub. */
-  stubRecordId: string | null;
-  onMatching: boolean;
-}
-
 /**
  * Resolve every identifier to a Vulnerability through VulnerabilityIdentifier, and mint a stub
- * for each one Viper does not hold yet, so the inbox agents know the vulnerability exists.
+ * for each one Viper does not hold yet.
  *
- * Only globally unique IDs (CVE, GHSA) are resolved or minted; anything else is skipped with a
- * warning, since a vendor-local ID could name two different vulnerabilities. The name still
- * appears in the advisory or remediation text.
+ * TODO: VW-583 is to populate the fields of this stub by searching NVD/GHSA API's
  *
- * A stub is an OTHER VulnerabilityRecord whose sourceId is the identifier itself. Creating it
- * creates the Vulnerability. Its unique key (source, sourceId, vulnerabilityId) is also the lock:
- * when two runs mint the same identifier at once, the loser's record collides, and it reads the
- * winner's row instead.
- * TODO: VW-583 fetch each stub's details from NVD or GHSA, and give it that source.
+ * (Possible TODO for VW-538, depending on MedISAO behavior) A vulnerability Viper already 
+ * holds is only linked, never given this channel's devices, even when it is a stub
+ * another channel minted.
  *
- * A stub is attached to every channel that names it, not only the first. A vulnerability another
- * source holds is linked but left alone, because its devices belong to that source.
+ * first: populate `wanted`, a list of normalized vulnerability identifiers based on `names`
+ * second: find all vulnerabilities with those identifiers
+ * third: for vulnerabilities that we can't find, create new stub records
+ *    the source is OTHER, and the vulnerability is attached to deviceGroupMatchingId
+ * return all matched identifiers, and how many vulns were created
+ *
  */
 export async function resolveOrMintVulnerabilities({
   names,
-  integrationId,
-  integrationUserId,
+  integrationUserId, // TODO VW-540, remove this when Vulnerability.userId is deleted
   deviceGroupMatchingId,
 }: ResolveOrMintInput): Promise<ResolveOrMintResult> {
   const ids = new Map<string, string>();
-  // Lookup value → every normalized name that spells it, e.g. two casings of one GHSA ID.
   const wanted = new Map<string, string[]>();
   for (const name of new Set(names.map(normalizeIdentifier))) {
     if (!name) continue;
     if (!isGlobalVulnerabilityIdentifier(name)) {
+      // TODO: does MedISAO give us vendor ID's for vulnerabilities? If so, that may be more work for us
+      // since those vendor ID's could potentially collide with each other if they don't have unique
+      // prefixes (i.e, Baxter vulnerability #27 might collid with Meditech vulnerability #27)
+      // As MedISAO today is not a real service used in the world today, I would like to avoid doing
+      // this extra work of constructing unique vendor prefixes until we learn it's necessary.
+      // They might just give us only CVE/GHSA, in which case it'd be unnecessary.
       console.warn(
         "MedISAO named a vulnerability without a CVE or GHSA ID; skipping it",
-        { name, integrationId },
+        { name },
       );
       continue;
     }
@@ -82,19 +76,12 @@ export async function resolveOrMintVulnerabilities({
   }
   if (wanted.size === 0) return { ids, created: 0 };
 
-  const adopt = async (value: string, held: Held) => {
-    if (held.stubRecordId && !held.onMatching) {
-      await updateVulnerabilityRecord(held.stubRecordId, {
-        deviceGroupMatchingIds: [deviceGroupMatchingId],
-      });
-    }
-    for (const name of wanted.get(value) ?? []) {
-      ids.set(name, held.vulnerabilityId);
-    }
+  const link = (value: string, vulnerabilityId: string) => {
+    for (const name of wanted.get(value) ?? []) ids.set(name, vulnerabilityId);
   };
 
-  const found = await findHeld([...wanted.keys()], deviceGroupMatchingId);
-  for (const [value, held] of found) await adopt(value, held);
+  const found = await findHeld([...wanted.keys()]);
+  for (const [value, vulnerabilityId] of found) link(value, vulnerabilityId);
 
   let created = 0;
   for (const [value, [name]] of wanted) {
@@ -103,7 +90,6 @@ export async function resolveOrMintVulnerabilities({
       const { vulnerabilityId, vulnerabilityCreated } =
         await createVulnerabilityRecord(
           {
-            // TODO: VW-583 set the real source once the details are fetched
             source: VulnerabilitySource.OTHER,
             sourceId: value,
             identifiers: [name],
@@ -112,58 +98,25 @@ export async function resolveOrMintVulnerabilities({
           },
           { actingUserId: integrationUserId },
         );
-      for (const spelling of wanted.get(value) ?? []) {
-        ids.set(spelling, vulnerabilityId);
-      }
+      link(value, vulnerabilityId);
       if (vulnerabilityCreated) created += 1;
     } catch (error) {
+      // Another run minted this identifier first, and its stub record holds the unique key.
       if (!isUniqueViolation(error)) throw error;
-      const raced = (await findHeld([value], deviceGroupMatchingId)).get(value);
+      const raced = (await findHeld([value])).get(value);
       if (!raced) throw error;
-      await adopt(value, raced);
+      link(value, raced);
     }
   }
 
   return { ids, created };
 }
 
-async function findHeld(
-  values: string[],
-  deviceGroupMatchingId: string,
-): Promise<Map<string, Held>> {
+/** Lookup value → the id of the Vulnerability that holds it, for every value Viper knows. */
+async function findHeld(values: string[]): Promise<Map<string, string>> {
   const rows = await prisma.vulnerabilityIdentifier.findMany({
     where: { value: { in: values } },
-    select: {
-      value: true,
-      vulnerabilityId: true,
-      vulnerability: {
-        select: {
-          records: {
-            where: {
-              source: VulnerabilitySource.OTHER,
-              sourceId: { in: values },
-            },
-            select: { id: true, sourceId: true },
-          },
-          deviceGroupMatchings: {
-            where: { id: deviceGroupMatchingId },
-            select: { id: true },
-          },
-        },
-      },
-    },
+    select: { value: true, vulnerabilityId: true },
   });
-  return new Map(
-    rows.map((row) => [
-      row.value,
-      {
-        vulnerabilityId: row.vulnerabilityId,
-        stubRecordId:
-          row.vulnerability.records.find(
-            (record) => record.sourceId === row.value,
-          )?.id ?? null,
-        onMatching: row.vulnerability.deviceGroupMatchings.length > 0,
-      },
-    ]),
-  );
+  return new Map(rows.map((row) => [row.value, row.vulnerabilityId]));
 }

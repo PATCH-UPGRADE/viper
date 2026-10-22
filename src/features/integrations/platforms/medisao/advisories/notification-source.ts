@@ -91,7 +91,6 @@ export const linkAdvisoryEntities =
 
       const { ids, created } = await resolveOrMintVulnerabilities({
         names: advisory.vulnerabilityIds,
-        integrationId: mapping.integrationId,
         integrationUserId: mapping.integration.integrationUserId,
         deviceGroupMatchingId,
       });

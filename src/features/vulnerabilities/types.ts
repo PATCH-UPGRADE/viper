@@ -116,33 +116,41 @@ const metricResponseBase = {
 
 /** Each metric type returns only the fields it uses. */
 export const metricResponseSchema = z.discriminatedUnion("type", [
-  z.object({
-    ...metricResponseBase,
-    type: z.enum([
-      MetricType.CVSS_V3_0,
-      MetricType.CVSS_V3_1,
-      MetricType.CVSS_V4_0,
-    ]),
-    vector: z.string().nullable(),
-    score: z.number().nullable(),
-    severity: severitySchema.nullable(),
-  }),
-  z.object({
-    ...metricResponseBase,
-    type: z.literal(MetricType.QUALITATIVE),
-    severity: severitySchema.nullable(),
-  }),
-  z.object({
-    ...metricResponseBase,
-    type: z.literal(MetricType.EPSS),
-    score: z.number().nullable(), // probability, 0–1
-    percentile: z.number().nullable(),
-  }),
-  z.object({
-    ...metricResponseBase,
-    type: z.literal(MetricType.KEV),
-    inKev: z.boolean().nullable(), // false: the catalog was checked and doesn't list it
-  }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.enum([
+        MetricType.CVSS_V3_0,
+        MetricType.CVSS_V3_1,
+        MetricType.CVSS_V4_0,
+      ]),
+      vector: z.string().nullable(),
+      score: z.number().nullable(),
+      severity: severitySchema.nullable(),
+    })
+    .meta({ id: "CvssMetric" }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.literal(MetricType.QUALITATIVE),
+      severity: severitySchema.nullable(),
+    })
+    .meta({ id: "QualitativeMetric" }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.literal(MetricType.EPSS),
+      score: z.number().nullable(), // probability, 0–1
+      percentile: z.number().nullable(),
+    })
+    .meta({ id: "EpssMetric" }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.literal(MetricType.KEV),
+      inKev: z.boolean().nullable(), // false: the catalog was checked and doesn't list it
+    })
+    .meta({ id: "KevMetric" }),
 ]);
 export type MetricResponse = z.infer<typeof metricResponseSchema>;
 

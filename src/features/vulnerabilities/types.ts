@@ -3,6 +3,7 @@ import { z } from "zod";
 import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
+  type Metric,
   MetricType,
   PlatformEnum,
   Priority,
@@ -108,14 +109,75 @@ export type VulnerabilityRecordUpdateInput = z.infer<
   typeof vulnerabilityRecordUpdateInputSchema
 >;
 
-export const metricResponseSchema = z.object({
+const metricResponseBase = {
   id: z.string(),
-  type: z.enum(MetricType),
-  vector: z.string().nullable(),
-  score: z.number().nullable(),
-  percentile: z.number().nullable(),
-  severity: severitySchema.nullable(),
-});
+  updatedAt: z.date(),
+};
+
+/** Each metric type returns only the fields it uses. */
+export const metricResponseSchema = z.discriminatedUnion("type", [
+  z.object({
+    ...metricResponseBase,
+    type: z.enum([
+      MetricType.CVSS_V3_0,
+      MetricType.CVSS_V3_1,
+      MetricType.CVSS_V4_0,
+    ]),
+    vector: z.string().nullable(),
+    score: z.number().nullable(),
+    severity: severitySchema.nullable(),
+  }),
+  z.object({
+    ...metricResponseBase,
+    type: z.literal(MetricType.QUALITATIVE),
+    severity: severitySchema.nullable(),
+  }),
+  z.object({
+    ...metricResponseBase,
+    type: z.literal(MetricType.EPSS),
+    score: z.number().nullable(), // probability, 0–1
+    percentile: z.number().nullable(),
+  }),
+  z.object({
+    ...metricResponseBase,
+    type: z.literal(MetricType.KEV),
+    inKev: z.boolean().nullable(), // false: the catalog was checked and doesn't list it
+  }),
+]);
+export type MetricResponse = z.infer<typeof metricResponseSchema>;
+
+/** Picks the fields a metric's type uses. Prisma returns Decimals; the API returns numbers. */
+export function toMetricResponse(metric: Metric): MetricResponse {
+  const { id, type, updatedAt } = metric;
+  const score = metric.score?.toNumber() ?? null;
+  switch (type) {
+    case MetricType.CVSS_V3_0:
+    case MetricType.CVSS_V3_1:
+    case MetricType.CVSS_V4_0:
+      return {
+        id,
+        type,
+        updatedAt,
+        vector: metric.vector,
+        score,
+        severity: metric.severity,
+      };
+    case MetricType.QUALITATIVE:
+      return { id, type, updatedAt, severity: metric.severity };
+    case MetricType.EPSS:
+      return {
+        id,
+        type,
+        updatedAt,
+        score,
+        percentile: metric.percentile?.toNumber() ?? null,
+      };
+    case MetricType.KEV:
+      return { id, type, updatedAt, inKev: metric.flag };
+    default:
+      return type satisfies never;
+  }
+}
 
 export const ta3SubmissionResponseSchema = z.object({
   id: z.string(),
@@ -166,10 +228,7 @@ export const ta3SubmissionInclude = {
   record: { select: { vulnerabilityId: true } },
 } satisfies Prisma.TA3SubmissionInclude;
 
-/**
- * Prisma returns Decimal for metric scores; the API returns plain numbers. The rest is the row
- * as is: the output schema strips the fields the API doesn't return.
- */
+/** The rest is the row as is: the output schema strips the fields the API doesn't return. */
 export function toVulnerabilityRecordResponse(
   record: Prisma.VulnerabilityRecordGetPayload<{
     include: typeof vulnerabilityRecordInclude;
@@ -177,11 +236,7 @@ export function toVulnerabilityRecordResponse(
 ): VulnerabilityRecordResponse {
   return {
     ...record,
-    metrics: record.metrics.map((metric) => ({
-      ...metric,
-      score: metric.score?.toNumber() ?? null,
-      percentile: metric.percentile?.toNumber() ?? null,
-    })),
+    metrics: record.metrics.map(toMetricResponse),
     ta3Submission: record.ta3Submission && {
       ...record.ta3Submission,
       vulnerabilityId: record.vulnerabilityId,

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   computeDisplayId,
   findVulnerabilityByIdentifiers,
+  isGlobalVulnerabilityIdentifier,
   mintViperIdentifier,
   normalizeIdentifier,
   normalizeIdentifiers,
@@ -85,6 +86,22 @@ describe("normalizeIdentifiers", () => {
     ).toEqual([
       { value: "GHSA-ABCD-EFGH-IJKL", displayValue: "GHSA-abcd-efgh-ijkl" },
     ]);
+  });
+});
+
+describe("isGlobalVulnerabilityIdentifier", () => {
+  it("accepts CVE and GHSA IDs in any case", () => {
+    expect(isGlobalVulnerabilityIdentifier("CVE-2026-0001")).toBe(true);
+    expect(isGlobalVulnerabilityIdentifier(" cve-2026-12345 ")).toBe(true);
+    expect(isGlobalVulnerabilityIdentifier("GHSA-jfh8-c2jp-5v3q")).toBe(true);
+    expect(isGlobalVulnerabilityIdentifier("GHSA-JFH8-C2JP-5V3Q")).toBe(true);
+  });
+
+  it("rejects vendor-local and malformed IDs", () => {
+    expect(isGlobalVulnerabilityIdentifier("VENDOR-7")).toBe(false);
+    expect(isGlobalVulnerabilityIdentifier("TEST-2026-0001")).toBe(false);
+    expect(isGlobalVulnerabilityIdentifier("GHSA-abc")).toBe(false);
+    expect(isGlobalVulnerabilityIdentifier("VIPER-ABC123")).toBe(false);
   });
 });
 

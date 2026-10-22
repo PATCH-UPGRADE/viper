@@ -1,11 +1,15 @@
 import "server-only";
 import {
   CVE_PATTERN,
+  isGlobalVulnerabilityIdentifier,
   normalizeIdentifier as normalizeVulnerabilityIdentifier,
 } from "@/features/vulnerabilities/server/identity";
-import { VersionStatus } from "@/generated/prisma";
+import {
+  createVulnerabilityRecord,
+  updateVulnerabilityRecord,
+} from "@/features/vulnerabilities/server/records";
+import { VulnerabilitySource } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { baselineIssueStatus } from "@/lib/device-matching";
 import { isUniqueViolation } from "@/lib/router-utils";
 
 /** Trimmed, and a CVE upper-cased, so one identifier has one spelling. */
@@ -15,125 +19,132 @@ export const normalizeIdentifier = (name: string): string => {
 };
 
 interface ResolveOrMintInput {
-  /** Identifiers exactly as MedISAO sent them: CVE, GHSA, or vendor ids. */
+  /** Identifiers exactly as MedISAO sent them. Only CVE and GHSA IDs are used. */
   names: string[];
   integrationId: string;
-  /** The integration's shadow user, recorded as the creator of a minted row. */
+  /** The integration's shadow user. Only fills the legacy Vulnerability.userId column. */
   integrationUserId: string;
-  /** The channel's matching. Every row minted here is attached to it. */
+  /** The channel's matching. Every stub minted here is attached to it. */
   deviceGroupMatchingId: string;
-  /** Where MedISAO named the identifier, written into a non-CVE stub. */
-  context: string;
 }
 
 interface ResolveOrMintResult {
-  /** Normalized identifier → Vulnerability id, for every name given. */
+  /** Normalized identifier → Vulnerability id, for every name that resolved. */
   ids: Map<string, string>;
   created: number;
 }
 
-// TODO: VW-540 resolve and mint through VulnerabilityIdentifier + VulnerabilityRecord
-// (VENDOR_ADVISORY) instead of ExternalVulnerabilityMapping and cveId. Until then a second
-// integration minting the same non-CVE name hits the identifier's unique key and throws.
+/** A vulnerability found by one identifier. */
+interface Held {
+  vulnerabilityId: string;
+  /** The OTHER record a MedISAO mint left for this identifier, when the row is a stub. */
+  stubRecordId: string | null;
+  onMatching: boolean;
+}
+
 /**
- * Resolve every identifier to a Vulnerability, and mint the ones Viper does not
- * hold.
+ * Resolve every identifier to a Vulnerability through VulnerabilityIdentifier, and mint a stub
+ * for each one Viper does not hold yet, so the inbox agents know the vulnerability exists.
  *
- * A non-CVE identifier has no `cveId` to find it by, so every minted row carries
- * an `ExternalVulnerabilityMapping` keyed on the identifier. That mapping is
- * also the lock: two runs that mint the same identifier at once collide on its
- * unique key, and the loser reads the winner's row.
+ * Only globally unique IDs (CVE, GHSA) are resolved or minted; anything else is skipped with a
+ * warning, since a vendor-local ID could name two different vulnerabilities. The name still
+ * appears in the advisory or remediation text.
  *
- * A row this integration minted is attached to every channel that names it,
- * not only the first. A row another source holds is linked but left alone,
- * because its matchings belong to that source.
+ * A stub is an OTHER VulnerabilityRecord whose sourceId is the identifier itself. Creating it
+ * creates the Vulnerability. Its unique key (source, sourceId, vulnerabilityId) is also the lock:
+ * when two runs mint the same identifier at once, the loser's record collides, and it reads the
+ * winner's row instead.
+ * TODO: VW-583 fetch each stub's details from NVD or GHSA, and give it that source.
  *
- * Each write runs outside any transaction. `vulnerabilityExtension` opens the
- * baseline Issues through the outer client, which cannot see the matching
- * link of a row that an open transaction holds.
+ * A stub is attached to every channel that names it, not only the first. A vulnerability another
+ * source holds is linked but left alone, because its devices belong to that source.
  */
 export async function resolveOrMintVulnerabilities({
   names,
   integrationId,
   integrationUserId,
   deviceGroupMatchingId,
-  context,
 }: ResolveOrMintInput): Promise<ResolveOrMintResult> {
-  const wanted = [...new Set(names.map(normalizeIdentifier))].filter(Boolean);
   const ids = new Map<string, string>();
-  if (wanted.length === 0) return { ids, created: 0 };
+  // Lookup value → every normalized name that spells it, e.g. two casings of one GHSA ID.
+  const wanted = new Map<string, string[]>();
+  for (const name of new Set(names.map(normalizeIdentifier))) {
+    if (!name) continue;
+    if (!isGlobalVulnerabilityIdentifier(name)) {
+      console.warn(
+        "MedISAO named a vulnerability without a CVE or GHSA ID; skipping it",
+        { name, integrationId },
+      );
+      continue;
+    }
+    const value = normalizeVulnerabilityIdentifier(name)?.value;
+    if (value) wanted.set(value, [...(wanted.get(value) ?? []), name]);
+  }
+  if (wanted.size === 0) return { ids, created: 0 };
 
-  const adopt = async (name: string, row: MintedRow) => {
-    if (!row.onMatching) await attach(row.id, deviceGroupMatchingId);
-    ids.set(name, row.id);
+  const adopt = async (value: string, held: Held) => {
+    if (held.stubRecordId && !held.onMatching) {
+      await updateVulnerabilityRecord(held.stubRecordId, {
+        deviceGroupMatchingIds: [deviceGroupMatchingId],
+      });
+    }
+    for (const name of wanted.get(value) ?? []) {
+      ids.set(name, held.vulnerabilityId);
+    }
   };
 
-  const [minted, held] = await Promise.all([
-    findMinted(integrationId, wanted, deviceGroupMatchingId),
-    prisma.vulnerability.findMany({
-      where: { cveId: { in: wanted } },
-      select: { id: true, cveId: true },
-    }),
-  ]);
-  // Minted first: the `cveId` lookup also finds a CVE minted here, and would
-  // treat it as another source's row.
-  for (const [name, row] of minted) await adopt(name, row);
-  for (const row of held) {
-    if (row.cveId && !ids.has(row.cveId)) ids.set(row.cveId, row.id);
-  }
+  const found = await findHeld([...wanted.keys()], deviceGroupMatchingId);
+  for (const [value, held] of found) await adopt(value, held);
 
   let created = 0;
-  for (const name of wanted.filter((name) => !ids.has(name))) {
-    const isCve = CVE_PATTERN.test(name);
-    const identifier = normalizeVulnerabilityIdentifier(name);
-    if (!identifier) continue; // unreachable: blank names are filtered above
+  for (const [value, [name]] of wanted) {
+    if (found.has(value)) continue;
     try {
-      const row = await prisma.vulnerability.create({
-        data: {
-          displayId: identifier.displayValue,
-          identifiers: { create: identifier },
-          cveId: isCve ? name : null,
-          description: isCve ? null : `${name}. ${context}`,
-          sarif: {},
-          userId: integrationUserId,
-          deviceGroupMatchings: { connect: [{ id: deviceGroupMatchingId }] },
-          externalMappings: { create: { integrationId, externalId: name } },
-        },
-        select: { id: true },
-      });
-      ids.set(name, row.id);
-      created += 1;
+      const { vulnerabilityId, vulnerabilityCreated } =
+        await createVulnerabilityRecord(
+          {
+            // TODO: VW-583 set the real source once the details are fetched
+            source: VulnerabilitySource.OTHER,
+            sourceId: value,
+            identifiers: [name],
+            deviceGroupMatchingIds: [deviceGroupMatchingId],
+            userId: null,
+          },
+          { actingUserId: integrationUserId },
+        );
+      for (const spelling of wanted.get(value) ?? []) {
+        ids.set(spelling, vulnerabilityId);
+      }
+      if (vulnerabilityCreated) created += 1;
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      const raced = (
-        await findMinted(integrationId, [name], deviceGroupMatchingId)
-      ).get(name);
+      const raced = (await findHeld([value], deviceGroupMatchingId)).get(value);
       if (!raced) throw error;
-      await adopt(name, raced);
+      await adopt(value, raced);
     }
   }
 
   return { ids, created };
 }
 
-interface MintedRow {
-  id: string;
-  onMatching: boolean;
-}
-
-async function findMinted(
-  integrationId: string,
-  names: string[],
+async function findHeld(
+  values: string[],
   deviceGroupMatchingId: string,
-): Promise<Map<string, MintedRow>> {
-  if (names.length === 0) return new Map();
-  const rows = await prisma.externalVulnerabilityMapping.findMany({
-    where: { integrationId, externalId: { in: names } },
+): Promise<Map<string, Held>> {
+  const rows = await prisma.vulnerabilityIdentifier.findMany({
+    where: { value: { in: values } },
     select: {
-      externalId: true,
-      item: {
+      value: true,
+      vulnerabilityId: true,
+      vulnerability: {
         select: {
-          id: true,
+          records: {
+            where: {
+              source: VulnerabilitySource.OTHER,
+              sourceId: { in: values },
+            },
+            select: { id: true, sourceId: true },
+          },
           deviceGroupMatchings: {
             where: { id: deviceGroupMatchingId },
             select: { id: true },
@@ -144,42 +155,15 @@ async function findMinted(
   });
   return new Map(
     rows.map((row) => [
-      row.externalId,
+      row.value,
       {
-        id: row.item.id,
-        onMatching: row.item.deviceGroupMatchings.length > 0,
+        vulnerabilityId: row.vulnerabilityId,
+        stubRecordId:
+          row.vulnerability.records.find(
+            (record) => record.sourceId === row.value,
+          )?.id ?? null,
+        onMatching: row.vulnerability.deviceGroupMatchings.length > 0,
       },
     ]),
   );
-}
-
-/**
- * `vulnerabilityExtension` opens Issues on create only, so a matching added
- * later needs its baseline Issue opened here.
- */
-async function attach(vulnerabilityId: string, deviceGroupMatchingId: string) {
-  const matching = await prisma.vulnerability.update({
-    where: { id: vulnerabilityId },
-    data: {
-      deviceGroupMatchings: { connect: [{ id: deviceGroupMatchingId }] },
-    },
-    select: {
-      deviceGroupMatchings: {
-        where: { id: deviceGroupMatchingId },
-        select: { versionStatus: true },
-      },
-    },
-  });
-  const versionStatus =
-    matching.deviceGroupMatchings[0]?.versionStatus ?? VersionStatus.KNOWN;
-  await prisma.issue.createMany({
-    data: [
-      {
-        vulnerabilityId,
-        deviceGroupMatchingId,
-        status: baselineIssueStatus(versionStatus),
-      },
-    ],
-    skipDuplicates: true,
-  });
 }

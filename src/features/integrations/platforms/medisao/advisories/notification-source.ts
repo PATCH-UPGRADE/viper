@@ -94,7 +94,6 @@ export const linkAdvisoryEntities =
         integrationId: mapping.integrationId,
         integrationUserId: mapping.integration.integrationUserId,
         deviceGroupMatchingId,
-        context: `Named by MedISAO on the advisory "${advisory.title}". No CVE is assigned.`,
       });
 
       if (ids.size > 0) {

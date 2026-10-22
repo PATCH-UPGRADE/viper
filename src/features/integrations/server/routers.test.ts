@@ -3,31 +3,40 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
-  vi.hoisted(() => ({
-    mockCategoriesFor: vi.fn(),
-    mockDefaultSyncEveryFor: vi.fn(),
-    mockInngest: { send: vi.fn() },
-    mockPrisma: {
-      integration: {
-        count: vi.fn(),
-        create: vi.fn(),
-        delete: vi.fn(),
-        findFirst: vi.fn(),
-        findMany: vi.fn(),
-        findUnique: vi.fn(),
-        update: vi.fn(),
-      },
-      integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
-      user: { create: vi.fn() },
-      workOrderTicket: { count: vi.fn() },
-      $executeRaw: vi.fn(),
-      $transaction: vi.fn(),
+const {
+  mockCategoriesFor,
+  mockDefaultSyncEveryFor,
+  mockInngest,
+  mockPrisma,
+  mockSuggestedPlatforms,
+} = vi.hoisted(() => ({
+  mockCategoriesFor: vi.fn(),
+  mockDefaultSyncEveryFor: vi.fn(),
+  mockInngest: { send: vi.fn() },
+  mockSuggestedPlatforms: vi.fn(),
+  mockPrisma: {
+    integration: {
+      count: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
     },
-  }));
+    integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
+    user: { create: vi.fn() },
+    workOrderTicket: { count: vi.fn() },
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(),
+  },
+}));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/inngest/client", () => ({ inngest: mockInngest }));
+vi.mock("../core/suggestions", () => ({
+  suggestedPlatforms: mockSuggestedPlatforms,
+}));
 vi.mock("../core/registry", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../core/registry")>();
   return {
@@ -74,6 +83,15 @@ beforeEach(() => {
   mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
     fn(mockPrisma),
   );
+});
+
+describe("integrationsRouter.getSuggestions", () => {
+  it("returns what the platforms suggest", async () => {
+    const suggestions = [{ platform: PlatformEnum.FLEET, reason: "12 assets" }];
+    mockSuggestedPlatforms.mockResolvedValue(suggestions);
+
+    await expect(caller.getSuggestions()).resolves.toEqual(suggestions);
+  });
 });
 
 describe("integrationsRouter.getMany", () => {

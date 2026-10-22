@@ -230,6 +230,16 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   credentialSchema: z.ZodType<TCreds>;
 }
 
+export interface SuggestCtx {
+  /** Every Integration row, loaded once and shared by all platforms. */
+  integrations: { platform: PlatformEnum; enabled: boolean }[];
+}
+
+export interface Suggestion {
+  /** One sentence for the "Suggested for you" card: why this platform fits this hospital. */
+  reason: string;
+}
+
 /**
  * A platform must supply *either* `sync` or at least one resource module. With
  * resource modules, core dispatches to the one that owns the resource; without
@@ -247,6 +257,13 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   /** How often `sync` should run, in seconds. A resource module's own value wins. */
   defaultSyncEvery?: number | null;
   onCreate?(): Promise<void>;
+
+  /**
+   * Returns a suggestion when this hospital's data shows a need for the
+   * platform, else null. The platform owns every condition, including whether
+   * an integration of it already exists.
+   */
+  suggest?(ctx: SuggestCtx): Promise<Suggestion | null>;
 
   /**
    * Required when the platform has resource modules. Core calls it and hands

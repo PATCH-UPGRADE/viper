@@ -10,3 +10,7 @@ type Input = inferInput<typeof trpc.integrations.getMany>;
 export const prefetchIntegrations = (params: Input) => {
   return prefetch(trpc.integrations.getMany.queryOptions(params));
 };
+
+export const prefetchIntegrationSuggestions = () => {
+  return prefetch(trpc.integrations.getSuggestions.queryOptions());
+};

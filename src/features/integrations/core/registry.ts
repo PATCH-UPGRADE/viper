@@ -41,8 +41,11 @@ export const displayNameFor = (platform: PlatformEnum): string =>
 export const categoriesFor = (platform: PlatformEnum): Category[] =>
   registry[platform]?.definition.categories ?? [];
 
+export const registeredModules = (): AnyConnectorModule[] =>
+  Object.values(registry) as AnyConnectorModule[];
+
 export const unscheduledPlatforms = (): PlatformEnum[] =>
-  (Object.values(registry) as AnyConnectorModule[])
+  registeredModules()
     .filter((module) => module.definition.unscheduled)
     .map((module) => module.definition.platform);
 

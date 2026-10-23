@@ -50,7 +50,7 @@ async function fetchEpss(cve: string) {
   return {
     score,
     percentile: Number.isNaN(percentile) ? null : percentile,
-    raw: { ...entry },
+    raw: entry,
   };
 }
 
@@ -75,11 +75,7 @@ async function fetchKevSet(): Promise<Set<string>> {
 }
 
 export const enrichVulnerability = inngest.createFunction(
-  {
-    id: "enrich-vulnerability",
-    // The create-time event and the nightly run can overlap; upsertFeedRecord finds then creates.
-    concurrency: { key: "event.data.vulnerabilityId", limit: 1 },
-  },
+  { id: "enrich-vulnerability" },
   { event: "vulnerability/enrich.requested" },
   async ({ event, step }) => {
     // kevIds is present when triggered from enrichAllVulnerabilities (batch path).
@@ -94,6 +90,8 @@ export const enrichVulnerability = inngest.createFunction(
         where: { id: vulnerabilityId },
         select: {
           id: true,
+          // The oldest CVE identifier, not displayId: displayId is a display choice whose rules
+          // may change, while the CVE identifier is stable, and the feeds are keyed by CVE.
           identifiers: {
             where: { value: { startsWith: CVE_PREFIX } },
             orderBy: { createdAt: "asc" },

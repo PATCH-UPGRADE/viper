@@ -9,6 +9,7 @@ import {
   TriggerEnum,
   VulnerabilitySource,
 } from "@/generated/prisma";
+import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { baselineIssueStatus } from "@/lib/device-matching";
 import { sendWebhooks } from "@/lib/prisma-client-extensions";
@@ -34,10 +35,7 @@ export const CVSS_METRIC_TYPES: MetricType[] = [
  * Enrichment adds an EPSS and a KEV record to every vulnerability with a CVE. They describe a
  * vulnerability but never keep one alive: deleting its last other record deletes it.
  */
-export type FeedSource =
-  | typeof VulnerabilitySource.FIRST_EPSS
-  | typeof VulnerabilitySource.CISA_KEV;
-export const FEED_SOURCES: FeedSource[] = [
+const FEED_SOURCES: VulnerabilitySource[] = [
   VulnerabilitySource.FIRST_EPSS,
   VulnerabilitySource.CISA_KEV,
 ];
@@ -200,6 +198,20 @@ export async function createVulnerabilityRecord(
     );
   }
   await refreshVulnerability(vulnerabilityId, data.deviceGroupMatchingIds);
+  // Sent here, after the record and its metrics commit, because enrichment reads the CVSS metric.
+  if (created) {
+    inngest
+      .send({
+        name: "vulnerability/enrich.requested",
+        data: { vulnerabilityId },
+      })
+      .catch((err) => {
+        console.error(
+          "Failed to dispatch vulnerability enrichment event:",
+          err,
+        );
+      });
+  }
   return { record, vulnerabilityId, vulnerabilityCreated: created };
 }
 
@@ -324,9 +336,7 @@ async function findOrCreateVulnerability(
         narrative: data.ta3Submission?.narrative ?? null,
         impact: data.ta3Submission?.impact ?? null,
         ...(severity ? { severity } : {}),
-        // TODO: VW-540 legacy columns, still read by the UI, enrichment and inbox. Written at
-        // create because vulnerabilityExtension starts enrichment, which reads cveId and
-        // cvssScore, as soon as the row exists.
+        // TODO: VW-540 legacy columns, still read by the UI and inbox.
         cveId: CVE_PATTERN.test(displayId) ? displayId : null,
         cvssScore: cvss?.score ?? null,
         cvssVector: cvss?.vector ?? null,

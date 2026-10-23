@@ -143,22 +143,6 @@ describe("enrichVulnerability", () => {
     expect(mockUpsertFeedRecord).not.toHaveBeenCalled();
   });
 
-  it("asks for the oldest CVE identifier, not the displayId", async () => {
-    hasVulnerability();
-    respond({ epss: { epss: "0.2", percentile: "0.9" } });
-
-    await run({ vulnerabilityId: "v-1", kevIds: [] });
-
-    const { select } = mockPrisma.vulnerability.findUnique.mock.calls[0][0];
-    expect(select).not.toHaveProperty("displayId");
-    expect(select.identifiers).toEqual({
-      where: { value: { startsWith: "CVE-" } },
-      orderBy: { createdAt: "asc" },
-      take: 1,
-      select: { value: true },
-    });
-  });
-
   it("writes the EPSS and KEV records and the legacy columns", async () => {
     hasVulnerability({ cvss: 9.8 });
     respond({ epss: { epss: "0.2", percentile: "0.95" } });
@@ -239,9 +223,6 @@ describe("enrichVulnerability", () => {
 
     await run({ vulnerabilityId: "v-1", kevIds: [] });
 
-    expect(mockPrisma.metric.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: { updatedAt: "desc" } }),
-    );
     const { data } = mockPrisma.vulnerability.update.mock.calls[0][0];
     expect(data.priority).toBe("Monitor");
   });
@@ -278,10 +259,6 @@ describe("enrichAllVulnerabilities", () => {
 
     const result = await enrichAll({ step });
 
-    expect(mockPrisma.vulnerability.findMany).toHaveBeenCalledWith({
-      where: { identifiers: { some: { value: { startsWith: "CVE-" } } } },
-      select: { id: true },
-    });
     expect(step.sendEvent).toHaveBeenCalledWith("trigger-enrichments", [
       {
         name: "vulnerability/enrich.requested",

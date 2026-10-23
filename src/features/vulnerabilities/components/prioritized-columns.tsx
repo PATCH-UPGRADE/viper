@@ -37,6 +37,9 @@ const kevText = (records: Records) => {
   return kev.inKev ? "True" : "False";
 };
 
+// TODO: these sort headers do nothing. Sorting is manual, and getManyByPriorityInternal never
+// reads `sort`: fetchPaginated always orders by createdAt. Sources and KEV are worked out from
+// the records, so even with `sort` wired up, Prisma can't order by them without a stored column.
 export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
   {
     accessorKey: "id",

@@ -27,11 +27,15 @@ function AccordionItem({
 
 function AccordionTrigger({
   className,
+  headerClassName,
   children,
   ...props
-}: React.ComponentProps<typeof AccordionPrimitive.Trigger>) {
+}: React.ComponentProps<typeof AccordionPrimitive.Trigger> & {
+  /** Classes for the header that wraps the trigger, e.g. to make it sticky. */
+  headerClassName?: string;
+}) {
   return (
-    <AccordionPrimitive.Header className="flex">
+    <AccordionPrimitive.Header className={cn("flex", headerClassName)}>
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(

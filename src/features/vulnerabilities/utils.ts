@@ -41,7 +41,7 @@ export const VULNERABILITY_SOURCE_LABELS: Record<VulnerabilitySource, string> =
     CISA_KEV: "CISA KEV",
   };
 
-type CvssMetric = Extract<MetricResponse, { vector: string | null }>;
+export type CvssMetric = Extract<MetricResponse, { vector: string | null }>;
 type EpssMetric = Extract<MetricResponse, { percentile: number | null }>;
 type KevMetric = Extract<MetricResponse, { inKev: boolean | null }>;
 
@@ -53,46 +53,47 @@ export interface MetricSummary {
   kev: Pick<KevMetric, "inKev" | "updatedAt"> | null;
 }
 
-const newest = <T extends { updatedAt: Date }>(metrics: T[]): T | null =>
-  metrics.reduce<T | null>(
-    (best, metric) =>
-      !best || metric.updatedAt > best.updatedAt ? metric : best,
-    null,
-  );
+const newestFirst = <T extends { updatedAt: Date }>(metrics: T[]): T[] =>
+  [...metrics].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
 /**
- * Pick the newest CVSS (with a score), EPSS and KEV metric across a vulnerability's records.
- * Newest is the latest updatedAt, the same rule enrichment and the vulnerability's severity use.
+ * Every CVSS metric that has a score, newest first. The first is the one a vulnerability shows:
+ * newest is the latest updatedAt, the same rule enrichment and the vulnerability's severity use.
  * TODO: VW-540 replace "newest CVSS wins" once there's a precedence rule between sources.
  */
-export function summarizeMetrics(metrics: MetricResponse[]): MetricSummary {
-  const cvss = newest(
+export function cvssScores<M extends MetricResponse>(
+  metrics: M[],
+): Extract<M, CvssMetric>[] {
+  return newestFirst(
     metrics.filter(
-      (metric): metric is CvssMetric =>
+      (metric): metric is Extract<M, CvssMetric> =>
         CVSS_METRIC_TYPES.includes(metric.type) &&
         (metric as CvssMetric).score !== null,
     ),
   );
-  const epss = newest(
-    metrics.filter((metric): metric is EpssMetric => metric.type === "EPSS"),
-  );
-  const kev = newest(
-    metrics.filter((metric): metric is KevMetric => metric.type === "KEV"),
-  );
+}
+
+/**
+ * Pick the newest CVSS (with a score), EPSS and KEV metric across a vulnerability's records.
+ * Returns the metrics themselves, so anything the caller attached (such as their record) comes
+ * along.
+ */
+export function summarizeMetrics<M extends MetricResponse>(metrics: M[]) {
   return {
-    cvss: cvss && {
-      type: cvss.type,
-      score: cvss.score,
-      vector: cvss.vector,
-      severity: cvss.severity,
-    },
-    epss: epss && {
-      score: epss.score,
-      percentile: epss.percentile,
-      updatedAt: epss.updatedAt,
-    },
-    kev: kev && { inKev: kev.inKev, updatedAt: kev.updatedAt },
-  };
+    cvss: cvssScores(metrics)[0] ?? null,
+    epss:
+      newestFirst(
+        metrics.filter(
+          (metric): metric is Extract<M, EpssMetric> => metric.type === "EPSS",
+        ),
+      )[0] ?? null,
+    kev:
+      newestFirst(
+        metrics.filter(
+          (metric): metric is Extract<M, KevMetric> => metric.type === "KEV",
+        ),
+      )[0] ?? null,
+  } satisfies MetricSummary;
 }
 
 /** summarizeMetrics for records loaded straight from Prisma, whose scores are Decimals. */
@@ -131,6 +132,16 @@ export function recordSources(records: RecordLike[]): {
     ),
   ];
   return { sources, ta3Contributors };
+}
+
+/** Names one record for a reader: "Vendor advisory GE-2020-004", "TA3 (Seed User)". */
+export function recordAttribution(
+  record: RecordLike & { sourceId?: string | null },
+): string {
+  const label = VULNERABILITY_SOURCE_LABELS[record.source];
+  const sourceId = record.sourceId ? ` ${record.sourceId}` : "";
+  const user = record.user ? ` (${record.user.name})` : "";
+  return `${label}${sourceId}${user}`;
 }
 
 /** Every TA3 submission across a vulnerability's records, in record order. */

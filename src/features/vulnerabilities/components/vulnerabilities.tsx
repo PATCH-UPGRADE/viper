@@ -91,37 +91,6 @@ export const VulnerabilitiesList = () => {
   );
 };
 
-// if we use this again wrap ^VulnerabilitiesList with drawer logic
-export const VulnerabilitiesListWithDrawer = () => {
-  const { data: vulnerabilities, isFetching } = useSuspenseVulnerabilities();
-  const [vuln, setVuln] = useState<VulnerabilityResponse | undefined>(
-    undefined,
-  );
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  return (
-    <>
-      {vuln && (
-        <VulnerabilityDrawer
-          vulnerability={vuln}
-          open={drawerOpen}
-          setOpen={setDrawerOpen}
-        />
-      )}
-      <DataTable
-        paginatedData={vulnerabilities}
-        columns={columns}
-        isLoading={isFetching}
-        search={<VulnerabilitiesSearch />}
-        rowOnclick={(row) => {
-          setDrawerOpen(true);
-          setVuln(row.original);
-        }}
-      />
-    </>
-  );
-};
-
 const PrioritiesExplained = {
   Critical: {
     help: "Immediate remediation required. Confirmed exploitation of high-impact vulnerabilities.",

@@ -30,10 +30,10 @@ const sourcesText = (records: Records) =>
     .sources.map((source) => VULNERABILITY_SOURCE_LABELS[source])
     .join(", ");
 
-/** "N/A" when the KEV catalog was never checked for this vulnerability. */
+/** "Unknown" when the KEV catalog was never checked for this vulnerability. */
 const kevText = (records: Records) => {
   const kev = summarizeMetrics(records.flatMap((r) => r.metrics)).kev;
-  if (kev?.inKev == null) return "N/A";
+  if (kev?.inKev == null) return "Unknown";
   return kev.inKev ? "True" : "False";
 };
 

@@ -21,7 +21,7 @@ export function ExploitLinks({ submissions }: { submissions: Submission[] }) {
             href={uri}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline flex items-center gap-1"
+            className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
           >
             {uri}
             <ExternalLinkIcon className="size-3" />
@@ -52,7 +52,9 @@ export function SarifBlocks({
           </div>
           <pre
             className={cn(
-              "text-xs bg-muted p-3 rounded overflow-x-auto",
+              // Wrapped, not scrolled: inside a drawer's ScrollArea, a line that can't
+              // wrap widens the whole tab instead of scrolling.
+              "text-xs bg-muted p-3 rounded whitespace-pre-wrap break-all",
               className,
             )}
           >

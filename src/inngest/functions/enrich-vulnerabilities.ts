@@ -94,7 +94,6 @@ export const enrichVulnerability = inngest.createFunction(
         where: { id: vulnerabilityId },
         select: {
           id: true,
-          // The oldest CVE, not displayId: what gets enriched shouldn't follow display rules.
           identifiers: {
             where: { value: { startsWith: CVE_PREFIX } },
             orderBy: { createdAt: "asc" },

@@ -34,7 +34,10 @@ export const CVSS_METRIC_TYPES: MetricType[] = [
  * Enrichment adds an EPSS and a KEV record to every vulnerability with a CVE. They describe a
  * vulnerability but never keep one alive: deleting its last other record deletes it.
  */
-const FEED_SOURCES: VulnerabilitySource[] = [
+export type FeedSource =
+  | typeof VulnerabilitySource.FIRST_EPSS
+  | typeof VulnerabilitySource.CISA_KEV;
+export const FEED_SOURCES: FeedSource[] = [
   VulnerabilitySource.FIRST_EPSS,
   VulnerabilitySource.CISA_KEV,
 ];

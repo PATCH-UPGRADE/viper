@@ -38,7 +38,7 @@ interface ResolveOrMintResult {
  *
  * TODO: VW-583 is to populate the fields of this stub by searching NVD/GHSA API's
  *
- * (Possible TODO for VW-538, depending on MedISAO behavior) A vulnerability Viper already
+ * (Possible TODO for VW-583, depending on MedISAO behavior) A vulnerability Viper already
  * holds is only linked, never given this channel's devices, even when it is a stub
  * another channel minted.
  *

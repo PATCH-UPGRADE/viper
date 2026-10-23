@@ -29,9 +29,9 @@ export async function resolveNoteTargetLabel(
     case "VULNERABILITY": {
       const vuln = await prisma.vulnerability.findUnique({
         where: { id: instanceId },
-        select: { cveId: true },
+        select: { displayId: true },
       });
-      return vuln ? (vuln.cveId ?? `Vulnerability ${instanceId}`) : null;
+      return vuln?.displayId ?? null;
     }
     case "REMEDIATION": {
       const remediation = await prisma.remediation.findUnique({

@@ -9,6 +9,8 @@ export type NoteTargetLabels = {
   assetLabel: Map<string, string>;
   groupLabel: Map<string, string>;
   matchingLabel: Map<string, string>;
+  // TODO: VW-540 the inbox contexts fill this from the legacy `cveId`. Fill it from `displayId`
+  // and rename it displayIdById when the inbox moves to identifiers.
   cveById: Map<string, string>;
 };
 

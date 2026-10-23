@@ -40,6 +40,9 @@ export const safeUrlSchema = z
     { message: "Only http(s) and git URLs allowed" },
   );
 
+/** When a source published something, e.g. a vulnerability record or a remediation release. */
+export const publishedAtSchema = z.iso.datetime({ offset: true });
+
 /** A manufacturer, product, or version, named by its id or by its name. */
 const catalogRefSchema = z.union([
   z.strictObject({ id: z.string().min(1) }),

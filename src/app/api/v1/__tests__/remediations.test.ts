@@ -39,13 +39,14 @@ describe("Remediations Endpoint (/remediations)", () => {
   };
 
   const vulnerabilityPayload = {
-    sarif: { tool: { driver: { name: "TestScanner" } } },
     devices: [generateDevice("rem_vuln_v1")],
-    exploitUri: "https://exploit-db.com/5678",
-    upstreamApi: "https://nvd.nist.gov/api",
-    description: "Mock -- Critical vulnerability requiring remediation",
-    narrative: "Found during security audit.",
-    impact: "Critical",
+    details: "Mock -- Critical vulnerability requiring remediation",
+    ta3Submission: {
+      sarif: { tool: { driver: { name: "TestScanner" } } },
+      exploitUri: "https://exploit-db.com/5678",
+      narrative: "Found during security audit.",
+      impact: "Critical",
+    },
   };
 
   const mockIntegrationPayload = {
@@ -268,15 +269,16 @@ describe("Remediations Endpoint (/remediations)", () => {
     const newDevice = generateDevice("rem_with_vuln_ref_v1");
     const vulnerabilityIds: string[] = [];
     for (let i = 0; i < 2; i++) {
+      // No identifiers, so each record gets its own vulnerability.
       const vulnRes = await request(BASE_URL)
-        .post("/vulnerabilities")
+        .post("/vulnerabilityRecords")
         .set(authHeader)
         .send({
           ...vulnerabilityPayload,
           devices: [newDevice],
         });
       expect(vulnRes.status).toBe(200);
-      vulnerabilityIds.push(vulnRes.body.id);
+      vulnerabilityIds.push(vulnRes.body.vulnerabilityId);
     }
 
     // Create remediation linked to both vulnerabilities

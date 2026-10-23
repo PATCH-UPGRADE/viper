@@ -6,9 +6,12 @@ import {
   MetricType,
   type Prisma,
   type Severity,
+  TriggerEnum,
   VulnerabilitySource,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { baselineIssueStatus } from "@/lib/device-matching";
+import { sendWebhooks } from "@/lib/prisma-client-extensions";
 import { isUniqueViolation } from "@/lib/router-utils";
 import { requireExistence } from "@/trpc/middleware";
 import {
@@ -108,6 +111,19 @@ function toMetricCreate(
   };
 }
 
+type SubmissionTrigger =
+  | typeof TriggerEnum.TA3Submission_Created
+  | typeof TriggerEnum.TA3Submission_Updated;
+
+/**
+ * Tell webhook subscribers (ALOHA) a TA3 submission was uploaded or changed. Called after its
+ * transaction commits, so a subscriber that queries GET /ta3Submissions straight away finds it.
+ * The query extension in prisma-client-extensions can't do this: the submission is a nested write.
+ */
+export function announceSubmission(trigger: SubmissionTrigger, at: Date) {
+  void sendWebhooks(trigger, at);
+}
+
 function toSubmissionCreate(
   submission: Ta3SubmissionInput,
 ): Prisma.TA3SubmissionUncheckedCreateWithoutRecordInput {
@@ -140,11 +156,11 @@ export async function createVulnerabilityRecord(
     actingUserId,
   );
 
-  let record: Awaited<ReturnType<typeof prisma.vulnerabilityRecord.create>>;
-  try {
-    record = await prisma.$transaction(async (tx) => {
+  const record = await prisma
+    .$transaction(async (tx) => {
       if (!created) await upsertIdentifiers(tx, vulnerabilityId, identifiers);
       return tx.vulnerabilityRecord.create({
+        include: { ta3Submission: { select: { createdAt: true } } },
         data: {
           vulnerabilityId,
           source: data.source,
@@ -163,17 +179,23 @@ export async function createVulnerabilityRecord(
             : {}),
         },
       });
+    })
+    .catch(async (error) => {
+      // Don't leave behind a vulnerability with no records.
+      if (created) {
+        await prisma.vulnerability
+          .deleteMany({ where: { id: vulnerabilityId } })
+          .catch(() => undefined);
+      }
+      throw error;
     });
-  } catch (error) {
-    // Don't leave behind a vulnerability with no records.
-    if (created) {
-      await prisma.vulnerability
-        .deleteMany({ where: { id: vulnerabilityId } })
-        .catch(() => undefined);
-    }
-    throw error;
-  }
 
+  if (record.ta3Submission) {
+    announceSubmission(
+      TriggerEnum.TA3Submission_Created,
+      record.ta3Submission.createdAt,
+    );
+  }
   await refreshVulnerability(vulnerabilityId, data.deviceGroupMatchingIds);
   return { record, vulnerabilityId, vulnerabilityCreated: created };
 }
@@ -196,7 +218,7 @@ export async function updateVulnerabilityRecord(
   assertSubmissionMatchesSource(existing.source, patch.ta3Submission);
   const { vulnerabilityId } = existing;
 
-  const record = await prisma.$transaction(async (tx) => {
+  const { record, submissionChange } = await prisma.$transaction(async (tx) => {
     if (patch.identifiers) {
       await upsertIdentifiers(
         tx,
@@ -205,15 +227,25 @@ export async function updateVulnerabilityRecord(
       );
     }
     if (patch.metrics) await tx.metric.deleteMany({ where: { recordId } });
+    let submissionChange: { trigger: SubmissionTrigger; at: Date } | null =
+      null;
     if (patch.ta3Submission) {
       const submission = toSubmissionCreate(patch.ta3Submission);
-      await tx.tA3Submission.upsert({
+      const existing = await tx.tA3Submission.findUnique({
+        where: { recordId },
+        select: { id: true },
+      });
+      const row = await tx.tA3Submission.upsert({
         where: { recordId },
         create: { recordId, ...submission },
         update: submission,
+        select: { createdAt: true, updatedAt: true },
       });
+      submissionChange = existing
+        ? { trigger: TriggerEnum.TA3Submission_Updated, at: row.updatedAt }
+        : { trigger: TriggerEnum.TA3Submission_Created, at: row.createdAt };
     }
-    return tx.vulnerabilityRecord.update({
+    const updated = await tx.vulnerabilityRecord.update({
       where: { id: recordId },
       data: {
         sourceId: patch.sourceId,
@@ -225,8 +257,12 @@ export async function updateVulnerabilityRecord(
           : {}),
       },
     });
+    return { record: updated, submissionChange };
   });
 
+  if (submissionChange) {
+    announceSubmission(submissionChange.trigger, submissionChange.at);
+  }
   // TODO: VW-541 devices are only ever added: they sit on the vulnerability, not the record,
   // so one record can't remove a device another record added. Affected fixes this.
   await refreshVulnerability(vulnerabilityId, patch.deviceGroupMatchingIds);
@@ -328,23 +364,33 @@ async function refreshVulnerability(
   });
   const matchings = [...new Set(deviceGroupMatchingIds)].map((id) => ({ id }));
 
-  await prisma.vulnerability.update({
+  const { deviceGroupMatchings: attached } = await prisma.vulnerability.update({
     where: { id: vulnerabilityId },
     data: {
+      // Explicit: with no new devices or severity the update is otherwise empty, and ALOHA and
+      // the lastUpdated filters rely on the bump.
+      updatedAt: new Date(),
       ...(matchings.length > 0
         ? { deviceGroupMatchings: { connect: matchings } }
         : {}),
       ...(rated?.severity ? { severity: rated.severity } : {}),
     },
+    select: {
+      deviceGroupMatchings: {
+        where: { id: { in: matchings.map(({ id }) => id) } },
+        select: { id: true, versionStatus: true },
+      },
+    },
   });
 
   // vulnerabilityExtension only opens baseline Issues on create, before any matching is
   // connected here, so open them for every matching this call attached.
-  if (matchings.length > 0) {
+  if (attached.length > 0) {
     await prisma.issue.createMany({
-      data: matchings.map(({ id }) => ({
+      data: attached.map((matching) => ({
         vulnerabilityId,
-        deviceGroupMatchingId: id,
+        deviceGroupMatchingId: matching.id,
+        status: baselineIssueStatus(matching.versionStatus),
       })),
       skipDuplicates: true,
     });

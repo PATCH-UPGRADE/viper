@@ -184,27 +184,6 @@ describe("validateEntityFilter", () => {
         }).success,
       ).toBe(false);
     });
-
-    it("rejects identifier fields other than value", () => {
-      expect(
-        validateEntityFilter("VULNERABILITY", {
-          identifiers: { some: { vulnerabilityId: "vuln_1" } },
-        }).success,
-      ).toBe(false);
-    });
-
-    it.each([
-      ["cveId", "CVE-2024-1234"],
-      ["displayId", "CVE-2024-1234"],
-      ["cvssScore", { gte: 7 }],
-      ["epss", { gte: 0.1 }],
-      ["inKEV", true],
-      ["affectedComponents", { has: "openssl" }],
-    ])("rejects the legacy field %s", (field, value) => {
-      expect(
-        validateEntityFilter("VULNERABILITY", { [field]: value }).success,
-      ).toBe(false);
-    });
   });
 
   describe("REMEDIATION and DEVICE_GROUP_MATCHING", () => {

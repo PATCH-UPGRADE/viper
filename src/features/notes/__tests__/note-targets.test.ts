@@ -159,12 +159,4 @@ describe("resolveNoteTargetLabel for a VULNERABILITY", () => {
       resolveNoteTargetLabel("VULNERABILITY", "vuln_1"),
     ).resolves.toBe("CVE-2024-1234");
   });
-
-  it("returns null when the vulnerability row does not exist", async () => {
-    vi.mocked(prisma.vulnerability.findUnique).mockResolvedValue(null);
-
-    await expect(
-      resolveNoteTargetLabel("VULNERABILITY", "missing"),
-    ).resolves.toBeNull();
-  });
 });

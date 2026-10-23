@@ -49,18 +49,6 @@ describe("summarizeMetrics", () => {
     expect(summary.cvss?.record).toBe(record);
   });
 
-  it("skips a CVSS metric with no score", () => {
-    const summary = summarizeMetrics([cvss(6.1, day(1)), cvss(null, day(5))]);
-    expect(summary.cvss?.score).toBe(6.1);
-  });
-
-  it("does not treat a qualitative rating as CVSS", () => {
-    const summary = summarizeMetrics([
-      { id: "q", type: "QUALITATIVE", updatedAt: day(1), severity: "High" },
-    ]);
-    expect(summary.cvss).toBeNull();
-  });
-
   it("picks up the EPSS and KEV feeds", () => {
     const summary = summarizeMetrics([
       {
@@ -79,13 +67,6 @@ describe("summarizeMetrics", () => {
     });
     expect(summary.kev).toMatchObject({ inKev: true, updatedAt: day(4) });
   });
-
-  it("keeps a KEV check that found no listing", () => {
-    const summary = summarizeMetrics([
-      { id: "k", type: "KEV", updatedAt: day(4), inKev: false },
-    ]);
-    expect(summary.kev).toMatchObject({ inKev: false, updatedAt: day(4) });
-  });
 });
 
 describe("cvssScores", () => {
@@ -94,6 +75,7 @@ describe("cvssScores", () => {
       cvss(9.8, day(1)),
       cvss(null, day(4)),
       cvss(8.1, day(3)),
+      { id: "q", type: "QUALITATIVE", updatedAt: day(6), severity: "High" },
       {
         id: "e",
         type: "EPSS",

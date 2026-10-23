@@ -15,8 +15,8 @@ import prisma from "@/lib/db";
 //
 // The allowlist intentionally exposes only indexed / cheap-to-filter scalar
 // fields, plus relation hops where they earn their keep: Asset -> product ->
-// deviceType lets a note target "all infusion pumps". Unknown
-// fields or operators are rejected.
+// deviceType lets a note target "all infusion pumps", and Vulnerability ->
+// identifiers lets one target a CVE. Unknown fields or operators are rejected.
 
 /** Thrown when a filter is malformed, disallowed, or its query fails. */
 export class EntityFilterError extends Error {
@@ -46,28 +46,6 @@ const stringFilter = z.union([
   }),
 ]);
 
-const numberFilter = z.union([
-  z.number(),
-  z.strictObject({
-    equals: z.number().optional(),
-    not: z.number().optional(),
-    in: z.array(z.number()).optional(),
-    notIn: z.array(z.number()).optional(),
-    lt: z.number().optional(),
-    lte: z.number().optional(),
-    gt: z.number().optional(),
-    gte: z.number().optional(),
-  }),
-]);
-
-const booleanFilter = z.union([
-  z.boolean(),
-  z.strictObject({
-    equals: z.boolean().optional(),
-    not: z.boolean().optional(),
-  }),
-]);
-
 // Dates are carried as ISO-8601 datetime strings in JSON; validate the format
 // up front so malformed values fail here rather than at query time.
 const dateFilter = z.union([
@@ -80,13 +58,6 @@ const dateFilter = z.union([
     gte: z.iso.datetime().optional(),
   }),
 ]);
-
-const stringListFilter = z.strictObject({
-  has: z.string().optional(),
-  hasEvery: z.array(z.string()).optional(),
-  hasSome: z.array(z.string()).optional(),
-  isEmpty: z.boolean().optional(),
-});
 
 type FieldMap = Record<string, z.ZodTypeAny>;
 
@@ -146,17 +117,26 @@ const assetFilterSchema = buildWhereSchema(
   { product: productWhere, version: versionWhere },
 );
 
-const vulnerabilityFilterSchema = buildWhereSchema({
-  id: stringFilter,
-  cveId: stringFilter,
-  severity: stringFilter,
-  cvssScore: numberFilter,
-  epss: numberFilter,
-  inKEV: booleanFilter,
-  priority: stringFilter,
-  affectedComponents: stringListFilter,
-  createdAt: dateFilter,
-});
+// Identifier values are stored trimmed and upper-cased ("CVE-2024-1234",
+// "GHSA-JFH8-C2JP-5V3Q"), so match them upper-cased or with mode: "insensitive".
+const vulnerabilityIdentifierWhere = buildWhereSchema({ value: stringFilter });
+
+const vulnerabilityFilterSchema = buildWhereSchema(
+  {
+    id: stringFilter,
+    severity: stringFilter,
+    priority: stringFilter,
+    createdAt: dateFilter,
+  },
+  {
+    // A to-many relation: Prisma needs some / every / none around the nested where.
+    identifiers: z.strictObject({
+      some: vulnerabilityIdentifierWhere.optional(),
+      every: vulnerabilityIdentifierWhere.optional(),
+      none: vulnerabilityIdentifierWhere.optional(),
+    }),
+  },
+);
 
 const remediationFilterSchema = buildWhereSchema({
   id: stringFilter,

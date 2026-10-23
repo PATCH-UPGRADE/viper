@@ -42,7 +42,7 @@ async function prepareRemediationNotification(
     select: {
       description: true,
       narrative: true,
-      vulnerabilities: { select: { id: true, cveId: true } },
+      vulnerabilities: { select: { id: true, displayId: true } },
     },
   });
   if (!remediation?.vulnerabilities.length) {
@@ -58,7 +58,7 @@ async function prepareRemediationNotification(
 
   const [first, ...rest] = vulnerabilities;
   const more = rest.length > 0 ? ` and ${rest.length} more` : "";
-  const title = `Update available for ${first.cveId ?? "a tracked vulnerability"}${more}`;
+  const title = `Update available for ${first.displayId}${more}`;
   const summary = remediation.description || remediation.narrative || null;
   const markdown = remediation.narrative || remediation.description || null;
   const raw = { remediationId };

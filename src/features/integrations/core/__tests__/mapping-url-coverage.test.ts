@@ -38,18 +38,6 @@ describe("every include that selects mappings still resolves", () => {
         deviceArtifactInclude,
         ResourceType.DeviceArtifact,
       ],
-      [
-        "vulnerabilityInclude",
-        "Vulnerability",
-        vulnerabilityInclude,
-        ResourceType.Vulnerability,
-      ],
-      [
-        "vulnerabilityByPriorityInclude",
-        "Vulnerability",
-        vulnerabilityByPriorityInclude,
-        ResourceType.Vulnerability,
-      ],
     ];
 
   for (const [name, model, include, resource] of cases) {
@@ -59,6 +47,27 @@ describe("every include that selects mappings still resolves", () => {
       ]);
     });
   }
+
+  // A vulnerability's mappings are on its records.
+  it("vulnerabilityInclude", () => {
+    const resource = ResourceType.Vulnerability;
+    expect(
+      mappingPaths("Vulnerability", { include: vulnerabilityInclude }),
+    ).toEqual([
+      { path: ["records", "externalMappings"], resource },
+      // TODO: VW-540 drop the vulnerability-level path with the legacy mappings.
+      { path: ["externalMappings"], resource },
+    ]);
+  });
+
+  it("vulnerabilityByPriorityInclude", () => {
+    const resource = ResourceType.Vulnerability;
+    expect(
+      mappingPaths("Vulnerability", {
+        include: vulnerabilityByPriorityInclude,
+      }),
+    ).toEqual([{ path: ["records", "externalMappings"], resource }]);
+  });
 
   // Related tickets select their own external id for the row label, so the
   // walk finds those nested mappings too.

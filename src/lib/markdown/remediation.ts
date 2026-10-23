@@ -15,7 +15,7 @@ export interface RemediationForMarkdown {
   id: string;
   description?: string | null;
   narrative?: string | null;
-  vulnerabilities: Array<{ id: string; cveId?: string | null }>;
+  vulnerabilities: Array<{ id: string; displayId: string }>;
   deviceGroupMatchings?: DeviceGroupMatchingForMarkdown[];
   issueRemediations?: Array<{
     issue: {
@@ -33,10 +33,9 @@ export interface RemediationForMarkdown {
 }
 
 export function remediationToMarkdown(r: RemediationForMarkdown): string {
-  const cveRef =
-    r.vulnerabilities.map((v) => v.cveId ?? v.id).join(", ") ||
-    "no linked vuln";
-  const lines = [`### Remediation ${r.id} → ${cveRef}`];
+  const vulnRef =
+    r.vulnerabilities.map((v) => v.displayId).join(", ") || "no linked vuln";
+  const lines = [`### Remediation ${r.id} → ${vulnRef}`];
 
   const remediationMatchings = r.deviceGroupMatchings ?? [];
   if (remediationMatchings.length > 0) {

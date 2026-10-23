@@ -127,6 +127,7 @@ describe("toVulnerabilityRecordResponse", () => {
         createdAt: at,
         updatedAt: at,
       },
+      externalMappings: [],
       createdAt: at,
       updatedAt: at,
     });

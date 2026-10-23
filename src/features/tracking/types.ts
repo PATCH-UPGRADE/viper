@@ -32,7 +32,7 @@ export const ticketBaseInclude = {
   },
   assignee: { select: { id: true, name: true, email: true } },
   creator: { select: { id: true, name: true, image: true } },
-  vulnerabilities: { select: { id: true, cveId: true } },
+  vulnerabilities: { select: { id: true, displayId: true } },
   assets: { select: { asset: { select: { id: true, hostname: true } } } },
   // Ingested source artifact(s); the Source column renders by channel (or the
   // creator avatar when there are none — i.e. a manually-created ticket).
@@ -213,7 +213,7 @@ export const ticketDetailInclude = {
     orderBy: { createdAt: "asc" as const },
   },
   vulnerabilities: {
-    select: { id: true, cveId: true, severity: true, cvssScore: true },
+    select: { id: true, displayId: true, severity: true },
   },
   assets: {
     select: {
@@ -384,7 +384,7 @@ export const workOrderListInclude = {
     },
   },
   vulnerabilities: {
-    select: { id: true, cveId: true, severity: true, cvssScore: true },
+    select: { id: true, displayId: true, severity: true },
   },
   remediations: { select: { id: true, description: true } },
   // Replaced at the procedure level with a where: { userId } filter.
@@ -437,7 +437,7 @@ export const workOrderLlmSelect = {
   departments: { select: { name: true }, orderBy: { name: "asc" as const } },
   assignee: { select: { name: true } },
   vulnerabilities: {
-    select: { id: true, cveId: true },
+    select: { id: true, displayId: true },
     take: WORK_ORDER_LLM_VULNERABILITY_LIMIT,
   },
   children: {
@@ -572,9 +572,8 @@ const assetTicketItemSchema = z.object({ asset: linkedAssetSchema });
 
 const linkedVulnerabilitySchema = z.object({
   id: z.string(),
-  cveId: z.string().nullable(),
+  displayId: z.string(),
   severity: z.enum(Severity),
-  cvssScore: z.number().nullable(),
 });
 
 const linkedRemediationSchema = z.object({

@@ -7,14 +7,15 @@ import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import type { VulnerabilityResponse } from "../types";
+import { VulnerabilitySources } from "./vulnerability-sources";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [
   {
-    accessorKey: "cveId",
-    meta: { title: "CVE ID" },
-    header: ({ column }) => <SortableHeader header="CVE ID" column={column} />,
+    accessorKey: "displayId",
+    meta: { title: "ID" },
+    header: ({ column }) => <SortableHeader header="ID" column={column} />,
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.cveId ?? "—"}</span>
+      <span className="font-mono text-xs">{row.original.displayId}</span>
     ),
   },
   {
@@ -41,10 +42,10 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
     ),
   },
   {
-    accessorKey: "userId",
-    meta: { title: "Source Tool" },
-    header: "Source Tool",
-    accessorFn: (row) => row.user.name,
+    id: "sources",
+    meta: { title: "Sources" },
+    header: "Sources",
+    cell: ({ row }) => <VulnerabilitySources records={row.original.records} />,
   },
   {
     accessorKey: "updatedAt",

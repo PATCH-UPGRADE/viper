@@ -12,6 +12,7 @@ vi.mock("@/lib/db", () => ({
     deviceGroupMatching: { findFirst: vi.fn(), findMany: vi.fn() },
     manufacturer: { findFirst: vi.fn() },
     product: { findFirst: vi.fn() },
+    vulnerability: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/router-utils", () => {
@@ -145,5 +146,17 @@ describe("resolveNoteTargetLabel for an ASSET", () => {
     await expect(
       resolveNoteTargetLabel("ASSET", "missing"),
     ).resolves.toBeNull();
+  });
+});
+
+describe("resolveNoteTargetLabel for a VULNERABILITY", () => {
+  it("labels a vulnerability by its displayId", async () => {
+    vi.mocked(prisma.vulnerability.findUnique).mockResolvedValue({
+      displayId: "CVE-2024-1234",
+    } as never);
+
+    await expect(
+      resolveNoteTargetLabel("VULNERABILITY", "vuln_1"),
+    ).resolves.toBe("CVE-2024-1234");
   });
 });

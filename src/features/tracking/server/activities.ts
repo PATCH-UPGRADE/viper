@@ -49,6 +49,7 @@ type UpdateInput = {
   descriptions?: DescriptionInput[];
   assigneeId?: string | null;
   scheduledAt?: Date | null;
+  scheduledEndTime?: Date | null;
 };
 
 /**
@@ -174,6 +175,19 @@ export async function recordUpdateActivities(
     });
   }
   if (
+    input.scheduledEndTime !== undefined &&
+    (input.scheduledEndTime?.getTime() ?? null) !==
+      (before.scheduledEndTime?.getTime() ?? null)
+  ) {
+    rows.push({
+      type: "SCHEDULED_END_CHANGED",
+      data: {
+        from: before.scheduledEndTime,
+        to: input.scheduledEndTime ?? null,
+      },
+    });
+  }
+  if (
     input.assigneeId !== undefined &&
     (input.assigneeId ?? null) !== before.assigneeId
   ) {
@@ -223,6 +237,7 @@ export async function recordUpdateActivities(
         | "ASSIGNEE_CHANGED"
         | "DEPARTMENTS_CHANGED"
         | "SCHEDULED_AT_CHANGED"
+        | "SCHEDULED_END_CHANGED"
         | "SUMMARY_CHANGED"
         | "DESCRIPTION_CHANGED",
       data: r.data,

@@ -199,6 +199,21 @@ const renderActivity = (a: Activity): React.ReactNode => {
         );
       return "changed the scheduled time";
     }
+    case "SCHEDULED_END_CHANGED": {
+      const from = data.from ? new Date(data.from) : null;
+      const to = data.to ? new Date(data.to) : null;
+      if (!from && to)
+        return <>set the end time to {format(to, "MMM d, yyyy 'at' h:mm a")}</>;
+      if (from && !to) return "cleared the end time";
+      if (from && to)
+        return (
+          <>
+            changed the end time from {format(from, "MMM d")} to{" "}
+            {format(to, "MMM d, yyyy 'at' h:mm a")}
+          </>
+        );
+      return "changed the end time";
+    }
     case "SUMMARY_CHANGED":
       return "edited the summary";
     case "DESCRIPTION_CHANGED": {

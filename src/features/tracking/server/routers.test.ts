@@ -2277,6 +2277,37 @@ describe("activity writes", () => {
     ]);
   });
 
+  it("writes one SCHEDULED_END_CHANGED row when only the end time changes", async () => {
+    const start = new Date("2026-06-01T09:00:00Z");
+    const end = new Date("2026-06-01T10:30:00Z");
+    const later = new Date("2026-06-01T11:00:00Z");
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeUpdateBefore({ scheduledAt: start, scheduledEndTime: end }),
+    );
+
+    await setup().update({ id: "t1", scheduledEndTime: later });
+
+    const [arg] = mockPrisma.ticketActivity.createMany.mock.calls[0];
+    expect(arg.data).toEqual([
+      expect.objectContaining({
+        type: "SCHEDULED_END_CHANGED",
+        data: { from: end, to: later },
+      }),
+    ]);
+  });
+
+  it("writes no SCHEDULED_END_CHANGED row when the end time is unchanged", async () => {
+    const start = new Date("2026-06-01T09:00:00Z");
+    const end = new Date("2026-06-01T10:30:00Z");
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeUpdateBefore({ scheduledAt: start, scheduledEndTime: end }),
+    );
+
+    await setup().update({ id: "t1", scheduledEndTime: new Date(end) });
+
+    expect(mockPrisma.ticketActivity.createMany).not.toHaveBeenCalled();
+  });
+
   it("records assignee changes with before/after user snapshots", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue(

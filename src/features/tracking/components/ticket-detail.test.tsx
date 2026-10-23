@@ -1425,6 +1425,35 @@ describe("TicketDetailContent — view mode", () => {
     expect(within(entry).getByText("High")).toBeInTheDocument();
     expect(within(entry).getByText("Critical")).toBeInTheDocument();
   });
+
+  it.each([
+    [
+      { from: new Date(2026, 5, 1, 10, 30), to: new Date(2026, 5, 2, 14, 30) },
+      /changed the end time from Jun 1 to Jun 2, 2026 at 2:30 PM/,
+    ],
+    [
+      { from: null, to: new Date(2026, 5, 2, 14, 30) },
+      /set the end time to Jun 2, 2026 at 2:30 PM/,
+    ],
+    [{ from: new Date(2026, 5, 1, 10, 30), to: null }, /cleared the end time/],
+  ])("renders a SCHEDULED_END_CHANGED entry for %o", (data, text) => {
+    renderDetail({
+      activities: [
+        {
+          id: "e1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "SCHEDULED_END_CHANGED",
+          data,
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const entry = screen.getByLabelText("Activity: SCHEDULED_END_CHANGED");
+    expect(within(entry).getByText(text)).toBeInTheDocument();
+  });
 });
 
 describe("TicketDetailContent — embedded", () => {

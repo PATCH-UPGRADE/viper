@@ -74,7 +74,7 @@ describe("recordInboxCvss", () => {
     expect(upsertSourceRecord).not.toHaveBeenCalled();
   });
 
-  it("leaves a vulnerability that already has a CVSS metric alone", async () => {
+  it("leaves a vulnerability that already has a CVSS score alone", async () => {
     mockPrisma.metric.count.mockResolvedValue(1);
 
     await recordInboxCvss({
@@ -87,6 +87,7 @@ describe("recordInboxCvss", () => {
       where: {
         record: { vulnerabilityId: "vuln-1" },
         type: { in: ["CVSS_V3_0", "CVSS_V3_1", "CVSS_V4_0"] },
+        score: { not: null },
       },
     });
     expect(upsertSourceRecord).not.toHaveBeenCalled();

@@ -2,6 +2,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import {
+  CVE_PATTERN,
   CVSS_METRIC_TYPES,
   cvssBand,
   FEED_SOURCES,
@@ -20,7 +21,6 @@ import { sendWebhooks } from "@/lib/prisma-client-extensions";
 import { isUniqueViolation } from "@/lib/router-utils";
 import { requireExistence } from "@/trpc/middleware";
 import {
-  CVE_PATTERN,
   computeDisplayId,
   findVulnerabilityByIdentifiers,
   mintViperIdentifier,

@@ -384,20 +384,6 @@ describe("applyDecisions — vulnerability mapping", () => {
     });
     expect(order).toEqual(["commit", "cvss"]);
   });
-
-  it("writes no CVSS for a link without a score or vector", async () => {
-    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
-      count: 1,
-    });
-
-    await applyDecisions(
-      { notificationId: "n-1" },
-      [vulnDecision],
-      vulnCandidates,
-    );
-
-    expect(recordInboxCvss).not.toHaveBeenCalled();
-  });
 });
 
 describe("applyDecision - remediation impact", () => {

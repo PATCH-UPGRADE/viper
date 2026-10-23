@@ -206,7 +206,8 @@ export async function enrichVersionUdi(
 /**
  * Keep a CVSS score the match step read out of a notification, as an INBOX record on the
  * vulnerability (one per notification). Only fills a gap: a vulnerability that already has a CVSS
- * metric from any source is left alone, which also makes a re-run a no-op.
+ * score from any source is left alone, which also makes a re-run a no-op. A vector with no score
+ * doesn't count, since nothing shows it, so a later notification can still add the score.
  *
  * Call it after the match transaction commits: the record service writes the vulnerability row,
  * which the transaction may hold locked.
@@ -228,6 +229,7 @@ export async function recordInboxCvss({
     where: {
       record: { vulnerabilityId },
       type: { in: CVSS_METRIC_TYPES },
+      score: { not: null },
     },
   });
   if (existing > 0) return;

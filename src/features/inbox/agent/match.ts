@@ -563,14 +563,12 @@ export async function applyDecisions(
             data: { description: data.description },
           });
         }
-        if (data.cvssScore !== undefined || data.cvssVector) {
-          pendingCvss.push({
-            vulnerabilityId: decision.targetId,
-            notificationId: owner.notificationId,
-            cvssScore: data.cvssScore,
-            cvssVector: data.cvssVector,
-          });
-        }
+        pendingCvss.push({
+          vulnerabilityId: decision.targetId,
+          notificationId: owner.notificationId,
+          cvssScore: data.cvssScore,
+          cvssVector: data.cvssVector,
+        });
         if (decision.op === "update") summary.updated++;
         else summary.linked++;
       } else if (decision.kind === "remediation") {

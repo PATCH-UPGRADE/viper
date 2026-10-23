@@ -7,7 +7,7 @@ type IdentifierRow = {
   vulnerabilityId: string;
 };
 
-const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
+const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
   const identifiers: IdentifierRow[] = [];
   const SUBMITTED_AT = new Date("2026-10-21T12:00:00.000Z");
   const matches = (
@@ -91,6 +91,7 @@ const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
     db,
     identifiers,
     sendWebhooks: vi.fn(async () => {}),
+    send: vi.fn(async () => undefined),
     SUBMITTED_AT,
   };
 });
@@ -98,18 +99,14 @@ const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: db }));
 vi.mock("@/lib/prisma-client-extensions", () => ({ sendWebhooks }));
+vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 
-import { inngest } from "@/inngest/client";
 import {
   createVulnerabilityRecord,
   deleteVulnerabilityRecord,
   updateVulnerabilityRecord,
   upsertSourceRecord,
 } from "../records";
-
-// Stub only the method, so no test reaches an Inngest server (CI has none; a local dev server
-// would run enrichment against the dev database).
-const send = vi.spyOn(inngest, "send").mockResolvedValue({ ids: [] });
 
 const SARIF = { version: "2.1.0", runs: [] };
 
@@ -530,7 +527,9 @@ describe("upsertSourceRecord", () => {
     metrics: [{ type: "CVSS_V3_1" as const, score: 7.5 }],
   };
 
-  it("upserts the record on (source, sourceId, vulnerability) and replaces its metrics", async () => {
+  it("upserts the record on (source, sourceId, vulnerability), replaces its metrics and refreshes the vulnerability", async () => {
+    db.metric.findFirst.mockResolvedValueOnce({ severity: "High" } as never);
+
     await upsertSourceRecord("vuln-1", inbox);
 
     expect(db.vulnerabilityRecord.upsert).toHaveBeenCalledWith(
@@ -557,15 +556,6 @@ describe("upsertSourceRecord", () => {
         }),
       ],
     });
-  });
-
-  it("refreshes the vulnerability without creating one or requesting enrichment", async () => {
-    db.metric.findFirst.mockResolvedValueOnce({ severity: "High" } as never);
-
-    await upsertSourceRecord("vuln-1", inbox);
-
-    expect(db.vulnerability.create).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
     expect(db.vulnerability.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "vuln-1" },

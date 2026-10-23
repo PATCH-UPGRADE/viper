@@ -2,10 +2,9 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
+import { CVE_PATTERN } from "@/features/vulnerabilities/utils";
 import type { TransactionClient } from "@/lib/db";
-import { CVE_PATTERN } from "../utils";
 
-export { CVE_PATTERN };
 /** Every stored CVE `value` starts with this: values are upper-cased. */
 export const CVE_PREFIX = "CVE-";
 const GHSA_PATTERN = /^GHSA(-[0-9a-z]{4}){3}$/i;

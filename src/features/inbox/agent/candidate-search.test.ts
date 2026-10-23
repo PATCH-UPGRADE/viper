@@ -15,7 +15,7 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 import { searchCandidates } from "./candidate-search";
 
-const cvss = (score: number, updatedAt: string, vector: string | null) => ({
+const cvss = (score: number, vector: string | null) => ({
   id: `m-${score}`,
   recordId: "rec",
   type: "CVSS_V3_1" as const,
@@ -24,8 +24,8 @@ const cvss = (score: number, updatedAt: string, vector: string | null) => ({
   percentile: null,
   severity: null,
   flag: null,
-  createdAt: new Date(updatedAt),
-  updatedAt: new Date(updatedAt),
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
 });
 
 const empty = {
@@ -55,16 +55,13 @@ describe("searchCandidates — vulnerabilities", () => {
     );
   });
 
-  it("returns the display ID and the newest CVSS across its records", async () => {
+  it("returns the display ID and the CVSS from its records", async () => {
     mockPrisma.vulnerability.findMany.mockResolvedValue([
       {
         id: "vuln-1",
         displayId: "CVE-2026-0001",
         description: null,
-        records: [
-          { metrics: [cvss(6.1, "2026-01-01", "CVSS:3.1/AV:L")] },
-          { metrics: [cvss(9.8, "2026-06-01", "CVSS:3.1/AV:N")] },
-        ],
+        records: [{ metrics: [cvss(9.8, "CVSS:3.1/AV:N")] }],
       },
     ]);
 

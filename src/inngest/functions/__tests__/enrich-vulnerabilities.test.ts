@@ -19,10 +19,6 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/features/vulnerabilities/server/feed-records", () => ({
   upsertFeedRecord: mockUpsertFeedRecord,
 }));
-// records.ts pulls in webhooks and tRPC; enrichment only needs the CVSS types.
-vi.mock("@/features/vulnerabilities/server/records", () => ({
-  CVSS_METRIC_TYPES: ["CVSS_V3_0", "CVSS_V3_1", "CVSS_V4_0"],
-}));
 
 // The functions under test only need `createFunction` to hand back its handler.
 vi.mock("../../client", () => ({

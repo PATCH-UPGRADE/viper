@@ -1,5 +1,6 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
+import { summarizeRecordMetrics } from "@/features/vulnerabilities/utils";
 import {
   workflowSerializeInclude,
   workflowsUsingAssetsOrMatchings,
@@ -79,6 +80,7 @@ export async function gatherTriageContext(
                 },
               },
               issues: true,
+              records: { select: { metrics: true } },
             },
           },
         },
@@ -191,11 +193,7 @@ export async function gatherTriageContext(
     displayId: v.displayId,
     severity: v.severity,
     priority: v.priority,
-    cvssScore: v.cvssScore,
-    cvssVector: v.cvssVector,
-    epss: v.epss,
-    inKEV: v.inKEV,
-    affectedComponents: v.affectedComponents,
+    metrics: summarizeRecordMetrics(v.records),
     description: v.description,
     narrative: v.narrative,
     impact: v.impact,

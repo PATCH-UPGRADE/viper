@@ -16,6 +16,26 @@ import {
 import { getAssetTitle } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import type { VulnerabilityWithRelations } from "../types";
+import {
+  recordSources,
+  summarizeMetrics,
+  VULNERABILITY_SOURCE_LABELS,
+} from "../utils";
+import { VulnerabilitySources } from "./vulnerability-sources";
+
+type Records = VulnerabilityWithRelations["records"];
+
+const sourcesText = (records: Records) =>
+  recordSources(records)
+    .sources.map((source) => VULNERABILITY_SOURCE_LABELS[source])
+    .join(", ");
+
+/** "N/A" when the KEV catalog was never checked for this vulnerability. */
+const kevText = (records: Records) => {
+  const kev = summarizeMetrics(records.flatMap((r) => r.metrics)).kev;
+  if (kev?.inKev == null) return "N/A";
+  return kev.inKev ? "True" : "False";
+};
 
 export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
   {
@@ -36,11 +56,10 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
     cell: ({ row }) => row.original.displayId,
   },
   {
-    accessorKey: "user.name",
-    header: ({ column }) => (
-      <SortableHeader header="Source Tool" column={column} />
-    ),
-    cell: ({ row }) => row.original.user.name,
+    id: "sources",
+    accessorFn: (row) => sourcesText(row.records),
+    header: ({ column }) => <SortableHeader header="Sources" column={column} />,
+    cell: ({ row }) => <VulnerabilitySources records={row.original.records} />,
   },
   {
     accessorKey: "createdAt",
@@ -61,7 +80,8 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
     ),
   },
   {
-    accessorKey: "inKEV",
+    id: "kev",
+    accessorFn: (row) => kevText(row.records),
     header: ({ column }) => (
       <div className="flex items-center gap-2">
         <SortableHeader header="In KEV?" column={column} />
@@ -71,11 +91,14 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
         </QuestionTooltip>
       </div>
     ),
-    cell: ({ row }) => (
-      <Badge variant={row.original.inKEV ? "destructive" : "outline"}>
-        {row.original.inKEV ? "True" : "False"}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const text = kevText(row.original.records);
+      return (
+        <Badge variant={text === "True" ? "destructive" : "outline"}>
+          {text}
+        </Badge>
+      );
+    },
   },
   {
     accessorKey: "remediations",

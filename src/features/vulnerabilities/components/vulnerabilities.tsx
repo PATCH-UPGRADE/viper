@@ -1,14 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import {
-  BugIcon,
-  Clock,
-  ExternalLinkIcon,
-  Eye,
-  ShieldAlert,
-  ShieldClose,
-} from "lucide-react";
+import { BugIcon, Clock, Eye, ShieldAlert, ShieldClose } from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import {
   EmptyView,
@@ -59,8 +52,14 @@ import type {
   VulnerabilityResponse,
   VulnerabilityWithRelations,
 } from "../types";
+import { recordExternalMappings, ta3Submissions } from "../utils";
 import { columns } from "./columns";
 import { issueColumns, prioritizedColumns } from "./prioritized-columns";
+import {
+  ExploitLinks,
+  hasExploitLinks,
+  SarifBlocks,
+} from "./ta3-submission-details";
 import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
 
 export const VulnerabilitiesSearch = () => {
@@ -358,6 +357,8 @@ export function VulnerabilityDrawer({
   children,
   ...props
 }: PropsWithChildren<VulnerabilityDrawerProps>) {
+  const submissions = ta3Submissions(vulnerability.records);
+  const externalMappings = recordExternalMappings(vulnerability.records);
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
@@ -415,30 +416,22 @@ export function VulnerabilityDrawer({
               </CopyCode>
             </div>
 
-            {vulnerability.exploitUri && (
+            {hasExploitLinks(submissions) && (
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   Exploit Repository
                 </div>
-                <a
-                  href={vulnerability.exploitUri ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  {vulnerability.exploitUri}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
+                <ExploitLinks submissions={submissions} />
               </div>
             )}
 
-            {vulnerability.externalMappings.length > 0 && (
+            {externalMappings.length > 0 && (
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   Integrations
                 </div>
                 <ExternalMappingList
-                  mappings={vulnerability.externalMappings}
+                  mappings={externalMappings}
                   emptyMessage={
                     <p className="text-sm text-muted-foreground">
                       Not mapped to any integration.
@@ -450,14 +443,16 @@ export function VulnerabilityDrawer({
           </div>
         </div>
 
-        <Separator />
+        {submissions.length > 0 && (
+          <>
+            <Separator />
 
-        <div className="flex flex-col gap-2">
-          <h3 className="font-semibold">SARIF Data</h3>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-            {JSON.stringify(vulnerability.sarif, null, 2)}
-          </pre>
-        </div>
+            <div className="flex flex-col gap-2">
+              <h3 className="font-semibold">SARIF Data</h3>
+              <SarifBlocks submissions={submissions} />
+            </div>
+          </>
+        )}
       </div>
     </EntityDrawer>
   );

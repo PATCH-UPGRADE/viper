@@ -25,7 +25,9 @@ import {
 import { requireExistence } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
+  LEGACY_VULNERABILITY_OMIT,
   paginatedVulnerabilityResponseSchema,
+  toPrioritizedVulnerability,
   toVulnerabilityResponse,
   vulnerabilitiesByPriorityInputSchema,
   vulnerabilityByPriorityInclude,
@@ -54,7 +56,6 @@ const ALLOWED_SORT_FIELDS = new Set([
   "priority",
   "displayId",
   "description",
-  "inKEV",
 ] as const);
 
 function getSortValue(segment: string): "asc" | "desc" {
@@ -241,10 +242,15 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         }),
       };
 
-      return fetchPaginated(prisma.vulnerability, pagination, {
+      const result = await fetchPaginated(prisma.vulnerability, pagination, {
         where,
         include: vulnerabilityByPriorityInclude,
+        omit: LEGACY_VULNERABILITY_OMIT,
       });
+      return {
+        ...result,
+        items: result.items.map(toPrioritizedVulnerability),
+      };
     }),
 
   getPriorityMetricsInternal: protectedProcedure.query(async () => {

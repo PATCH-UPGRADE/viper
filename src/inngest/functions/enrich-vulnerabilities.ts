@@ -1,7 +1,7 @@
 import "server-only";
 import { upsertFeedRecord } from "@/features/vulnerabilities/server/feed-records";
 import { CVE_PREFIX } from "@/features/vulnerabilities/server/identity";
-import { CVSS_METRIC_TYPES } from "@/features/vulnerabilities/server/records";
+import { CVSS_METRIC_TYPES } from "@/features/vulnerabilities/utils";
 import type { Priority } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";

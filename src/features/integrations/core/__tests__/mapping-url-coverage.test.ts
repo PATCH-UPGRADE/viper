@@ -17,46 +17,64 @@ import { mappingPaths } from "../mapping-urls";
  * silently, and only in the UI. This is the guard against that.
  */
 describe("every include that selects mappings still resolves", () => {
-  const cases: [name: string, model: string, include: unknown, ResourceType][] =
+  // Each case lists the mapping paths its include selects, from the model root.
+  const cases: [
+    name: string,
+    model: string,
+    include: unknown,
+    ResourceType,
+    paths: string[][],
+  ][] = [
     [
-      ["assetInclude", "Asset", assetInclude, ResourceType.Asset],
-      [
-        "assetDashboardInclude",
-        "Asset",
-        assetDashboardInclude,
-        ResourceType.Asset,
-      ],
-      [
-        "remediationInclude",
-        "Remediation",
-        remediationInclude,
-        ResourceType.Remediation,
-      ],
-      [
-        "deviceArtifactInclude",
-        "DeviceArtifact",
-        deviceArtifactInclude,
-        ResourceType.DeviceArtifact,
-      ],
-      [
-        "vulnerabilityInclude",
-        "Vulnerability",
-        vulnerabilityInclude,
-        ResourceType.Vulnerability,
-      ],
-      [
-        "vulnerabilityByPriorityInclude",
-        "Vulnerability",
-        vulnerabilityByPriorityInclude,
-        ResourceType.Vulnerability,
-      ],
-    ];
+      "assetInclude",
+      "Asset",
+      assetInclude,
+      ResourceType.Asset,
+      [["externalMappings"]],
+    ],
+    [
+      "assetDashboardInclude",
+      "Asset",
+      assetDashboardInclude,
+      ResourceType.Asset,
+      [["externalMappings"]],
+    ],
+    [
+      "remediationInclude",
+      "Remediation",
+      remediationInclude,
+      ResourceType.Remediation,
+      [["externalMappings"]],
+    ],
+    [
+      "deviceArtifactInclude",
+      "DeviceArtifact",
+      deviceArtifactInclude,
+      ResourceType.DeviceArtifact,
+      [["externalMappings"]],
+    ],
+    [
+      "vulnerabilityInclude",
+      "Vulnerability",
+      vulnerabilityInclude,
+      ResourceType.Vulnerability,
+      // TODO: VW-540 drop the vulnerability-level path with the legacy mappings.
+      [["records", "externalMappings"], ["externalMappings"]],
+    ],
+    [
+      "vulnerabilityByPriorityInclude",
+      "Vulnerability",
+      vulnerabilityByPriorityInclude,
+      ResourceType.Vulnerability,
+      [["records", "externalMappings"]],
+    ],
+  ];
 
-  for (const [name, model, include, resource] of cases) {
+  for (const [name, model, include, resource, paths] of cases) {
     it(name, () => {
-      expect(mappingPaths(model, { include })).toEqual([
-        { path: ["externalMappings"], resource },
-      ]);
+      expect(mappingPaths(model, { include })).toEqual(
+        paths.map((path) => ({ path, resource })),
+      );
     });
   }
 

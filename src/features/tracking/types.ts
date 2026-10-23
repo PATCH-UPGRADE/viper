@@ -213,7 +213,7 @@ export const ticketDetailInclude = {
     orderBy: { createdAt: "asc" as const },
   },
   vulnerabilities: {
-    select: { id: true, displayId: true, severity: true, cvssScore: true },
+    select: { id: true, displayId: true, severity: true },
   },
   assets: {
     select: {
@@ -384,7 +384,7 @@ export const workOrderListInclude = {
     },
   },
   vulnerabilities: {
-    select: { id: true, displayId: true, severity: true, cvssScore: true },
+    select: { id: true, displayId: true, severity: true },
   },
   remediations: { select: { id: true, description: true } },
   // Replaced at the procedure level with a where: { userId } filter.
@@ -574,7 +574,6 @@ const linkedVulnerabilitySchema = z.object({
   id: z.string(),
   displayId: z.string(),
   severity: z.enum(Severity),
-  cvssScore: z.number().nullable(),
 });
 
 const linkedRemediationSchema = z.object({

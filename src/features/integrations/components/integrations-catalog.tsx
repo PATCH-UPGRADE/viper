@@ -20,7 +20,7 @@ const SECTION_SUBTITLES: Record<Category, string> = {
     "Get notified about new advisories, recalls, and platform events.",
 };
 
-const PlatformCard = ({
+export const PlatformAddAction = ({
   entry,
   added,
 }: {
@@ -28,6 +28,20 @@ const PlatformCard = ({
   added: boolean;
 }) => {
   const PlatformAddButton = PLATFORM_ADD_OVERRIDES[entry.platform];
+  return PlatformAddButton ? (
+    <PlatformAddButton entry={entry} />
+  ) : (
+    <CreateIntegrationDialog entry={entry} added={added} />
+  );
+};
+
+const PlatformCard = ({
+  entry,
+  added,
+}: {
+  entry: CatalogEntry;
+  added: boolean;
+}) => {
   return (
     <Card className="p-0 gap-0 overflow-hidden">
       <div className="flex items-center gap-3 p-4">
@@ -42,11 +56,7 @@ const PlatformCard = ({
         </div>
       </div>
       <div className="p-4 border-t">
-        {PlatformAddButton ? (
-          <PlatformAddButton entry={entry} />
-        ) : (
-          <CreateIntegrationDialog entry={entry} added={added} />
-        )}
+        <PlatformAddAction entry={entry} added={added} />
       </div>
     </Card>
   );

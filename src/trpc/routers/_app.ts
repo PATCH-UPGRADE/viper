@@ -4,7 +4,11 @@ import { chatRouter } from "@/features/chat/server/routers";
 import { debriefRouter } from "@/features/debrief/server/routers";
 import { departmentsRouter } from "@/features/departments/server/routers";
 import { deviceArtifactsRouter } from "@/features/device-artifacts/server/routers";
-import { deviceGroupsRouter } from "@/features/device-groups/server/routers";
+import {
+  manufacturersRouter,
+  productsRouter,
+  versionsRouter,
+} from "@/features/device-catalog/server/routers";
 import { deviceTypesRouter } from "@/features/device-types/server/routers";
 import { notificationsRouter } from "@/features/inbox/server/routers";
 import { csvImportRouter } from "@/features/integrations/platforms/csv-upload/server/routers";
@@ -37,8 +41,10 @@ export const appRouter = createTRPCRouter({
   mitigation: mitigationRouter,
   integrations: integrationsRouter,
   csvImport: csvImportRouter,
-  deviceGroups: deviceGroupsRouter,
   deviceTypes: deviceTypesRouter,
+  manufacturers: manufacturersRouter,
+  products: productsRouter,
+  versions: versionsRouter,
   webhooks: webhooksRouter,
   artifacts: artifactsRouter,
   chat: chatRouter,

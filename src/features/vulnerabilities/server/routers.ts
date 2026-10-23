@@ -5,11 +5,16 @@ import {
 } from "@/features/notes/server/get-relevant-notes";
 import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { paginationInputSchema } from "@/lib/pagination";
 import {
-  cpesToMatchingConnect,
+  type DeviceIdentity,
+  deviceIdentitySelect,
+} from "@/lib/device-matching";
+import { type PaginationInput, paginationInputSchema } from "@/lib/pagination";
+import {
+  devicesToMatchingConnect,
   fetchPaginated,
-  findVulnerabilitiesMatchingDeviceGroups,
+  findVersionIdentity,
+  findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
@@ -69,6 +74,25 @@ function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
 }
 
+/** One page of the vulnerabilities whose matchings apply to a device. */
+async function paginateVulnerabilitiesForDevice(
+  device: DeviceIdentity,
+  input: PaginationInput,
+) {
+  const matchedVulns = await findVulnerabilitiesMatchingDevices([device]);
+  const idFilter = { id: { in: matchedVulns.map((vuln) => vuln.id) } };
+  const result = await fetchPaginated(prisma.vulnerability, input, {
+    where: input.search
+      ? { AND: [createSearchFilter(input.search), idFilter] }
+      : idFilter,
+    include: vulnerabilityInclude,
+  });
+  return {
+    ...result,
+    items: await attachNotes("VULNERABILITY", result.items),
+  };
+}
+
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
   getMany: protectedProcedure
@@ -113,57 +137,53 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       };
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/vulnerabilities - List vulnerabilities for a device group
-  getManyByDeviceGroup: protectedProcedure
-    .input(
-      paginationInputSchema.extend({
-        deviceGroupId: z.string(),
-      }),
-    )
+  // GET /api/assets/{id}/vulnerabilities - Vulnerabilities whose matchings
+  // apply to an asset's manufacturer, product, and version
+  getManyByAsset: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/vulnerabilities",
-        tags: ["Vulnerabilities", "DeviceGroups"],
-        summary: "List Vulnerabilities by Device Group",
+        path: "/assets/{id}/vulnerabilities",
+        tags: ["Vulnerabilities", "Assets"],
+        summary: "List Vulnerabilities by Asset",
         description:
-          "Get all vulnerabilities affecting a specific device group. Any authenticated user can view all vulnerabilities.",
+          "Get the vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version.",
       },
     })
     .output(paginatedVulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      const { search, deviceGroupId } = input;
-      const searchFilter = createSearchFilter(search);
-
-      // Resolve the device group's identity, then find every vulnerability whose
-      // match objects apply to it (VERS ranges require the in-memory matcher).
-      const deviceGroup = await prisma.deviceGroup.findUnique({
-        where: { id: deviceGroupId },
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
+      const asset = await prisma.asset.findUnique({
+        where: { id: input.id },
+        select: deviceIdentitySelect,
       });
-      const matchedVulns = deviceGroup
-        ? await findVulnerabilitiesMatchingDeviceGroups([deviceGroup])
-        : [];
-      const matchedIds = matchedVulns.map((vuln) => vuln.id);
-
-      const idFilter = { id: { in: matchedIds } };
-      const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
-      const result = await fetchPaginated(prisma.vulnerability, input, {
-        where: whereFilter,
-        include: vulnerabilityInclude,
-      });
-
-      return {
-        ...result,
-        items: await attachNotes("VULNERABILITY", result.items),
-      };
+      return paginateVulnerabilitiesForDevice(
+        requireExistence(asset, "Asset"),
+        input,
+      );
     }),
+
+  // GET /api/versions/{id}/vulnerabilities - Vulnerabilities whose matchings
+  // apply to one product version
+  getManyByVersion: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/versions/{id}/vulnerabilities",
+        tags: ["Vulnerabilities", "Versions"],
+        summary: "List Vulnerabilities by Version",
+        description:
+          "Get the vulnerabilities whose matching rules apply to one product version.",
+      },
+    })
+    .output(paginatedVulnerabilityResponseSchema)
+    .query(async ({ input }) =>
+      paginateVulnerabilitiesForDevice(
+        requireExistence(await findVersionIdentity(input.id), "Version"),
+        input,
+      ),
+    ),
 
   // GET /api/vulnerabilities/{id} - Get single vulnerability (any authenticated user can access)
   getOne: protectedProcedure
@@ -203,8 +223,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { cpes, ...dataInput } = input;
-      const connect = await cpesToMatchingConnect(cpes);
+      const { devices, ...dataInput } = input;
+      const connect = await devicesToMatchingConnect(devices);
 
       return prisma.vulnerability.create({
         data: {
@@ -233,13 +253,15 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // resolve shared matchings up-front (each runs its own transaction)
       const connects = await Promise.all(
-        input.vulnerabilities.map((vuln) => cpesToMatchingConnect(vuln.cpes)),
+        input.vulnerabilities.map((vuln) =>
+          devicesToMatchingConnect(vuln.devices),
+        ),
       );
 
       // create all vulns in a transaction
       return prisma.$transaction(
         input.vulnerabilities.map((vuln, index) => {
-          const { cpes: _cpes, ...dataInput } = vuln;
+          const { devices: _devices, ...dataInput } = vuln;
           return prisma.vulnerability.create({
             data: {
               ...dataInput,
@@ -321,16 +343,16 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
-      const { cpes, ...dataInput } = input.data;
+      const { devices, ...dataInput } = input.data;
 
       return prisma.vulnerability.update({
         where: { id: input.id },
         data: {
           ...dataInput,
-          ...(cpes
+          ...(devices
             ? {
                 deviceGroupMatchings: {
-                  set: await cpesToMatchingConnect(cpes),
+                  set: await devicesToMatchingConnect(devices),
                 },
               }
             : {}),

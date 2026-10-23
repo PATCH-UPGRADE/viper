@@ -123,6 +123,8 @@ export type ResolvedDeviceGroupAsset = {
   hostname: string | null;
   serialNumber: string | null;
   location: unknown;
+  manufacturerId: string | null;
+  productId: string | null;
   version: string | null;
   versionStatus: VersionStatus;
   status: AssetStatus | null;

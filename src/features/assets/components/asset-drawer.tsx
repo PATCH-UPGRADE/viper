@@ -287,7 +287,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
   const sections: Section[] = [
     {
       header: "Device Overview",
-      text: `${getAssetTitle(asset)} — ${deviceLabel(asset.deviceGroup)}`,
+      text: `${getAssetTitle(asset)} — ${deviceLabel(asset)}`,
     },
     ...(location
       ? [

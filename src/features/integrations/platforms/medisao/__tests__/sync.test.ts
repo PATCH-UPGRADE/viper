@@ -375,7 +375,7 @@ describe("the ingest mapping", () => {
     });
   });
 
-  it("resolves the channel to a device group matching, not a CPE", async () => {
+  it("resolves the channel to a device group matching", async () => {
     const { createData } = await transformOf({
       version: "vers:semver/<=6.0.2",
     });

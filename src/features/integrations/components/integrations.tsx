@@ -9,12 +9,13 @@ import {
   WebhookIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   EmptyView,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { mainPadding } from "@/config/constants";
@@ -27,6 +28,7 @@ import { CATEGORIES, type Category } from "../types";
 import { IntegrationCard } from "./integration-row";
 import { IntegrationsCatalog } from "./integrations-catalog";
 import { enabledRowsFor, PlatformUploadsCard } from "./platform-uploads-row";
+import { SuggestedIntegrations } from "./suggested-integrations";
 
 const SECTION_ICONS: Record<Category, LucideIcon> = {
   "Hospital Inventory": ArchiveIcon,
@@ -184,6 +186,12 @@ export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
       />
       <div className="flex flex-col gap-10 flex-1 min-w-0">
         <EnabledIntegrations catalog={catalog} />
+        {/* Suggestions are optional: if they fail or load slowly, the rest of the page still renders. */}
+        <ReportingErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <SuggestedIntegrations catalog={catalog} />
+          </Suspense>
+        </ReportingErrorBoundary>
         <IntegrationsCatalog catalog={catalog} register={register} />
       </div>
     </div>

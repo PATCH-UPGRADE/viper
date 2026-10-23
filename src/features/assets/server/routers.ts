@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import {
   assetNameSearchTerms,
   countAffectedRemediations,
@@ -18,6 +17,7 @@ import {
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceIdentitySelect } from "@/lib/device-matching";
 import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
@@ -25,12 +25,11 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
-  cpeToDeviceGroup,
+  assetWhereForMatchings,
+  deviceInputToAsset,
   fetchPaginated,
-  findDeviceGroupIdsForMatchings,
-  findVulnerabilitiesMatchingDeviceGroups,
+  findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
-  resolveDeviceGroup,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
 import {
@@ -60,17 +59,8 @@ const createSearchFilter = (search: string) => {
     ? {
         OR: [
           ...assetNameSearchTerms(insensitive),
-          {
-            deviceGroup: {
-              is: { manufacturer: { is: { canonicalName: insensitive } } },
-            },
-          },
-          {
-            deviceGroup: {
-              is: { product: { is: { canonicalName: insensitive } } },
-            },
-          },
-          { deviceGroup: { is: { cpe: { has: search } } } },
+          { manufacturer: { is: { canonicalName: insensitive } } },
+          { product: { is: { canonicalName: insensitive } } },
         ],
       }
     : {};
@@ -92,9 +82,7 @@ export function assetOrderBy(
       const key = field.replace("-", "");
       if (key === "issues") return { issues: { _count: direction } };
       if (key === "deviceType") {
-        return {
-          deviceGroup: { product: { deviceType: { displayName: direction } } },
-        };
+        return { product: { deviceType: { displayName: direction } } };
       }
       return { [key]: direction };
     }),
@@ -133,48 +121,32 @@ export const assetsRouter = createTRPCRouter({
       };
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/assets - List assets for a device group
-  getManyByDeviceGroup: protectedProcedure
-    .input(
-      paginationInputSchema.extend({
-        deviceGroupId: z.string(),
-      }),
-    )
+  // GET /api/versions/{id}/assets - Assets that run one product version
+  getManyByVersion: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/assets",
-        tags: ["Assets", "DeviceGroups"],
-        summary: "List Assets by Device Group",
-        description:
-          "Get all assets affecting a specific device group. Any authenticated user can view all assets.",
+        path: "/versions/{id}/assets",
+        tags: ["Assets", "Versions"],
+        summary: "List Assets by Version",
+        description: "Get the assets that run one product version.",
       },
     })
     .output(paginatedAssetResponseSchema)
     .query(async ({ input }) => {
-      const { search, deviceGroupId } = input;
-      const searchFilter = createSearchFilter(search);
-      const whereFilter = search
-        ? {
-            AND: [
-              searchFilter,
-              {
-                deviceGroup: {
-                  id: deviceGroupId,
-                },
-              },
-            ],
-          }
-        : {
-            deviceGroup: {
-              id: deviceGroupId,
-            },
-          };
+      const version = await prisma.version.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+      requireExistence(version, "Version");
       const result = await fetchPaginated(prisma.asset, input, {
-        where: whereFilter,
+        where: {
+          versionId: input.id,
+          ...createSearchFilter(input.search),
+        },
         include: assetInclude,
       });
-
       return {
         ...result,
         items: await attachNotes("ASSET", result.items),
@@ -182,8 +154,7 @@ export const assetsRouter = createTRPCRouter({
     }),
 
   // Assets used in a clinical workflow — either linked directly to one of its
-  // nodes, or belonging to a device group matched by a node's device-group
-  // matching.
+  // nodes, or matched by a node's device-group matching.
   getManyByWorkflow: protectedProcedure
     .input(z.object({ id: z.string() }))
     .output(assetArrayResponseSchema)
@@ -199,18 +170,15 @@ export const assetsRouter = createTRPCRouter({
           versionRange: true,
         },
       });
-      const matchedGroupIds = await findDeviceGroupIdsForMatchings(matchings);
+      const matchedWhere = await assetWhereForMatchings(matchings, {
+        loose: true,
+      });
 
       // Find assets that are directly linked by a node
-      // and assets that are indirectly linked via a node's device group
+      // and assets that are indirectly linked via a node's matching
       const assets = await prisma.asset.findMany({
         where: {
-          OR: [
-            { nodes: { some: { workflowId } } },
-            ...(matchedGroupIds.length
-              ? [{ deviceGroupId: { in: matchedGroupIds } }]
-              : []),
-          ],
+          OR: [{ nodes: { some: { workflowId } } }, matchedWhere],
         },
         include: assetInclude,
         orderBy: { updatedAt: "desc" },
@@ -346,7 +314,7 @@ export const assetsRouter = createTRPCRouter({
     const severities = Object.values(Severity);
 
     const assets = await prisma.asset.findMany({
-      select: { id: true, deviceGroupId: true },
+      select: deviceIdentitySelect,
     });
     const effectiveIssuesByAssetId = await resolveEffectiveIssuesByAsset(
       assets,
@@ -407,8 +375,7 @@ export const assetsRouter = createTRPCRouter({
       const { deviceGroupMatchingIds, assetIds } = input;
 
       // Assets are matched directly by id and/or via the device-group matchings
-      // the node links (each matching resolves to the device groups, and thus
-      // assets, it applies to).
+      // the node links (each matching resolves to the assets it applies to).
       const orConditions: Prisma.AssetWhereInput[] = [];
       if (assetIds?.length) orConditions.push({ id: { in: assetIds } });
       if (deviceGroupMatchingIds?.length) {
@@ -421,9 +388,9 @@ export const assetsRouter = createTRPCRouter({
             versionRange: true,
           },
         });
-        const matchedGroupIds = await findDeviceGroupIdsForMatchings(matchings);
-        if (matchedGroupIds.length)
-          orConditions.push({ deviceGroupId: { in: matchedGroupIds } });
+        orConditions.push(
+          await assetWhereForMatchings(matchings, { loose: true }),
+        );
       }
 
       // No resolvable filters => nothing matches.
@@ -445,23 +412,9 @@ export const assetsRouter = createTRPCRouter({
         orderBy: { updatedAt: "desc" },
       });
 
-      // Collect the distinct device-group identities backing these assets and
-      // find every vulnerability whose matchings apply to them.
-      const deviceGroupIds = [
-        ...new Set(assetItems.map((asset) => asset.deviceGroupId)),
-      ];
-      const deviceGroups = await prisma.deviceGroup.findMany({
-        where: { id: { in: deviceGroupIds } },
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      });
+      // Find every vulnerability whose matchings apply to these assets.
       const vulnerabilities =
-        await findVulnerabilitiesMatchingDeviceGroups(deviceGroups);
+        await findVulnerabilitiesMatchingDevices(assetItems);
 
       return {
         assets: assetItems,
@@ -528,15 +481,20 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { cpe, utilization, deviceType, ...dataInput } = input;
+      const {
+        device: deviceInput,
+        utilization,
+        deviceType,
+        ...dataInput
+      } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
-      const deviceGroup = await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
-      await applyDeviceType(deviceGroup.productId, deviceType);
+      const device = await deviceInputToAsset(deviceInput);
+      await applyDeviceType(device.productId, deviceType);
       return prisma.asset.create({
         data: {
           ...dataInput,
           utilization: utilization as Prisma.InputJsonValue | undefined,
-          deviceGroupId: deviceGroup.id,
+          ...device,
           userId: ctx.auth.user.id,
         },
         include: assetInclude,
@@ -561,22 +519,19 @@ export const assetsRouter = createTRPCRouter({
       const applyDeviceType = await prepareDeviceTypeSlugs(
         input.assets.map((asset) => asset.deviceType),
       );
-      // resolve all device groups in parallel
-      const deviceGroupPromises = input.assets.map(async (asset) => {
-        const { cpe } = asset;
-        return await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
-      });
-
-      const deviceGroups = await Promise.all(deviceGroupPromises);
+      // resolve all devices in parallel
+      const devices = await Promise.all(
+        input.assets.map(({ device }) => deviceInputToAsset(device)),
+      );
       for (const [index, { deviceType }] of input.assets.entries()) {
-        await applyDeviceType(deviceGroups[index].productId, deviceType);
+        await applyDeviceType(devices[index].productId, deviceType);
       }
 
       // create all assets in a transaction
       return prisma.$transaction(
         input.assets.map((asset, index) => {
           const {
-            cpe: _cpe,
+            device: _device,
             utilization,
             deviceType: _deviceType,
             ...dataInput
@@ -585,7 +540,7 @@ export const assetsRouter = createTRPCRouter({
             data: {
               ...dataInput,
               utilization: utilization as Prisma.InputJsonValue | undefined,
-              deviceGroupId: deviceGroups[index].id,
+              ...devices[index],
               userId: ctx.auth.user.id,
             },
             include: assetInclude,
@@ -707,59 +662,30 @@ export const assetsRouter = createTRPCRouter({
 
       const {
         id,
-        cpe,
+        device: deviceInput,
         utilization,
-        version,
-        versionStatus,
         deviceType,
         ...updateData
       } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
       const current = await prisma.asset.findUniqueOrThrow({
         where: { id },
-        select: {
-          deviceGroup: {
-            select: {
-              productId: true,
-              manufacturer: { select: { canonicalName: true } },
-              product: { select: { canonicalName: true } },
-            },
-          },
-        },
+        select: { productId: true },
       });
 
-      let deviceGroupId: string | undefined;
-      let productId = current.deviceGroup.productId;
-      if (cpe) {
-        const target = await cpeToDeviceGroup(cpe);
-        deviceGroupId = target.id;
-        productId = target.productId;
-      } else if (version || versionStatus) {
-        if (current.deviceGroup.manufacturer && current.deviceGroup.product) {
-          const target = await resolveDeviceGroup({
-            manufacturer: current.deviceGroup.manufacturer.canonicalName,
-            product: current.deviceGroup.product.canonicalName,
-            version: version ?? null,
-            versionStatus: version ? "KNOWN" : (versionStatus ?? "UNKNOWN"),
-          });
-          deviceGroupId = target.id;
-        }
-      }
-      await applyDeviceType(productId, deviceType);
-      const updated = await prisma.asset.update({
+      const device =
+        deviceInput === undefined
+          ? undefined
+          : await deviceInputToAsset(deviceInput);
+      await applyDeviceType(device?.productId ?? current.productId, deviceType);
+      return prisma.asset.update({
         where: { id },
         data: {
-          ...(deviceGroupId ? { deviceGroupId } : {}),
+          ...device,
           ...updateData,
           utilization: utilization as Prisma.InputJsonValue | undefined,
         },
         include: assetInclude,
       });
-      if (deviceGroupId) {
-        await prisma.deviceGroupHistory.create({
-          data: { deviceGroupId, assetId: id },
-        });
-      }
-      return updated;
     }),
 });

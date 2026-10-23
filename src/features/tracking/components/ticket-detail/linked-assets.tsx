@@ -126,8 +126,8 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
               {(candidates ?? []).map((a) => {
                 const label = getAssetIdentifier(a);
                 const model = [
-                  a.deviceGroup?.manufacturer?.canonicalDisplayName,
-                  a.deviceGroup?.product?.canonicalDisplayName,
+                  a.manufacturer?.canonicalDisplayName,
+                  a.product?.canonicalDisplayName,
                 ]
                   .filter(Boolean)
                   .join(" ");

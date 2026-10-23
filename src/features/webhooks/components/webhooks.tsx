@@ -1,14 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  BugIcon,
-  ComputerIcon,
-  CpuIcon,
-  FileIcon,
-  PlusIcon,
-  WrenchIcon,
-} from "lucide-react";
+import { BugIcon, CpuIcon, FileIcon, PlusIcon, WrenchIcon } from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { AuthenticationFields } from "@/components/auth-form";
@@ -80,22 +73,6 @@ export const triggerDescriptions = {
       <CpuIcon size={15} />{" "}
       <span>
         A <b>Device Artifact</b> is updated
-      </span>
-    </>
-  ),
-  [TriggerEnum.DeviceGroup_Created]: (
-    <>
-      <ComputerIcon size={15} />{" "}
-      <span>
-        A <b>Device Group</b> is created
-      </span>
-    </>
-  ),
-  [TriggerEnum.DeviceGroup_Updated]: (
-    <>
-      <ComputerIcon size={15} />{" "}
-      <span>
-        A <b>Device Group</b> is updated
       </span>
     </>
   ),

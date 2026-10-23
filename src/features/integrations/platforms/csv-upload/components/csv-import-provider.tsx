@@ -137,9 +137,8 @@ export const CsvImportProvider = ({ children }: { children: ReactNode }) => {
       setTrackedImportIds((previous) =>
         (previous ?? []).filter((trackedId) => trackedId !== importId),
       );
-      void queryClient.invalidateQueries(
-        trpc.integrations.getMany.pathFilter(),
-      );
+      // The whole router: imported assets can change which platforms are suggested.
+      void queryClient.invalidateQueries(trpc.integrations.pathFilter());
       void queryClient.invalidateQueries(
         trpc.assets.getManyDashboardInternal.pathFilter(),
       );

@@ -12,7 +12,7 @@ vi.mock("@/lib/db", () => ({ default: db }));
 vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: vi.fn(),
 }));
-vi.mock("@/lib/router-utils", () => ({ resolveDeviceGroup: vi.fn() }));
+vi.mock("@/lib/router-utils", () => ({ resolveDevice: vi.fn() }));
 vi.mock("@/features/device-types/server/apply-device-type", () => ({
   fillProductDeviceType: vi.fn(),
 }));
@@ -28,7 +28,7 @@ import { fillProductDeviceType } from "@/features/device-types/server/apply-devi
 import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
-import { resolveDeviceGroup } from "@/lib/router-utils";
+import { resolveDevice } from "@/lib/router-utils";
 import type { ResourceSyncCtx, Session } from "../../../../core/types";
 import type { FleetConfig, FleetCreds } from "../../config";
 import { syncFleetContracts } from "../contracts";
@@ -100,6 +100,13 @@ const makeCtx = (
   ...overrides,
 });
 
+const device = {
+  manufacturerId: "m-1",
+  productId: "p-1",
+  versionId: "v-1",
+  versionStatus: "KNOWN" as const,
+};
+
 beforeEach(() => {
   db.integration.findUniqueOrThrow.mockResolvedValue({
     integrationUserId: "shadow-1",
@@ -108,11 +115,7 @@ beforeEach(() => {
   // By default no Fleet asset is safe to re-group; individual tests opt in.
   db.externalAssetMapping.findMany.mockReset().mockResolvedValue([]);
   vi.mocked(processIntegrationSync).mockReset().mockResolvedValue(okResponse);
-  vi.mocked(resolveDeviceGroup)
-    .mockReset()
-    .mockResolvedValue({ id: "dg-1", productId: "p-1" } as Awaited<
-      ReturnType<typeof resolveDeviceGroup>
-    >);
+  vi.mocked(resolveDevice).mockReset().mockResolvedValue(device);
   db.product.findUniqueOrThrow
     .mockReset()
     .mockResolvedValue({ deviceTypeId: null });
@@ -151,7 +154,7 @@ describe("syncAssets", () => {
     expect(outcome).toEqual({ cursor: null });
   });
 
-  it("derives the device group from Fleet's product and version names", async () => {
+  it("derives the device from Fleet's product and version names", async () => {
     await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
@@ -159,15 +162,12 @@ describe("syncAssets", () => {
       input.items[0] as Parameters<typeof config.transformInputItem>[0],
       "shadow-1",
     );
-    expect(resolveDeviceGroup).toHaveBeenCalledWith({
+    expect(resolveDevice).toHaveBeenCalledWith({
       manufacturer: "Siemens Healthineers",
       product: "syngo WebSpace",
       version: "VA11A",
     });
-    expect(out.createData).toMatchObject({
-      deviceGroupId: "dg-1",
-      userId: "shadow-1",
-    });
+    expect(out.createData).toMatchObject({ ...device, userId: "shadow-1" });
     expect(out.uniqueFieldConditions).toEqual([{ serialNumber: "63014" }]);
   });
 
@@ -186,7 +186,7 @@ describe("syncAssets", () => {
     expect(out.updateData).not.toHaveProperty("role");
   });
 
-  it("re-groups an asset whose device group Fleet itself built", async () => {
+  it("updates the device of an asset that Fleet created", async () => {
     db.externalAssetMapping.findMany.mockResolvedValue([
       { externalId: "US_1006103273" },
     ]);
@@ -198,10 +198,10 @@ describe("syncAssets", () => {
       input.items[0] as Parameters<typeof config.transformInputItem>[0],
       "shadow-1",
     );
-    expect(out.updateData).toMatchObject({ deviceGroupId: "dg-1" });
+    expect(out.updateData).toMatchObject(device);
   });
 
-  it("leaves the device group alone when a CPE-derived group owns the asset", async () => {
+  it("leaves the device alone on an asset that another source created", async () => {
     db.externalAssetMapping.findMany.mockResolvedValue([]);
 
     await syncAssets(makeCtx());
@@ -211,17 +211,14 @@ describe("syncAssets", () => {
       input.items[0] as Parameters<typeof config.transformInputItem>[0],
       "shadow-1",
     );
-    expect(out.updateData).not.toHaveProperty("deviceGroupId");
+    expect(out.updateData).not.toHaveProperty("productId");
   });
 
-  it("only asks for assets sitting in a group with no CPE", async () => {
+  it("only asks for the assets that the Fleet user created", async () => {
     await syncAssets(makeCtx());
 
     expect(db.externalAssetMapping.findMany).toHaveBeenCalledWith({
-      where: {
-        integrationId: "int-1",
-        item: { deviceGroup: { cpe: { isEmpty: true } } },
-      },
+      where: { integrationId: "int-1", item: { userId: "shadow-1" } },
       select: { externalId: true },
     });
   });

@@ -5,9 +5,10 @@ import { paginationInputSchema } from "@/lib/pagination";
 import {
   createArtifactWrappers,
   fetchPaginated,
-  findMatchingIdsForDeviceGroup,
+  findMatchingIdsForDevice,
+  findVersionIdentity,
   processIntegrationToken,
-  resolveMatchingIdFromCpe,
+  resolveMatchingIdForDevice,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
@@ -82,52 +83,36 @@ export const deviceArtifactsRouter = createTRPCRouter({
       };
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/deviceArtifacts - List deviceArtifacts for a device group
-  getManyByDeviceGroup: protectedProcedure
-    .input(
-      paginationInputSchema.extend({
-        deviceGroupId: z.string(),
-      }),
-    )
+  // GET /api/versions/{id}/deviceArtifacts - DeviceArtifacts whose matchings
+  // apply to one product version
+  getManyByVersion: protectedProcedure
+    .input(paginationInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/deviceArtifacts",
-        tags: ["DeviceArtifacts", "DeviceGroups"],
-        summary: "List DeviceArtifacts by Device Group",
+        path: "/versions/{id}/deviceArtifacts",
+        tags: ["DeviceArtifacts", "Versions"],
+        summary: "List DeviceArtifacts by Version",
         description:
-          "Get all DeviceArtifacts affecting a specific device group. Any authenticated user can view all DeviceArtifacts.",
+          "Get the DeviceArtifacts whose matching rules apply to one product version.",
       },
     })
     .output(paginatedDeviceArtifactResponseSchema)
     .query(async ({ input }) => {
-      const { search, deviceGroupId } = input;
-      const searchFilter = createSearchFilter(search);
-
-      // Artifacts "for" a device group are those whose identity matching applies.
-      const group = await prisma.deviceGroup.findUnique({
-        where: { id: deviceGroupId },
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      });
-      const matchingIds = group
-        ? await findMatchingIdsForDeviceGroup(group)
-        : [];
+      const version = requireExistence(
+        await findVersionIdentity(input.id),
+        "Version",
+      );
+      const matchingIds = await findMatchingIdsForDevice(version);
       const idFilter = {
         deviceGroupMatchings: { some: { id: { in: matchingIds } } },
       };
-      const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
-
       const result = await fetchPaginated(prisma.deviceArtifact, input, {
-        where: whereFilter,
+        where: input.search
+          ? { AND: [createSearchFilter(input.search), idFilter] }
+          : idFilter,
         include: deviceArtifactInclude,
       });
-
       return {
         ...result,
         items: result.items.map(transformArtifactWrapper),
@@ -175,8 +160,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(deviceArtifactUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // The CPE resolves to the device's identity matching.
-      const identityMatchingId = await resolveMatchingIdFromCpe(input.cpe);
+      const identityMatchingId = await resolveMatchingIdForDevice(input.device);
       const matchingConnect = [{ id: identityMatchingId }];
       const userId = ctx.auth.user.id;
 
@@ -289,7 +273,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
-      const { id, cpe, ...updateData } = input;
+      const { id, device, ...updateData } = input;
 
       // Prepare update data
       const data: Prisma.DeviceArtifactUpdateInput = {
@@ -299,10 +283,9 @@ export const deviceArtifactsRouter = createTRPCRouter({
         }),
       };
 
-      // Update the device's identity matching (from CPE) when provided.
-      if (cpe) {
+      if (device) {
         data.deviceGroupMatchings = {
-          set: [{ id: await resolveMatchingIdFromCpe(cpe) }],
+          set: [{ id: await resolveMatchingIdForDevice(device) }],
         };
       }
 

@@ -40,19 +40,60 @@ export const safeUrlSchema = z
     { message: "Only http(s) and git URLs allowed" },
   );
 
+/** A manufacturer, product, or version, named by its id or by its name. */
+const catalogRefSchema = z.union([
+  z.strictObject({ id: z.string().min(1) }),
+  z.strictObject({ name: z.string().trim().min(1) }),
+]);
+
 /**
- * CPE 2.3 format validator
- * Validates Common Platform Enumeration strings
+ * The devices that a vulnerability, remediation, or device artifact applies to.
+ * An id must exist. A name that does not exist is created inside its parent.
+ * The version is required, so "every version" is an explicit range.
  */
-export const cpeSchema = z
-  .string()
-  .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
+export const deviceInputSchema = z.object({
+  manufacturer: catalogRefSchema,
+  product: catalogRefSchema,
+  version: z
+    .union([
+      catalogRefSchema,
+      z.strictObject({
+        range: z
+          .string()
+          .trim()
+          .regex(/^vers:/, "A range is a VERS string that starts with vers:"),
+      }),
+      z.strictObject({ status: z.enum(["UNKNOWN", "NOT_APPLICABLE"]) }),
+    ])
+    .describe(
+      'One version, or { range } with a VERS string, for example "vers:semver/>=8.0|<8.2". Use { "range": "vers:all/*" } for every version, { "status": "UNKNOWN" } when the source gives no version, and { "status": "NOT_APPLICABLE" } for a product that has no versions.',
+    ),
+});
+export type DeviceInput = z.infer<typeof deviceInputSchema>;
+
+/**
+ * An asset's device. Its version can be a status instead, which says why the
+ * asset has no version, so a version and a status cannot both be sent.
+ */
+export const assetDeviceInputSchema = z.object({
+  manufacturer: catalogRefSchema,
+  product: catalogRefSchema.optional(),
+  version: z
+    .union([
+      catalogRefSchema,
+      z.strictObject({ status: z.enum(["UNKNOWN", "UNSURE"]) }),
+    ])
+    .describe(
+      "The asset's version, or { status } when the version is not known. A version needs a product.",
+    ),
+});
+export type AssetDeviceInput = z.infer<typeof assetDeviceInputSchema>;
 
 export const versionStatusSchema = z.enum(Object.values(VersionStatus));
 export const versSchemeSchema = z.enum(Object.values(VersScheme));
 
 /** A canonical manufacturer/product/version reference as returned by the API. */
-const canonicalRefSchema = z.object({
+export const canonicalRefSchema = z.object({
   canonicalName: z.string(),
   canonicalDisplayName: z.string(),
 });
@@ -64,6 +105,7 @@ export const deviceGroupMatchingResponseSchema = z.object({
   product: canonicalRefSchema.nullable(),
   version: canonicalRefSchema.nullable(),
   versionRange: z.string().nullable(),
+  versionStatus: versionStatusSchema,
 });
 export type DeviceGroupMatchingResponse = z.infer<
   typeof deviceGroupMatchingResponseSchema

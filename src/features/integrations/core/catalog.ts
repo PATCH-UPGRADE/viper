@@ -3,8 +3,7 @@ import type { z } from "zod";
 import type { PlatformEnum } from "@/generated/prisma";
 import type { Category, FieldSpec } from "../types";
 import { usesGenericAuth } from "./credentials";
-import { registry } from "./registry";
-import type { AnyConnectorModule } from "./types";
+import { registeredModules } from "./registry";
 
 const shapeOf = (schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> =>
   "shape" in schema ? (schema.shape as Record<string, z.ZodTypeAny>) : {};
@@ -50,7 +49,7 @@ export interface CatalogEntry {
  * boundary (`registry` pulls in `node:crypto` via `core/credentials.ts`).
  */
 export const catalogEntries = (): CatalogEntry[] =>
-  (Object.values(registry) as AnyConnectorModule[]).map((module) => {
+  registeredModules().map((module) => {
     const { definition } = module;
     return {
       platform: definition.platform,

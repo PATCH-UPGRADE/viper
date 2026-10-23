@@ -31,8 +31,8 @@ Your recommendations should be at a high level overview. You should not suggest 
 </role>
 
 <grounding_rules>
-- Retrieve assets, vulnerabilities, remediations, device groups, device type counts, clinical workflows,
-  inbox notifications, and work orders on demand with the query_platform_data tool, and
+- Retrieve assets, vulnerabilities, remediations, device type counts, manufacturers, products, and versions,
+  clinical workflows, inbox notifications, and work orders on demand with the query_platform_data tool, and
   base your recommendation on what you retrieve.
 - Never invent CVSS scores, EPSS values, KEV status, asset IDs, hostnames, scheduling
   windows, or commands to run on devices. If a fact is not in the persistent notes and
@@ -127,7 +127,7 @@ ask_user_questions call (up to 4 questions) rather than asking them one at a tim
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - query_platform_data: read-only lookup of assets, vulnerabilities, remediations, device
-  groups, device type counts, clinical workflows, inbox notifications, and work orders on demand (see
+  type counts, manufacturers, products, and versions, clinical workflows, inbox notifications, and work orders on demand (see
   data_access). Use it to retrieve the records you reason over, and to check for work
   already in progress before you propose a work order.
 - list_work_order_targets: find which external platform files work orders for given

@@ -7,12 +7,10 @@ const asset = (overrides: Partial<AssetArg> = {}): AssetArg => ({
   id: "asset-1",
   hostname: "PUMP-SIGMA-001",
   role: "ICU Bay Pump",
-  deviceGroup: {
-    manufacturer: { canonicalDisplayName: "Baxter" },
-    product: {
-      canonicalDisplayName: "Sigma Spectrum",
-      deviceType: { displayName: "Infusion Pump" },
-    },
+  manufacturer: { canonicalDisplayName: "Baxter" },
+  product: {
+    canonicalDisplayName: "Sigma Spectrum",
+    deviceType: { displayName: "Infusion Pump" },
   },
   ...overrides,
 });
@@ -32,9 +30,20 @@ describe("assetToMarkdown", () => {
       { product: { canonicalDisplayName: "OptiPlex 790", deviceType: null } },
     ],
     ["no product", { product: null }],
-  ])("says Unknown for %s", (_, deviceGroup) => {
+  ])("says Unknown for %s", (_, overrides) => {
     expect(
-      assetToMarkdown(asset({ deviceGroup }), { includeIssues: false }),
+      assetToMarkdown(asset(overrides), { includeIssues: false }),
     ).toContain("- **Device Type**: Unknown");
+  });
+
+  it("names the device and its version", () => {
+    const md = assetToMarkdown(
+      asset({ version: { canonicalDisplayName: "8.3" } }),
+      { includeIssues: false },
+    );
+
+    expect(md).toContain(
+      "- **Device**: Baxter Sigma Spectrum\n- **Version**: 8.3",
+    );
   });
 });

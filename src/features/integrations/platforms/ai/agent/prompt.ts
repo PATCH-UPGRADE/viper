@@ -7,23 +7,23 @@ const SHARED_FIELD_GUIDANCE = `- externalId: the id that the source API gives th
 - If the items have no id of their own in the source, do not record any items. Call ${REPORT_NO_STABLE_ID_TOOL} with the reason, then stop.
 - upstreamApi: the API URL for this one item, if the source has one.
 - webUrl: the URL where a person can view this item, if the source has one.
-- CPE fields: CPE 2.3 strings, for example "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*". Build them from the vendor, product, and version in the source. Use "*" for a part that you do not know.
+- Device fields: an object such as { "manufacturer": { "name": "Philips" }, "product": { "name": "IntelliVue MX800" }, "version": { "name": "B.02" } }, built from the vendor, product, and version in the source. version is always required. For an asset whose version you do not know, use { "status": "UNKNOWN" }, and leave out a product that you do not know. For a vulnerability, remediation, or device artifact, product is required, and version can be { "range": "vers:semver/>=2.0|<2.3" } for a range in the source, { "range": "vers:all/*" } when the source says every version, or { "status": "UNKNOWN" } when the source names no version.
 - Leave out an optional field that the source does not give. Do not guess values.`;
 
 const RESOURCE_GUIDANCE: Record<CrawlerResource, string> = {
   [ResourceType.Asset]: `You collect assets: networked devices on the hospital network.
 - ip is required. Skip a device that has no IP address.
-- Put the vendor, product, and version of the device in cpe.
+- Put the vendor, product, and version of the device in device.
 - hostname, macAddress, and serialNumber identify the device. Give each one that the source has.`,
   [ResourceType.Vulnerability]: `You collect vulnerabilities.
-- cpes is required: one CPE for each affected product. Skip a vulnerability that names no affected product.
+- devices is required: one device for each affected product. Skip a vulnerability that names no affected product.
 - Give cveId (for example "CVE-2024-12345"), description, severity, cvssScore, and cvssVector when the source has them.`,
   [ResourceType.Remediation]: `You collect remediations: patches, updates, and mitigations.
 - artifacts is required, with at least one entry. An artifact is a file or document: set artifactType, and set downloadUrl when the source links to it.
-- Put the products that the remediation applies to in cpes.
+- Put the products that the remediation applies to in devices.
 - description is a short summary. narrative holds the longer steps, if the source has them.`,
   [ResourceType.DeviceArtifact]: `You collect device artifacts: firmware, manuals, SBOMs, and other files for a device.
-- cpe is required: the device that the artifact is for.
+- device is required: the device that the artifact is for.
 - role and description are required.
 - artifacts is required, with at least one entry. Set artifactType, and set downloadUrl when the source links to it.`,
 };

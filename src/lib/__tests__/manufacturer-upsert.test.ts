@@ -63,7 +63,7 @@ describe("planManufacturerUpserts", () => {
       canonicalName: "siemens healthineers",
       nameMappings: [],
     };
-    const storedSiemensFromCpe: StoredManufacturer = {
+    const storedSiemensAlias: StoredManufacturer = {
       id: "m4",
       canonicalName: "siemens",
       nameMappings: [],
@@ -71,7 +71,7 @@ describe("planManufacturerUpserts", () => {
 
     const plan = planManufacturerUpserts(
       [siemensHealthineers],
-      [storedHealthineers, storedSiemensFromCpe],
+      [storedHealthineers, storedSiemensAlias],
     );
 
     expect(plan.writes).toEqual([

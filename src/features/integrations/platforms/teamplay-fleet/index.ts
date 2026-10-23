@@ -12,6 +12,7 @@ import {
 import { onCreate } from "./on-create";
 import { remediations } from "./remediations";
 import { createFleetSession } from "./session";
+import { suggest } from "./suggest";
 import { workOrders } from "./work-orders";
 
 export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
@@ -25,6 +26,7 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
     credentialSchema,
   },
   onCreate,
+  suggest,
   createSession: createFleetSession,
   assets,
   workOrders,

@@ -3,9 +3,9 @@ import { externalMappingSelect } from "@/features/integrations/core/urls";
 import { PlatformEnum } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
-  cpeSchema,
   createIntegrationInputSchema,
   deviceGroupMatchingResponseSchema,
+  deviceInputSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
@@ -28,8 +28,7 @@ const matchingInclude = {
 } as const;
 
 export const deviceArtifactInputSchema = z.object({
-  // The device this artifact is for (resolved to an identity matching).
-  cpe: cpeSchema,
+  device: deviceInputSchema.describe("The device that this artifact is for."),
   role: z.string().min(1, "Role is required"),
   description: z.string().min(1, "Description is required"),
   artifacts: z
@@ -44,7 +43,7 @@ export const deviceArtifactUpdateSchema = z.object({
   id: z.string(),
   role: z.string().min(1, "Role is required").optional(),
   description: z.string().optional(),
-  cpe: cpeSchema.optional(),
+  device: deviceInputSchema.optional(),
 });
 
 export const deviceArtifactResponseSchema = z.object({

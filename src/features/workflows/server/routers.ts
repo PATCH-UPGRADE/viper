@@ -3,12 +3,13 @@ import { generateSlug } from "random-word-slugs";
 import { z } from "zod";
 import type { NodeType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceIdentitySelect } from "@/lib/device-matching";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { findMatchingIdsForDeviceGroup } from "@/lib/router-utils";
+import { findMatchingIdsForDevice } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import {
@@ -302,26 +303,14 @@ export const workflowsRouter = createTRPCRouter({
 
       const asset = await prisma.asset.findUnique({
         where: { id: assetId },
-        select: {
-          deviceGroup: {
-            select: {
-              id: true,
-              manufacturerId: true,
-              productId: true,
-              versionId: true,
-              version: { select: { canonicalName: true } },
-            },
-          },
-        },
+        select: deviceIdentitySelect,
       });
       const found = requireExistence(asset, "Asset");
 
-      // Device-group matchings that apply to this asset's device group, then
+      // Device-group matchings that apply to this asset, then
       // workflows whose nodes link the asset directly or one of those matchings
       // (one OR query dedupes by workflow id).
-      const applicableMatchingIds = await findMatchingIdsForDeviceGroup(
-        found.deviceGroup,
-      );
+      const applicableMatchingIds = await findMatchingIdsForDevice(found);
       const workflows = await prisma.workflow.findMany({
         where: workflowsUsingAssetsOrMatchings(
           [assetId],

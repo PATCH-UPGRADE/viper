@@ -17,7 +17,6 @@ import { emailPromptText, type InboundEmail } from "./prompt";
 // TODO: What about more unique ID's for specific manufacturers? e.g, Siemens has material number as a unique device group code
 //    something like externalId on an Integration model
 export const extractedDeviceGroupSchema = z.object({
-  cpe: z.string().nullish(),
   udi: z.string().nullish(),
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
@@ -72,8 +71,7 @@ const SYSTEM_PROMPT = `You are an extraction agent for a hospital cybersecurity 
 Your task: extract the following Entities that the notification is about. 
 
 FOR DEVICE GROUPS: A device group is a class of affected product, identified by some combination of:
-- CPE string (e.g. "cpe:2.3:a:vendor:product:1.0:*:*:*:*:*:*:*")
-- UDI: the FDA-assigned Device Identifier (DI) - a fixed code identifying the labeler and specific device model (e.g, "04048675556176"), distinct from a CPE. If the notification quotes a full UDI label string that also encodes a Production Identifier (PI) in GS1 format "(01) 00855361005016", extract ONLY the DI segment.
+- UDI: the FDA-assigned Device Identifier (DI) - a fixed code identifying the labeler and specific device model (e.g, "04048675556176"). If the notification quotes a full UDI label string that also encodes a Production Identifier (PI) in GS1 format "(01) 00855361005016", extract ONLY the DI segment.
 - manufacturer / vendor (e.g. "Philips", "GE Healthcare")
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
@@ -112,7 +110,7 @@ FOR ASSETS: Specific devices named by network identity
 
 RULES:
 - Extract ONLY Entities explicitly referenced in the notification or its attachments.
-- Omit any field you are unsure about; do not guess or fabricate CPEs, models, or versions.
+- Omit any field you are unsure about; do not guess or fabricate UDIs, models, or versions.
 - If the notification references no specific info, return an empty array for each entity.
 - Each distinct affected product/vulnerability/remediation/asset should be its own entry.`;
 

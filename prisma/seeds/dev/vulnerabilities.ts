@@ -1,3 +1,4 @@
+import { upsertFeedRecord } from "@/features/vulnerabilities/server/feed-records";
 import {
   createVulnerabilityRecord,
   cvssMetricType,
@@ -262,11 +263,21 @@ export async function seedVulnerabilities(userId: string) {
       },
       { actingUserId: userId },
     );
-    // TODO: VW-540 EPSS and KEV become records from enrichment in future PR, and priority moves to
-    // Issue in VW-541. Until then they live on the vulnerability.
+    // What enrichment would write, without calling FIRST or CISA.
+    await upsertFeedRecord({
+      vulnerabilityId,
+      cve: cveId,
+      metric: { source: "FIRST_EPSS", score: epss, percentile: null },
+    });
+    await upsertFeedRecord({
+      vulnerabilityId,
+      cve: cveId,
+      metric: { source: "CISA_KEV", inKev: inKEV },
+    });
+    // TODO: VW-541 drop this update once priority moves to Issue.
     const created = await prisma.vulnerability.update({
       where: { id: vulnerabilityId },
-      data: { epss, inKEV, priority },
+      data: { priority },
     });
     vulnerabilities.push(created);
   }

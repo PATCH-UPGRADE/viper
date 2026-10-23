@@ -11,7 +11,6 @@ import {
   TriggerEnum,
 } from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
-import { inngest } from "@/inngest/client";
 import prisma from "./db";
 import { baselineIssueStatus } from "./device-matching";
 import { getBaseUrl } from "./url-utils";
@@ -137,18 +136,6 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
               skipDuplicates: true,
             });
           }
-
-          inngest
-            .send({
-              name: "vulnerability/enrich.requested",
-              data: { vulnerabilityId },
-            })
-            .catch((err) => {
-              console.error(
-                "Failed to dispatch vulnerability enrichment event:",
-                err,
-              );
-            });
 
           return vulnerability;
         },

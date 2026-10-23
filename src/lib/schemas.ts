@@ -45,8 +45,10 @@ export const publishedAtSchema = z.iso.datetime({ offset: true });
 
 /** A manufacturer, product, or version, named by its id or by its name. */
 const catalogRefSchema = z.union([
-  z.strictObject({ id: z.string().min(1) }),
-  z.strictObject({ name: z.string().trim().min(1) }),
+  z.strictObject({ id: z.string().min(1) }).meta({ id: "CatalogRefById" }),
+  z
+    .strictObject({ name: z.string().trim().min(1) })
+    .meta({ id: "CatalogRefByName" }),
 ]);
 
 /**
@@ -60,13 +62,17 @@ export const deviceInputSchema = z.object({
   version: z
     .union([
       catalogRefSchema,
-      z.strictObject({
-        range: z
-          .string()
-          .trim()
-          .regex(/^vers:/, "A range is a VERS string that starts with vers:"),
-      }),
-      z.strictObject({ status: z.enum(["UNKNOWN", "NOT_APPLICABLE"]) }),
+      z
+        .strictObject({
+          range: z
+            .string()
+            .trim()
+            .regex(/^vers:/, "A range is a VERS string that starts with vers:"),
+        })
+        .meta({ id: "VersionRangeRef" }),
+      z
+        .strictObject({ status: z.enum(["UNKNOWN", "NOT_APPLICABLE"]) })
+        .meta({ id: "DeviceVersionStatusRef" }),
     ])
     .describe(
       'One version, or { range } with a VERS string, for example "vers:semver/>=8.0|<8.2". Use { "range": "vers:all/*" } for every version, { "status": "UNKNOWN" } when the source gives no version, and { "status": "NOT_APPLICABLE" } for a product that has no versions.',
@@ -84,7 +90,9 @@ export const assetDeviceInputSchema = z.object({
   version: z
     .union([
       catalogRefSchema,
-      z.strictObject({ status: z.enum(["UNKNOWN", "UNSURE"]) }),
+      z
+        .strictObject({ status: z.enum(["UNKNOWN", "UNSURE"]) })
+        .meta({ id: "AssetVersionStatusRef" }),
     ])
     .describe(
       "The asset's version, or { status } when the version is not known. A version needs a product.",

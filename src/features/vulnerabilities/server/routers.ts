@@ -3,7 +3,7 @@ import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
-import { Priority, ResourceType } from "@/generated/prisma";
+import { Priority, type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   type DeviceIdentity,
@@ -26,6 +26,7 @@ import { requireExistence } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
   paginatedVulnerabilityResponseSchema,
+  toVulnerabilityResponse,
   vulnerabilitiesByPriorityInputSchema,
   vulnerabilityByPriorityInclude,
   vulnerabilityInclude,
@@ -33,23 +34,15 @@ import {
 } from "../types";
 import { processVulnerabilityIntegrationSync } from "./integration-sync";
 
-const createSearchFilter = (search: string) => {
+const createSearchFilter = (search: string): Prisma.VulnerabilityWhereInput => {
   const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
         OR: [
+          { displayId: insensitive },
+          { identifiers: { some: { value: insensitive } } },
           { description: insensitive },
           { impact: insensitive },
-          {
-            deviceGroupMatchings: {
-              some: {
-                OR: [
-                  { manufacturer: { is: { canonicalName: insensitive } } },
-                  { product: { is: { canonicalName: insensitive } } },
-                ],
-              },
-            },
-          },
         ],
       }
     : {};
@@ -83,7 +76,10 @@ async function paginateVulnerabilitiesForDevice(
   });
   return {
     ...result,
-    items: await attachNotes("VULNERABILITY", result.items),
+    items: await attachNotes(
+      "VULNERABILITY",
+      result.items.map(toVulnerabilityResponse),
+    ),
   };
 }
 
@@ -127,7 +123,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       return {
         ...result,
-        items: await attachNotes("VULNERABILITY", result.items),
+        items: await attachNotes(
+          "VULNERABILITY",
+          result.items.map(toVulnerabilityResponse),
+        ),
       };
     }),
 
@@ -199,7 +198,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
       });
       const found = requireExistence(vuln, "Vulnerability");
-      return attachNote("VULNERABILITY", found);
+      return attachNote("VULNERABILITY", toVulnerabilityResponse(found));
     }),
 
   processIntegrationCreate: baseProcedure

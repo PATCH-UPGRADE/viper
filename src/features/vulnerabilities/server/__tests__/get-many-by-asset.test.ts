@@ -83,6 +83,15 @@ describe("vulnerabilities.getManyByAsset", () => {
     expect(args.where.AND).toContainEqual({
       id: { in: ["vuln-1", "vuln-2"] },
     });
+    const insensitive = { contains: "CVE-2026", mode: "insensitive" };
+    expect(args.where.AND).toContainEqual({
+      OR: [
+        { displayId: insensitive },
+        { identifiers: { some: { value: insensitive } } },
+        { description: insensitive },
+        { impact: insensitive },
+      ],
+    });
   });
 
   it("returns NOT_FOUND for an unknown asset", async () => {

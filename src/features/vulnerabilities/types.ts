@@ -3,6 +3,7 @@ import { z } from "zod";
 import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
+  type Metric,
   MetricType,
   PlatformEnum,
   Priority,
@@ -108,14 +109,83 @@ export type VulnerabilityRecordUpdateInput = z.infer<
   typeof vulnerabilityRecordUpdateInputSchema
 >;
 
-export const metricResponseSchema = z.object({
+const metricResponseBase = {
   id: z.string(),
-  type: z.enum(MetricType),
-  vector: z.string().nullable(),
-  score: z.number().nullable(),
-  percentile: z.number().nullable(),
-  severity: severitySchema.nullable(),
-});
+  updatedAt: z.date(),
+};
+
+/** Each metric type returns only the fields it uses. */
+export const metricResponseSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.enum([
+        MetricType.CVSS_V3_0,
+        MetricType.CVSS_V3_1,
+        MetricType.CVSS_V4_0,
+      ]),
+      vector: z.string().nullable(),
+      score: z.number().nullable(),
+      severity: severitySchema.nullable(),
+    })
+    .meta({ id: "CvssMetric" }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.literal(MetricType.QUALITATIVE),
+      severity: severitySchema.nullable(),
+    })
+    .meta({ id: "QualitativeMetric" }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.literal(MetricType.EPSS),
+      score: z.number().nullable(), // probability, 0–1
+      percentile: z.number().nullable(),
+    })
+    .meta({ id: "EpssMetric" }),
+  z
+    .object({
+      ...metricResponseBase,
+      type: z.literal(MetricType.KEV),
+      inKev: z.boolean().nullable(), // false: the catalog was checked and doesn't list it
+    })
+    .meta({ id: "KevMetric" }),
+]);
+export type MetricResponse = z.infer<typeof metricResponseSchema>;
+
+/** Picks the fields a metric's type uses. Prisma returns Decimals; the API returns numbers. */
+export function toMetricResponse(metric: Metric): MetricResponse {
+  const { id, type, updatedAt } = metric;
+  const score = metric.score?.toNumber() ?? null;
+  switch (type) {
+    case MetricType.CVSS_V3_0:
+    case MetricType.CVSS_V3_1:
+    case MetricType.CVSS_V4_0:
+      return {
+        id,
+        type,
+        updatedAt,
+        vector: metric.vector,
+        score,
+        severity: metric.severity,
+      };
+    case MetricType.QUALITATIVE:
+      return { id, type, updatedAt, severity: metric.severity };
+    case MetricType.EPSS:
+      return {
+        id,
+        type,
+        updatedAt,
+        score,
+        percentile: metric.percentile?.toNumber() ?? null,
+      };
+    case MetricType.KEV:
+      return { id, type, updatedAt, inKev: metric.flag };
+    default:
+      return type satisfies never;
+  }
+}
 
 export const ta3SubmissionResponseSchema = z.object({
   id: z.string(),
@@ -166,10 +236,7 @@ export const ta3SubmissionInclude = {
   record: { select: { vulnerabilityId: true } },
 } satisfies Prisma.TA3SubmissionInclude;
 
-/**
- * Prisma returns Decimal for metric scores; the API returns plain numbers. The rest is the row
- * as is: the output schema strips the fields the API doesn't return.
- */
+/** The rest is the row as is: the output schema strips the fields the API doesn't return. */
 export function toVulnerabilityRecordResponse(
   record: Prisma.VulnerabilityRecordGetPayload<{
     include: typeof vulnerabilityRecordInclude;
@@ -177,11 +244,7 @@ export function toVulnerabilityRecordResponse(
 ): VulnerabilityRecordResponse {
   return {
     ...record,
-    metrics: record.metrics.map((metric) => ({
-      ...metric,
-      score: metric.score?.toNumber() ?? null,
-      percentile: metric.percentile?.toNumber() ?? null,
-    })),
+    metrics: record.metrics.map(toMetricResponse),
     ta3Submission: record.ta3Submission && {
       ...record.ta3Submission,
       vulnerabilityId: record.vulnerabilityId,
@@ -189,12 +252,46 @@ export function toVulnerabilityRecordResponse(
   };
 }
 
+export const vulnerabilityIdentifierResponseSchema = z.object({
+  value: z.string(), // trimmed + upper-cased, for lookup
+  displayValue: z.string(), // as published
+});
+
+/** A record as it appears nested in a vulnerability response. */
+export const vulnerabilityRecordWithUserResponseSchema =
+  vulnerabilityRecordResponseSchema.extend({
+    user: userSchema.nullable(),
+  });
+
 export const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   displayId: z.string(), // best human-facing ID: CVE > GHSA > other > VIPER-
+  description: z.string().nullable(),
+  narrative: z.string().nullable(),
+  impact: z.string().nullable(),
+  severity: severitySchema,
+  identifiers: z.array(vulnerabilityIdentifierResponseSchema),
+  // TODO: VW-541 show metrics per product (Affected) instead of per record
+  records: z.array(vulnerabilityRecordWithUserResponseSchema),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  notes: z.array(scopedNoteSchema).optional(),
+
+  // <Getting removed in VW-540>
+  // Legacy flat fields, kept until the UI and other consumers read identifiers and records.
+  cveId: z.string().nullable(),
+  cvssScore: z.number().nullable(),
+  cvssVector: z.string().nullable(),
+  epss: z.number().nullable(),
+  updatedEpss: z.date().nullable(),
+  inKEV: z.boolean(),
+  updatedInKev: z.date().nullable(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   exploitUri: z.string().nullable(),
+  affectedComponents: z.array(z.string()),
+  userId: z.string(),
+  user: userSchema,
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   externalMappings: z.array(
     z.object({
       externalId: z.string(),
@@ -207,23 +304,7 @@ export const vulnerabilityResponseSchema = z.object({
       }),
     }),
   ),
-  description: z.string().nullable(),
-  narrative: z.string().nullable(),
-  impact: z.string().nullable(),
-  cveId: z.string().nullable(),
-  cvssScore: z.number().nullable(),
-  severity: severitySchema,
-  affectedComponents: z.array(z.string()),
-  cvssVector: z.string().nullable(),
-  epss: z.number().nullable(),
-  updatedEpss: z.date().nullable(),
-  inKEV: z.boolean(),
-  updatedInKev: z.date().nullable(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-  notes: z.array(scopedNoteSchema).optional(),
+  // </Getting removed in VW-540>
 });
 export type VulnerabilityResponse = z.infer<typeof vulnerabilityResponseSchema>;
 
@@ -244,10 +325,34 @@ export const vulnerabilitiesByPriorityInputSchema =
   });
 
 export const vulnerabilityInclude = {
+  identifiers: {
+    select: { value: true, displayValue: true },
+    orderBy: { createdAt: "asc" },
+  },
+  records: {
+    include: { ...vulnerabilityRecordInclude, user: userIncludeSelect },
+    orderBy: { createdAt: "asc" },
+  },
+  // TODO: VW-540 legacy relations, removed with the flat fields above
   user: userIncludeSelect,
   deviceGroupMatchings: deviceGroupMatchingInclude,
   externalMappings: externalMappingSelect,
-};
+} satisfies Prisma.VulnerabilityInclude;
+
+/** Converts each record's metric Decimals; the output schema strips the rest. */
+export function toVulnerabilityResponse(
+  vulnerability: Prisma.VulnerabilityGetPayload<{
+    include: typeof vulnerabilityInclude;
+  }>,
+) {
+  return {
+    ...vulnerability,
+    records: vulnerability.records.map((record) => ({
+      ...toVulnerabilityRecordResponse(record),
+      user: record.user,
+    })),
+  };
+}
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,

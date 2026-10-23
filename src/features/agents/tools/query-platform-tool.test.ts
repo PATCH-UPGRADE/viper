@@ -620,7 +620,9 @@ describe("PLATFORM_CATALOG teaches ranking", () => {
     expect(PLATFORM_CATALOG).toContain(
       "Page 1 of a sorted query is the answer",
     );
-    expect(PLATFORM_CATALOG).toMatch(/larger pageSize, not for the next pages/);
+    expect(PLATFORM_CATALOG).toMatch(
+      /larger pageSize: one call returns them, where reading the next pages takes\s+several/,
+    );
   });
 
   it("pages on with the same sort past the largest pageSize", () => {

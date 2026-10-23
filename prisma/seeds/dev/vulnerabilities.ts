@@ -274,10 +274,10 @@ export async function seedVulnerabilities(userId: string) {
       cve: cveId,
       metric: { source: "CISA_KEV", inKev: inKEV },
     });
-    // TODO: VW-540 legacy columns, still read by the UI. TODO: VW-541 priority moves to Issue.
+    // TODO: VW-541 drop this update once priority moves to Issue.
     const created = await prisma.vulnerability.update({
       where: { id: vulnerabilityId },
-      data: { epss, inKEV, priority },
+      data: { priority },
     });
     vulnerabilities.push(created);
   }

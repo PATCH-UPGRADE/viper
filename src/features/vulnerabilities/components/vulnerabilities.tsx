@@ -13,7 +13,6 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { ExternalMappingList } from "@/components/external-mappings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,15 +51,10 @@ import type {
   VulnerabilityResponse,
   VulnerabilityWithRelations,
 } from "../types";
-import { recordExternalMappings, ta3Submissions } from "../utils";
 import { columns } from "./columns";
 import { issueColumns, prioritizedColumns } from "./prioritized-columns";
-import {
-  ExploitLinks,
-  hasExploitLinks,
-  SarifBlocks,
-} from "./ta3-submission-details";
 import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
+import { VulnerabilityRecordsAccordion } from "./vulnerability-records";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -326,8 +320,6 @@ export function VulnerabilityDrawer({
   children,
   ...props
 }: PropsWithChildren<VulnerabilityDrawerProps>) {
-  const submissions = ta3Submissions(vulnerability.records);
-  const externalMappings = recordExternalMappings(vulnerability.records);
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
@@ -384,44 +376,17 @@ export function VulnerabilityDrawer({
                 )}
               </CopyCode>
             </div>
-
-            {hasExploitLinks(submissions) && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Exploit Repository
-                </div>
-                <ExploitLinks submissions={submissions} />
-              </div>
-            )}
-
-            {externalMappings.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Integrations
-                </div>
-                <ExternalMappingList
-                  mappings={externalMappings}
-                  emptyMessage={
-                    <p className="text-sm text-muted-foreground">
-                      Not mapped to any integration.
-                    </p>
-                  }
-                />
-              </div>
-            )}
           </div>
         </div>
 
-        {submissions.length > 0 && (
-          <>
-            <Separator />
+        <Separator />
 
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold">SARIF Data</h3>
-              <SarifBlocks submissions={submissions} />
-            </div>
-          </>
-        )}
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold">
+            Sources ({vulnerability.records.length})
+          </h3>
+          <VulnerabilityRecordsAccordion records={vulnerability.records} />
+        </div>
       </div>
     </EntityDrawer>
   );

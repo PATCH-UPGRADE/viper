@@ -143,17 +143,3 @@ export function recordAttribution(
   const user = record.user ? ` (${record.user.name})` : "";
   return `${label}${sourceId}${user}`;
 }
-
-/** Every TA3 submission across a vulnerability's records, in record order. */
-export function ta3Submissions<T>(records: { ta3Submission: T | null }[]): T[] {
-  return records.flatMap((record) =>
-    record.ta3Submission ? [record.ta3Submission] : [],
-  );
-}
-
-/** Every integration's ID for a vulnerability's records. */
-export function recordExternalMappings<T>(
-  records: { externalMappings: T[] }[],
-): T[] {
-  return records.flatMap((record) => record.externalMappings);
-}

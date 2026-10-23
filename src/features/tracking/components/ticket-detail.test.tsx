@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -485,6 +485,53 @@ describe("TicketEditForm", () => {
     expect(payload.descriptions).toEqual([
       { departmentId: "d-radio", body: "Initial Radiology description" },
     ]);
+  });
+
+  describe("scheduled end", () => {
+    const scheduled = makeTicket({
+      scheduledAt: new Date(2026, 5, 1, 9, 0),
+      scheduledEndTime: new Date(2026, 5, 1, 10, 30),
+    });
+    it("flags an end that is not after the start and blocks Save", () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+      const end = screen.getByLabelText(/scheduled end/i);
+      expect(end).toHaveValue("2026-06-01T10:30");
+      expect(end).not.toHaveAttribute("aria-describedby");
+
+      fireEvent.change(end, { target: { value: "2026-06-01T08:00" } });
+
+      expect(end).toHaveAccessibleDescription(/end time must be after/i);
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+
+    it("asks for a start when the end has none", () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText(/scheduled for/i), {
+        target: { value: "" },
+      });
+
+      expect(screen.getByText(/set a start time first/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+
+    it("moves the end with the start", async () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText(/scheduled for/i), {
+        target: { value: "2026-06-02T13:00" },
+      });
+
+      expect(screen.getByLabelText(/scheduled end/i)).toHaveValue(
+        "2026-06-02T14:30",
+      );
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: /^save$/i }));
+      expect(mockMutate.mock.calls[0][0].scheduledEndTime).toEqual(
+        new Date(2026, 5, 2, 14, 30),
+      );
+    });
   });
 
   it("drops a department's description from the payload when its textarea is cleared", async () => {
@@ -1373,6 +1420,35 @@ describe("TicketDetailContent — view mode", () => {
     expect(within(entry).getByText("Priority")).toBeInTheDocument();
     expect(within(entry).getByText("High")).toBeInTheDocument();
     expect(within(entry).getByText("Critical")).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      { from: new Date(2026, 5, 1, 10, 30), to: new Date(2026, 5, 2, 14, 30) },
+      /changed the end time from Jun 1 to Jun 2, 2026 at 2:30 PM/,
+    ],
+    [
+      { from: null, to: new Date(2026, 5, 2, 14, 30) },
+      /set the end time to Jun 2, 2026 at 2:30 PM/,
+    ],
+    [{ from: new Date(2026, 5, 1, 10, 30), to: null }, /cleared the end time/],
+  ])("renders a SCHEDULED_END_CHANGED entry for %o", (data, text) => {
+    renderDetail({
+      activities: [
+        {
+          id: "e1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "SCHEDULED_END_CHANGED",
+          data,
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const entry = screen.getByLabelText("Activity: SCHEDULED_END_CHANGED");
+    expect(within(entry).getByText(text)).toBeInTheDocument();
   });
 });
 

@@ -8,6 +8,16 @@ export const CVE_PATTERN = /^CVE-\d{4}-\d{4,}$/i;
 const GHSA_PATTERN = /^GHSA(-[0-9a-z]{4}){3}$/i;
 const VIPER_PREFIX = "VIPER-";
 
+/**
+ * Identifier schemes that are unique across every source, so a source that only names a
+ * vulnerability (MedISAO) can resolve or mint by them safely. Add a scheme here when a source
+ * starts sending one.
+ */
+export const GLOBAL_VULNERABILITY_PATTERNS = [CVE_PATTERN, GHSA_PATTERN];
+
+export const isGlobalVulnerabilityIdentifier = (value: string): boolean =>
+  GLOBAL_VULNERABILITY_PATTERNS.some((pattern) => pattern.test(value.trim()));
+
 /** One identifier as it is stored: `value` for lookup, `displayValue` as published. */
 export interface NormalizedIdentifier {
   /** Trimmed and upper-cased, so one identifier has one spelling: "GHSA-JFH8-C2JP-5V3Q". */

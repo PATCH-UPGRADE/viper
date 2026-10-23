@@ -9,11 +9,22 @@ const prismaMock = {
     createMany: vi.fn(),
     updateMany: vi.fn(),
   },
-  vulnerability: { findMany: vi.fn(), create: vi.fn() },
-  externalVulnerabilityMapping: { findMany: vi.fn() },
+  vulnerabilityIdentifier: { findMany: vi.fn() },
   sourceRecord: { findUniqueOrThrow: vi.fn() },
 };
 vi.mock("@/lib/db", () => ({ default: prismaMock }));
+
+const createVulnerabilityRecord = vi.fn();
+vi.mock("@/features/vulnerabilities/server/records", () => ({
+  createVulnerabilityRecord: (...args: unknown[]) =>
+    createVulnerabilityRecord(...args),
+}));
+
+/** A vulnerabilityIdentifier row for a vulnerability Viper already holds. */
+const heldRow = (value: string, vulnerabilityId: string) => ({
+  value,
+  vulnerabilityId,
+});
 
 const resolveMatchingId = vi.fn();
 vi.mock("@/lib/router-utils", () => ({
@@ -49,11 +60,14 @@ const link = (raw: unknown, notificationId: string | null) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  prismaMock.vulnerability.findMany.mockResolvedValue([]);
-  prismaMock.vulnerability.create.mockImplementation(({ data }) =>
-    Promise.resolve({ id: `minted-${data.cveId}` }),
+  prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([]);
+  createVulnerabilityRecord.mockImplementation(({ sourceId }) =>
+    Promise.resolve({
+      record: { id: `record-${sourceId}` },
+      vulnerabilityId: `minted-${sourceId}`,
+      vulnerabilityCreated: true,
+    }),
   );
-  prismaMock.externalVulnerabilityMapping.findMany.mockResolvedValue([]);
   prismaMock.sourceRecord.findUniqueOrThrow.mockResolvedValue({
     mapping: {
       integrationId: "int-1",
@@ -118,23 +132,21 @@ describe("the advisory linker", () => {
   });
 
   it("links a held vulnerability and mints the one Viper lacks", async () => {
-    prismaMock.vulnerability.findMany.mockResolvedValue([
-      { id: "vuln-1", cveId: "CVE-2026-0001" },
+    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
+      heldRow("CVE-2026-0001", "vuln-1"),
     ]);
 
     const summary = await link(RAW, "notif-1");
 
-    expect(prismaMock.vulnerability.create).toHaveBeenCalledTimes(1);
-    const [{ data }] = prismaMock.vulnerability.create.mock.calls[0];
-    expect(data).toMatchObject({
-      cveId: "CVE-2026-0002",
-      description: null,
-      userId: "shadow-user",
-      deviceGroupMatchings: { connect: [{ id: "matching-1" }] },
-      externalMappings: {
-        create: { integrationId: "int-1", externalId: "CVE-2026-0002" },
-      },
-    });
+    expect(createVulnerabilityRecord).toHaveBeenCalledTimes(1);
+    expect(createVulnerabilityRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "OTHER",
+        sourceId: "CVE-2026-0002",
+        deviceGroupMatchingIds: ["matching-1"],
+      }),
+      { actingUserId: "shadow-user" },
+    );
     const [[{ data: links, skipDuplicates }]] =
       prismaMock.notificationVulnerabilityMapping.createMany.mock.calls;
     expect(skipDuplicates).toBe(true);
@@ -147,8 +159,8 @@ describe("the advisory linker", () => {
   });
 
   it("raises only a NeedsReview link, so a human's confidence stays", async () => {
-    prismaMock.vulnerability.findMany.mockResolvedValue([
-      { id: "vuln-1", cveId: "CVE-2026-0001" },
+    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
+      heldRow("CVE-2026-0001", "vuln-1"),
     ]);
 
     await link(RAW, "notif-1");
@@ -172,7 +184,7 @@ describe("the advisory linker", () => {
     );
 
     expect(prismaMock.notificationDeviceGroupMapping.upsert).toHaveBeenCalled();
-    expect(prismaMock.vulnerability.create).not.toHaveBeenCalled();
+    expect(createVulnerabilityRecord).not.toHaveBeenCalled();
     expect(
       prismaMock.notificationVulnerabilityMapping.createMany,
     ).not.toHaveBeenCalled();

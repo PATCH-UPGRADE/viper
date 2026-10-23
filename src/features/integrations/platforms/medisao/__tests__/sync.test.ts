@@ -7,12 +7,23 @@ vi.mock("server-only", () => ({}));
 
 const prismaMock = {
   integration: { findUniqueOrThrow: vi.fn() },
-  vulnerability: { findMany: vi.fn(), create: vi.fn() },
-  externalVulnerabilityMapping: { findMany: vi.fn() },
+  vulnerabilityIdentifier: { findMany: vi.fn() },
   remediation: {},
   externalRemediationMapping: {},
 };
 vi.mock("@/lib/db", () => ({ default: prismaMock }));
+
+const createVulnerabilityRecord = vi.fn();
+vi.mock("@/features/vulnerabilities/server/records", () => ({
+  createVulnerabilityRecord: (...args: unknown[]) =>
+    createVulnerabilityRecord(...args),
+}));
+
+/** A vulnerabilityIdentifier row for a vulnerability Viper already holds. */
+const heldRow = (value: string, vulnerabilityId: string) => ({
+  value,
+  vulnerabilityId,
+});
 
 const processIntegrationSync = vi.fn();
 vi.mock("@/features/integrations/core/sync/upsert", () => ({
@@ -102,9 +113,14 @@ beforeEach(() => {
   prismaMock.integration.findUniqueOrThrow.mockResolvedValue({
     integrationUserId: "shadow-user",
   });
-  prismaMock.vulnerability.findMany.mockResolvedValue([]);
-  prismaMock.vulnerability.create.mockResolvedValue({ id: "minted-1" });
-  prismaMock.externalVulnerabilityMapping.findMany.mockResolvedValue([]);
+  prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([]);
+  createVulnerabilityRecord.mockImplementation(({ sourceId }) =>
+    Promise.resolve({
+      record: { id: `record-${sourceId}` },
+      vulnerabilityId: `minted-${sourceId}`,
+      vulnerabilityCreated: true,
+    }),
+  );
   resolveMatchingId.mockResolvedValue("matching-1");
   processIntegrationSync.mockResolvedValue({ message: "success" });
 });
@@ -325,30 +341,29 @@ describe("the ingest mapping", () => {
   });
 
   it("links a held vulnerability and mints the one Viper lacks", async () => {
-    prismaMock.vulnerability.findMany.mockResolvedValue([
-      { id: "vuln-1", cveId: "CVE-2026-0001" },
+    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
+      heldRow("CVE-2026-0001", "vuln-1"),
     ]);
 
     const { createData } = await transformOf({
-      fixed_vulnerabilities: ["CVE-2026-0001", "GHSA-unknown"],
+      fixed_vulnerabilities: ["CVE-2026-0001", "GHSA-abcd-efgh-ijkl"],
     });
 
-    expect(prismaMock.vulnerability.create).toHaveBeenCalledTimes(1);
-    const [{ data }] = prismaMock.vulnerability.create.mock.calls[0];
-    expect(data).toMatchObject({
-      cveId: null,
-      userId: "shadow-user",
-      deviceGroupMatchings: { connect: [{ id: "matching-1" }] },
-      externalMappings: {
-        create: { integrationId: "int-1", externalId: "GHSA-unknown" },
-      },
-    });
-    expect(data.description).toContain("GHSA-unknown");
+    expect(createVulnerabilityRecord).toHaveBeenCalledTimes(1);
+    expect(createVulnerabilityRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "OTHER",
+        sourceId: "GHSA-ABCD-EFGH-IJKL",
+        identifiers: ["GHSA-abcd-efgh-ijkl"],
+        deviceGroupMatchingIds: ["matching-1"],
+      }),
+      { actingUserId: "shadow-user" },
+    );
     expect(createData.vulnerabilities).toEqual({
-      connect: [{ id: "vuln-1" }, { id: "minted-1" }],
+      connect: [{ id: "vuln-1" }, { id: "minted-GHSA-ABCD-EFGH-IJKL" }],
     });
     expect(createData.description).toContain(
-      "Fixes: CVE-2026-0001, GHSA-unknown",
+      "Fixes: CVE-2026-0001, GHSA-abcd-efgh-ijkl",
     );
   });
 
@@ -365,13 +380,15 @@ describe("the ingest mapping", () => {
     const first = await config.transformInputItem(input.items[0], "u");
     const second = await config.transformInputItem(input.items[1], "u");
 
-    expect(prismaMock.vulnerability.create).toHaveBeenCalledTimes(1);
-    expect(prismaMock.vulnerability.findMany).toHaveBeenCalledTimes(1);
+    expect(createVulnerabilityRecord).toHaveBeenCalledTimes(1);
+    expect(prismaMock.vulnerabilityIdentifier.findMany).toHaveBeenCalledTimes(
+      1,
+    );
     expect(first.createData.vulnerabilities).toEqual({
-      connect: [{ id: "minted-1" }],
+      connect: [{ id: "minted-CVE-2026-0009" }],
     });
     expect(second.createData.vulnerabilities).toEqual({
-      connect: [{ id: "minted-1" }],
+      connect: [{ id: "minted-CVE-2026-0009" }],
     });
   });
 
@@ -430,9 +447,9 @@ describe("the ingest mapping", () => {
   });
 
   it("links every vulnerability that resolves, on create and on update", async () => {
-    prismaMock.vulnerability.findMany.mockResolvedValue([
-      { id: "vuln-1", cveId: "CVE-2026-0001" },
-      { id: "vuln-2", cveId: "CVE-2026-0002" },
+    prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([
+      heldRow("CVE-2026-0001", "vuln-1"),
+      heldRow("CVE-2026-0002", "vuln-2"),
     ]);
 
     const { createData, updateData } = await transformOf({

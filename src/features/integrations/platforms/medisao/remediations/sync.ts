@@ -90,10 +90,8 @@ async function ingestRemediations(
           names: item.fixedVulnerabilities.filter(
             (name) => !vulnerabilityIdCache.has(cacheKey(name)),
           ),
-          integrationId,
           integrationUserId,
           deviceGroupMatchingId: matchingId,
-          context: `Named by MedISAO as fixed by remediation ${item.externalId}. No CVE is assigned.`,
         });
         for (const [name, id] of ids) {
           vulnerabilityIdCache.set(cacheKey(name), id);

@@ -3,7 +3,12 @@ import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
-import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
+import {
+  type AlohaStatus,
+  Priority,
+  type Prisma,
+  ResourceType,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   type DeviceIdentity,
@@ -61,17 +66,47 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
-const ALLOWED_SORT_FIELDS = new Set([
+export const VULNERABILITY_SORT_FIELDS = new Set([
   "createdAt",
   "updatedAt",
   "priority",
+  "severity",
+  "epss",
   "cveId",
   "description",
   "inKEV",
 ] as const);
 
+/** The `sort` documentation for the vulnerability lists, shared by OpenAPI and the agent catalog. */
+export const VULNERABILITY_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...VULNERABILITY_SORT_FIELDS].join(", ")}. severity sorts in enum order, so ascending puts Critical first. Rows with no EPSS sort last in both directions. Unknown fields are ignored.`;
+
+const vulnerabilityListInputSchema = paginationInputSchema.extend({
+  sort: z.string().default("").describe(VULNERABILITY_SORT_DESCRIPTION),
+});
+
 function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
+}
+
+/**
+ * The sort clauses for a comma-separated sort string, with unknown fields
+ * dropped. EPSS sorts nulls last in both directions: Postgres puts nulls first
+ * on a descending sort, so "-epss" would otherwise start with the unscored rows.
+ */
+export function vulnerabilitySortClauses(
+  sort: string,
+): Prisma.VulnerabilityOrderByWithRelationInput[] {
+  return sort
+    .split(",")
+    .flatMap<Prisma.VulnerabilityOrderByWithRelationInput>((s) => {
+      const field = s.replace("-", "");
+      if (!VULNERABILITY_SORT_FIELDS.has(field as never)) return [];
+      const direction = getSortValue(s);
+      if (field === "epss") {
+        return [{ epss: { sort: direction, nulls: "last" } }];
+      }
+      return [{ [field]: direction }];
+    });
 }
 
 /** One page of the vulnerabilities whose matchings apply to a device. */
@@ -81,11 +116,19 @@ async function paginateVulnerabilitiesForDevice(
 ) {
   const matchedVulns = await findVulnerabilitiesMatchingDevices([device]);
   const idFilter = { id: { in: matchedVulns.map((vuln) => vuln.id) } };
+  const sortClauses = vulnerabilitySortClauses(input.sort);
   const result = await fetchPaginated(prisma.vulnerability, input, {
     where: input.search
       ? { AND: [createSearchFilter(input.search), idFilter] }
       : idFilter,
     include: vulnerabilityInclude,
+    ...(sortClauses.length > 0 && {
+      orderBy: [
+        ...sortClauses,
+        { updatedAt: "desc" as const },
+        { id: "asc" as const },
+      ],
+    }),
   });
   return {
     ...result,
@@ -96,7 +139,7 @@ async function paginateVulnerabilitiesForDevice(
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(paginationInputSchema)
+    .input(vulnerabilityListInputSchema)
     .meta({
       openapi: {
         method: "GET",
@@ -114,20 +157,14 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const searchFilter = createSearchFilter(search);
 
       // TODO: sorting should eventually be moved to fetchPaginated, right?
-      const sortClauses = sort
-        ? sort.split(",").flatMap((s) => {
-            const field = s.replace("-", "");
-            if (!ALLOWED_SORT_FIELDS.has(field as never)) return [];
-            return [{ [field]: getSortValue(s) }];
-          })
-        : [];
+      const sortClauses = vulnerabilitySortClauses(sort);
 
       const result = await fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,
         include: vulnerabilityInclude,
         orderBy:
           sortClauses.length > 0
-            ? [...sortClauses, { updatedAt: "desc" }]
+            ? [...sortClauses, { updatedAt: "desc" }, { id: "asc" }]
             : { updatedAt: "desc" },
       });
 
@@ -140,7 +177,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/assets/{id}/vulnerabilities - Vulnerabilities whose matchings
   // apply to an asset's manufacturer, product, and version
   getManyByAsset: protectedProcedure
-    .input(paginationInputSchema.extend({ id: z.string() }))
+    .input(vulnerabilityListInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",
@@ -166,7 +203,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/versions/{id}/vulnerabilities - Vulnerabilities whose matchings
   // apply to one product version
   getManyByVersion: protectedProcedure
-    .input(paginationInputSchema.extend({ id: z.string() }))
+    .input(vulnerabilityListInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",

@@ -10,6 +10,8 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
+    deviceGroupMatching: { findMany: vi.fn() },
+    issue: { findMany: vi.fn() },
   },
   mockGetSession: vi.fn(),
 }));
@@ -161,6 +163,8 @@ const IN_HOUSE: ManagedByRow = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.asset.count.mockResolvedValue(1);
+  mockPrisma.deviceGroupMatching.findMany.mockResolvedValue([]);
+  mockPrisma.issue.findMany.mockResolvedValue([]);
 });
 
 describe("assetsRouter.getMany managedBy", () => {

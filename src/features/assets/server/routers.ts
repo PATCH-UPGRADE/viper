@@ -120,6 +120,9 @@ export const ASSET_SORT_KEYS = new Set<string>([
   ...AFFECTED_ISSUE_SORT_KEYS,
 ]);
 
+/** The `sort` documentation for assets.getMany, shared by OpenAPI and the agent catalog. */
+export const ASSET_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...ASSET_SORT_KEYS].join(", ")}. affectedIssues and severity_Critical to severity_Low count the vulnerabilities that affect each asset, by severity. Unknown fields are ignored.`;
+
 const affectedIssueCountInclude = {
   vulnerability: { select: { severity: true } },
 } satisfies Prisma.IssueInclude;
@@ -194,7 +197,11 @@ async function fetchAssetsSortedByAffectedIssues(
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(paginationInputSchema)
+    .input(
+      paginationInputSchema.extend({
+        sort: z.string().default("").describe(ASSET_SORT_DESCRIPTION),
+      }),
+    )
     .meta({
       openapi: {
         method: "GET",

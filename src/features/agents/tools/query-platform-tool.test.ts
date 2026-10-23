@@ -1,10 +1,12 @@
 // @vitest-environment node
+
+import { generateOpenApiDocument } from "trpc-to-openapi";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AFFECTED_ISSUE_SORT_KEYS } from "@/features/assets/server/effective-issue-sort";
-import { ASSET_SORT_KEYS } from "@/features/assets/server/routers";
-import { NOTIFICATION_SORT_FIELDS } from "@/features/inbox/server/routers";
-import { VULNERABILITY_SORT_FIELDS } from "@/features/vulnerabilities/server/routers";
+import { ASSET_SORT_DESCRIPTION } from "@/features/assets/server/routers";
+import { VULNERABILITY_SORT_DESCRIPTION } from "@/features/vulnerabilities/server/routers";
 import { createAgentCaller } from "@/trpc/agent-caller";
+import { appRouter } from "@/trpc/routers/_app";
 import {
   addNavigationLinks,
   capPageSize,
@@ -15,13 +17,6 @@ import {
 
 /** Every catalog bullet starts `- <router>.<procedure> — …`. */
 const CATALOG_LINE = /^- ([a-zA-Z]+\.[a-zA-Z]+) —/gm;
-
-/** One procedure's catalog bullet, up to the next bullet. */
-function catalogEntry(procedure: string): string {
-  const start = PLATFORM_CATALOG.indexOf(`- ${procedure} —`);
-  const end = PLATFORM_CATALOG.indexOf("\n- ", start + 1);
-  return PLATFORM_CATALOG.slice(start, end === -1 ? undefined : end);
-}
 
 function documentedProcedures(): string[] {
   return [...PLATFORM_CATALOG.matchAll(CATALOG_LINE)].map((m) => m[1]);
@@ -572,30 +567,41 @@ describe("PLATFORM_CATALOG teaches ranking", () => {
     expect(PLATFORM_CATALOG).toContain("affectedIssueCounts");
   });
 
-  it("names the vulnerability sort fields and the date filter", () => {
-    expect(PLATFORM_CATALOG).toMatch(/sort fields: severity, epss/);
+  it("names the date filter fields", () => {
     expect(PLATFORM_CATALOG).toContain("lastUpdatedStartTime");
     expect(PLATFORM_CATALOG).toContain("lastUpdatedEndTime");
   });
+
+  // API clients read the sort fields from the OpenAPI spec, not from the
+  // catalog.
+  it.each([
+    ["/assets", ASSET_SORT_DESCRIPTION],
+    ["/vulnerabilities", VULNERABILITY_SORT_DESCRIPTION],
+    ["/assets/{id}/vulnerabilities", VULNERABILITY_SORT_DESCRIPTION],
+    ["/versions/{id}/vulnerabilities", VULNERABILITY_SORT_DESCRIPTION],
+  ])(
+    "documents the sort fields of GET %s in the OpenAPI spec",
+    (path, text) => {
+      const document = generateOpenApiDocument(appRouter, {
+        title: "test",
+        version: "1.0.0",
+        baseUrl: "http://localhost/api/v1",
+      });
+      const sort = document.paths?.[path]?.get?.parameters?.find(
+        (parameter) => "name" in parameter && parameter.name === "sort",
+      );
+      const schema = sort && "schema" in sort ? sort.schema : undefined;
+      expect(
+        schema && "description" in schema ? schema.description : undefined,
+      ).toBe(text);
+    },
+  );
 
   // Postgres sorts the Severity and Priority enums in declaration order,
   // Critical first, which is the reverse of what a model guesses.
   it("says which direction puts Critical first", () => {
     expect(PLATFORM_CATALOG).toContain('"severity" puts Critical first');
     expect(PLATFORM_CATALOG).toContain('"priority" puts Critical first');
-  });
-
-  // Each router keeps its own allowed set; a field missing here is one the
-  // model can never use.
-  it.each([
-    ["assets.getMany", ASSET_SORT_KEYS],
-    ["vulnerabilities.getMany", VULNERABILITY_SORT_FIELDS],
-    ["notifications.getMany", NOTIFICATION_SORT_FIELDS],
-  ] as const)("lists every sort field %s accepts", (procedure, fields) => {
-    const entry = catalogEntry(procedure);
-    for (const field of fields) {
-      expect(entry).toMatch(new RegExp(`\\b${field}\\b`));
-    }
   });
 
   it("names exactly the procedures that cap pageSize, with their caps", () => {

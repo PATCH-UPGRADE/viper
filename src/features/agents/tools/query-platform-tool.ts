@@ -2,6 +2,9 @@ import "server-only";
 import { tool } from "@langchain/core/tools";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { ASSET_SORT_DESCRIPTION } from "@/features/assets/server/routers";
+import { NOTIFICATION_SORT_DESCRIPTION } from "@/features/inbox/server/routers";
+import { VULNERABILITY_SORT_DESCRIPTION } from "@/features/vulnerabilities/server/routers";
 import { createAgentCaller } from "@/trpc/agent-caller";
 
 /**
@@ -74,12 +77,10 @@ Available read-only procedures for query_platform_data:
   search matches hostname, ip, serial number, device type, manufacturer or product,
   never the role. To find an asset you know by its role, search its device type.
   Each row carries "affectedIssueCounts": { total, Critical, High, Medium, Low }, the
-  vulnerabilities that affect the asset, by severity. sort fields: affectedIssues,
-  severity_Critical, severity_High, severity_Medium, severity_Low (counts of affecting
-  vulnerabilities), hostname, ip, role, status, deviceType, networkSegment,
-  serialNumber, macAddress, createdAt, updatedAt (others are ignored). Most issues:
-  { sort: "-affectedIssues" }. Most
-  critical issues: { sort: "-severity_Critical,-severity_High,-severity_Medium" }.
+  vulnerabilities that affect the asset, by severity.
+  sort: ${ASSET_SORT_DESCRIPTION}
+  Most issues: { sort: "-affectedIssues" }. Most critical issues:
+  { sort: "-severity_Critical,-severity_High,-severity_Medium" }.
 - assets.getOne — one asset by id. input: { id }
   Both carry "managedBy": who services the asset, as a vendor or a department, with
   their responsibilities. An entry whose "workOrderIntegration" is set names the
@@ -91,9 +92,9 @@ Available read-only procedures for query_platform_data:
 - assets.getManyByVersion — assets that run one product version. input: { id, search?, page?, pageSize? } (version id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? }
-  sort fields: severity, epss, inKEV, priority, cveId, description, createdAt, updatedAt
-  (others are ignored). Most severe: { sort: "severity,-epss" }. Least severe: { sort: "-severity,epss" }.
-  Known exploited first: { sort: "-inKEV,severity" }. Rows with no EPSS sort last.
+  sort: ${VULNERABILITY_SORT_DESCRIPTION}
+  Most severe: { sort: "severity,-epss" }. Least severe: { sort: "-severity,epss" }.
+  Known exploited first: { sort: "-inKEV,severity" }.
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
 - vulnerabilities.getManyByAsset — vulnerabilities whose matching rules apply to an asset's manufacturer, product, and version. input: { id, search?, page?, pageSize?, sort? } (asset id) — sort fields as for vulnerabilities.getMany.
 - vulnerabilities.getManyByVersion — vulnerabilities whose matching rules apply to one product version. input: { id, search?, page?, pageSize?, sort? } (version id) — sort fields as for vulnerabilities.getMany.
@@ -114,7 +115,7 @@ Available read-only procedures for query_platform_data:
   send an id to manufacturers.getOne, products.getOne, or versions.getOne.
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
-- notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. sort fields: priority, createdAt, updatedAt (default: newest update first). pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page. Most urgent: { sort: "priority" }. New or changed since a time: { lastUpdatedStartTime: "<ISO datetime>", sort: "priority" }.
+- notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type?, sort?, lastUpdatedStartTime?, lastUpdatedEndTime? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. sort: ${NOTIFICATION_SORT_DESCRIPTION} pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page. Most urgent: { sort: "priority" }. New or changed since a time: { lastUpdatedStartTime: "<ISO datetime>", sort: "priority" }.
 - notifications.getOne — one notification by id, with the affected-asset counts per matching rule and the ids of the vulnerabilities it references. input: { id }
 - tracking.getManyForLlm — list top-level work orders (the hospital's tickets for work being done). A sub-ticket is listed in its parent's "children", not as its own row, except with a departmentId that its parent does not have. input: { notificationId?, vulnerabilityId?, assetId?, departmentId?, status?, search?, page?, pageSize? } — status is an optional array of TO_DO, IN_PROGRESS, REQUIRES_APPROVAL, DONE; omit it to get every work order that is not DONE. pageSize is capped at 20. Each row lists at most 5 vulnerabilities (_count.vulnerabilities is the total) and up to 10 sub-tickets that are not DONE (_count.children counts every sub-ticket).
 - tracking.getOneForLlm — one work order by id, with its description, sub-tickets, up to 20 assets (each with its own status and external ticket ids; _count.assets is the total), remediations, external ticket ids, and its 5 newest comments, newest first. input: { id }

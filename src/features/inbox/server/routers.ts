@@ -79,6 +79,9 @@ export const NOTIFICATION_SORT_FIELDS = new Set([
   "createdAt",
 ]);
 
+/** The `sort` documentation for notifications.getMany, shared with the agent catalog. */
+export const NOTIFICATION_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...NOTIFICATION_SORT_FIELDS].join(", ")}. priority sorts in enum order, so ascending puts Critical first and Unsorted last. With no sort, the newest update comes first. Unknown fields are ignored.`;
+
 function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
 }
@@ -239,6 +242,7 @@ export const notificationsRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(
       paginationInputSchema.extend({
+        sort: z.string().default("").describe(NOTIFICATION_SORT_DESCRIPTION),
         priority: z.array(z.nativeEnum(Priority)).default([]),
         type: z.array(z.nativeEnum(NotificationType)).default([]),
       }),

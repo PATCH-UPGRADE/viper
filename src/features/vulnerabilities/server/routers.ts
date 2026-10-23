@@ -77,6 +77,13 @@ export const VULNERABILITY_SORT_FIELDS = new Set([
   "inKEV",
 ] as const);
 
+/** The `sort` documentation for the vulnerability lists, shared by OpenAPI and the agent catalog. */
+export const VULNERABILITY_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...VULNERABILITY_SORT_FIELDS].join(", ")}. severity sorts in enum order, so ascending puts Critical first. Rows with no EPSS sort last in both directions. Unknown fields are ignored.`;
+
+const vulnerabilityListInputSchema = paginationInputSchema.extend({
+  sort: z.string().default("").describe(VULNERABILITY_SORT_DESCRIPTION),
+});
+
 function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
 }
@@ -132,7 +139,7 @@ async function paginateVulnerabilitiesForDevice(
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(paginationInputSchema)
+    .input(vulnerabilityListInputSchema)
     .meta({
       openapi: {
         method: "GET",
@@ -170,7 +177,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/assets/{id}/vulnerabilities - Vulnerabilities whose matchings
   // apply to an asset's manufacturer, product, and version
   getManyByAsset: protectedProcedure
-    .input(paginationInputSchema.extend({ id: z.string() }))
+    .input(vulnerabilityListInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",
@@ -196,7 +203,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/versions/{id}/vulnerabilities - Vulnerabilities whose matchings
   // apply to one product version
   getManyByVersion: protectedProcedure
-    .input(paginationInputSchema.extend({ id: z.string() }))
+    .input(vulnerabilityListInputSchema.extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",

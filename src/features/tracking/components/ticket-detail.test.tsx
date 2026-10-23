@@ -497,10 +497,11 @@ describe("TicketEditForm", () => {
       render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
       const end = screen.getByLabelText(/scheduled end/i);
       expect(end).toHaveValue("2026-06-01T10:30");
+      expect(end).not.toHaveAttribute("aria-describedby");
 
       fireEvent.change(end, { target: { value: "2026-06-01T08:00" } });
 
-      expect(screen.getByText(/end time must be after/i)).toBeInTheDocument();
+      expect(end).toHaveAccessibleDescription(/end time must be after/i);
       expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     });
 

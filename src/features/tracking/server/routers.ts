@@ -726,6 +726,9 @@ export const trackingRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { id, departmentIds, descriptions, ...rest } = input;
       return prisma.$transaction(async (tx) => {
+        // Two partial updates can each set one end of the range. Without the
+        // lock, both validate against the same stale snapshot.
+        await tx.$queryRaw`SELECT 1 FROM work_order_ticket WHERE id = ${id} FOR UPDATE`;
         const before = await snapshotBeforeUpdate(tx, id);
         if (!before) {
           throw new TRPCError({

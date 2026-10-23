@@ -291,11 +291,21 @@ export const TicketEditForm = ({
               type="datetime-local"
               value={form.scheduledEndTime}
               aria-invalid={!!endError}
+              aria-describedby={
+                endError ? "ticket-scheduled-end-error" : undefined
+              }
               onChange={(e) =>
                 setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
               }
             />
-            {endError && <p className="text-xs text-destructive">{endError}</p>}
+            {endError && (
+              <p
+                id="ticket-scheduled-end-error"
+                className="text-xs text-destructive"
+              >
+                {endError}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

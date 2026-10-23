@@ -60,6 +60,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     notificationVulnerabilityMapping: {
       findMany: vi.fn(),
     },
+    $queryRaw: vi.fn(),
     // The router uses prisma.$transaction(async (tx) => {...}) — invoke the
     // callback with the same mocked client so call assertions still work.
     $transaction: vi.fn(

@@ -222,7 +222,11 @@ describe("assets.getMany plain sort", () => {
     const result = await setup().getMany({ sort: "-hostname" });
 
     const [args] = mockPrisma.asset.findMany.mock.calls[0];
-    expect(args.orderBy).toEqual([{ hostname: "desc" }, { updatedAt: "desc" }]);
+    expect(args.orderBy).toEqual([
+      { hostname: "desc" },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ]);
     expect(args.take).toBe(10);
     expect(
       result.items.find((a) => a.id === "p2")?.affectedIssueCounts,
@@ -251,6 +255,10 @@ describe("assets.getMany plain sort", () => {
     await setup().getMany({ sort: "bogus,-hostname" });
 
     const [args] = mockPrisma.asset.findMany.mock.calls[0];
-    expect(args.orderBy).toEqual([{ hostname: "desc" }, { updatedAt: "desc" }]);
+    expect(args.orderBy).toEqual([
+      { hostname: "desc" },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ]);
   });
 });

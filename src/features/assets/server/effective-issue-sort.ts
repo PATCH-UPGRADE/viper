@@ -53,9 +53,10 @@ export function affectedIssueSortValue(
 
 /**
  * Sorts rows in memory by comma-separated sort fields ("-" for descending),
- * then by most recently updated.
+ * then by most recently updated, then by id. The id keeps rows that tie on
+ * everything else in one order, so a row cannot move between pages.
  */
-export function sortByFields<T extends { updatedAt: Date }>(
+export function sortByFields<T extends { id: string; updatedAt: Date }>(
   rows: T[],
   sortFields: string[],
   sortValue: (row: T, key: string) => number | string,
@@ -81,7 +82,9 @@ export function sortByFields<T extends { updatedAt: Date }>(
 
       if (cmp !== 0) return desc ? -cmp : cmp;
     }
-    return b.row.updatedAt.getTime() - a.row.updatedAt.getTime();
+    const byUpdate = b.row.updatedAt.getTime() - a.row.updatedAt.getTime();
+    if (byUpdate !== 0) return byUpdate;
+    return a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0;
   });
   return decorated.map(({ row }) => row);
 }

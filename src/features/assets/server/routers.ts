@@ -101,6 +101,7 @@ export function assetOrderBy(
       return { [key]: direction };
     }),
     { updatedAt: "desc" },
+    { id: "asc" },
   ];
 }
 

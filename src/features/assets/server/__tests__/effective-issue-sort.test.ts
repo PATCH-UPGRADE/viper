@@ -64,6 +64,24 @@ describe("sortByFields", () => {
     ]);
   });
 
+  // Postgres returns the rows in no fixed order, so the same rows can arrive
+  // in a different order on the next page request.
+  it("orders rows that tie on every field by id, whatever order they arrive in", () => {
+    const tied = [
+      row("b", 1, "m", "2026-01-01"),
+      row("a", 1, "m", "2026-01-01"),
+      row("c", 1, "m", "2026-01-01"),
+    ];
+    expect(sortByFields(tied, ["a"], value).map((r) => r.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect(
+      sortByFields([...tied].reverse(), ["a"], value).map((r) => r.id),
+    ).toEqual(["a", "b", "c"]);
+  });
+
   it("does not reorder the input array", () => {
     sortByFields(rows, ["-a"], value);
     expect(rows.map((r) => r.id)).toEqual(["x", "y", "z", "w"]);

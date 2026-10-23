@@ -15,6 +15,7 @@ describe("assetOrderBy", () => {
     expect(assetOrderBy("deviceType")).toEqual([
       { product: { deviceType: { displayName: "asc" } } },
       { updatedAt: "desc" },
+      { id: "asc" },
     ]);
     expect(assetOrderBy("-deviceType")[0]).toEqual({
       product: { deviceType: { displayName: "desc" } },
@@ -26,11 +27,15 @@ describe("assetOrderBy", () => {
       { issues: { _count: "desc" } },
       { ip: "asc" },
       { updatedAt: "desc" },
+      { id: "asc" },
     ]);
   });
 
   it("sorts by update time only, with no sort", () => {
-    expect(assetOrderBy(undefined)).toEqual([{ updatedAt: "desc" }]);
-    expect(assetOrderBy("")).toEqual([{ updatedAt: "desc" }]);
+    expect(assetOrderBy(undefined)).toEqual([
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ]);
+    expect(assetOrderBy("")).toEqual([{ updatedAt: "desc" }, { id: "asc" }]);
   });
 });

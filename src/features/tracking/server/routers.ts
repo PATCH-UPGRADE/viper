@@ -159,12 +159,12 @@ const ticketLinkedCount = (count: {
 }) => count.issues + count.vulnerabilities + count.remediations + count.assets;
 
 const buildLinkedPreview = (ticket: {
-  vulnerabilities: { id: string; cveId: string | null }[];
+  vulnerabilities: { id: string; displayId: string }[];
   assets: { asset: { id: string; hostname: string | null } }[];
 }) => [
   ...ticket.vulnerabilities.map((v) => ({
     id: v.id,
-    label: v.cveId ?? v.id,
+    label: v.displayId,
   })),
   ...ticket.assets.map(({ asset: a }) => ({
     id: a.id,

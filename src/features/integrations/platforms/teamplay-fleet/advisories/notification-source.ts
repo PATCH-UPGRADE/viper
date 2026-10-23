@@ -27,8 +27,8 @@ export const linkAdvisoryVulnerabilities =
         return { linked: 0, skipped: 0 };
       }
       const known = await prisma.vulnerability.findMany({
-        where: { cveId: { in: cveIds } },
-        select: { id: true, cveId: true },
+        where: { identifiers: { some: { value: { in: cveIds } } } },
+        select: { id: true, displayId: true },
       });
       const label =
         advisory.raw.advisoryId ?? `advisory ${advisory.externalId}`;
@@ -39,7 +39,7 @@ export const linkAdvisoryVulnerabilities =
           vulnerabilityId: vulnerability.id,
           confidence: "Matched" as const,
           reasonWhy:
-            `teamplay Fleet lists ${vulnerability.cveId}` + ` on ${label}.`,
+            `teamplay Fleet lists ${vulnerability.displayId}` + ` on ${label}.`,
         })),
         skipDuplicates: true,
       });

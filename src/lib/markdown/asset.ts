@@ -116,7 +116,7 @@ export interface AssetForMarkdown {
     status: string;
     vulnerability: {
       id: string;
-      cveId?: string | null;
+      displayId: string;
       severity: string;
       priority?: string;
     };
@@ -155,7 +155,7 @@ export function assetToMarkdown(
     for (const issue of a.issues) {
       const v = issue.vulnerability;
       lines.push(
-        `  - ${v.cveId ?? v.id}${v.priority ? ` [priority: ${v.priority}]` : ""} — severity: ${v.severity}, status: ${issue.status}`,
+        `  - ${v.displayId}${v.priority ? ` [priority: ${v.priority}]` : ""} — severity: ${v.severity}, status: ${issue.status}`,
       );
     }
   } else if (opts.includeIssues) {

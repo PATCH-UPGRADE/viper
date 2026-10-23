@@ -75,7 +75,7 @@ export async function gatherTriageContext(
                       version: true,
                     },
                   },
-                  vulnerabilities: { select: { id: true, cveId: true } },
+                  vulnerabilities: { select: { id: true, displayId: true } },
                 },
               },
               issues: true,
@@ -90,7 +90,7 @@ export async function gatherTriageContext(
               deviceGroupMatchings: {
                 include: { manufacturer: true, product: true, version: true },
               },
-              vulnerabilities: { select: { id: true, cveId: true } },
+              vulnerabilities: { select: { id: true, displayId: true } },
             },
           },
         },
@@ -188,7 +188,7 @@ export async function gatherTriageContext(
 
   const vulnInputs: VulnerabilityForMarkdown[] = vulnerabilities.map((v) => ({
     id: v.id,
-    cveId: v.cveId,
+    displayId: v.displayId,
     severity: v.severity,
     priority: v.priority,
     cvssScore: v.cvssScore,
@@ -254,8 +254,7 @@ export async function gatherTriageContext(
     ...linkableIds,
     assetIds: affectedAssetIds,
     // A remediation's target vulnerabilities may not be linked to the
-    // notification; remediationToMarkdown falls back to a raw id when a
-    // vulnerability has no cveId.
+    // notification; swap their ids anyway, in case one appears in the context.
     swapOnlyVulnerabilityIds: remediations.flatMap((r) =>
       r.vulnerabilities.map((v) => v.id),
     ),

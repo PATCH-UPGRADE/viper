@@ -182,9 +182,9 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
     ),
   },
   {
-    accessorKey: "vulnerability.cveId",
-    header: "CVE ID",
-    cell: ({ row }) => row.original.vulnerability.cveId || "—",
+    accessorKey: "vulnerability.displayId",
+    header: "ID",
+    cell: ({ row }) => row.original.vulnerability.displayId,
   },
   {
     accessorKey: "vulnerability.severity",

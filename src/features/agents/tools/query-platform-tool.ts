@@ -351,9 +351,9 @@ function linkEntities(value: unknown): void {
 
   const id = typeof obj.id === "string" ? obj.id : undefined;
   if (!id) return;
-  // Full vulnerability records only. The { id, cveId } stubs nested in work
-  // orders and notifications have no inKEV.
-  if ("cveId" in obj && "inKEV" in obj)
+  // Full vulnerabilities only. The { id, displayId } stubs nested in work
+  // orders and notifications have no records.
+  if ("displayId" in obj && "records" in obj)
     addLinks(obj, { workOrders: workOrdersLink({ vulnerabilityId: id }) });
   // Only WorkOrderTicket has all three.
   if ("summary" in obj && "category" in obj && "status" in obj)

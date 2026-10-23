@@ -52,7 +52,7 @@ const ALLOWED_SORT_FIELDS = new Set([
   "createdAt",
   "updatedAt",
   "priority",
-  "cveId",
+  "displayId",
   "description",
   "inKEV",
 ] as const);
@@ -234,7 +234,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const where = {
         priority: priority as Priority,
         ...(search && {
-          OR: [{ cveId: insensitive }, { description: insensitive }],
+          OR: [
+            { identifiers: { some: { value: insensitive } } },
+            { description: insensitive },
+          ],
         }),
       };
 

@@ -10,11 +10,11 @@ import type { VulnerabilityResponse } from "../types";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [
   {
-    accessorKey: "cveId",
-    meta: { title: "CVE ID" },
-    header: ({ column }) => <SortableHeader header="CVE ID" column={column} />,
+    accessorKey: "displayId",
+    meta: { title: "ID" },
+    header: ({ column }) => <SortableHeader header="ID" column={column} />,
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.cveId ?? "—"}</span>
+      <span className="font-mono text-xs">{row.original.displayId}</span>
     ),
   },
   {

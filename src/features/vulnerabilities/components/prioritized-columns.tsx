@@ -31,9 +31,9 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
     ),
   },
   {
-    accessorKey: "cveId",
-    header: ({ column }) => <SortableHeader header="CVE ID" column={column} />,
-    cell: ({ row }) => row.original.cveId || "—",
+    accessorKey: "displayId",
+    header: ({ column }) => <SortableHeader header="ID" column={column} />,
+    cell: ({ row }) => row.original.displayId,
   },
   {
     accessorKey: "user.name",

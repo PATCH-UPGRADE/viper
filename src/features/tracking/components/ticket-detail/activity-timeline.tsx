@@ -38,7 +38,7 @@ const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
   const data = activity.data as {
     source?: string | null;
     advisoryTitle?: string | null;
-    cveId?: string | null;
+    displayId?: string | null;
     externalRecordId?: string | null;
     category?: string | null;
     priority?: string | null;
@@ -56,7 +56,7 @@ const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
   const generatedParts: string[] = [];
   if (data.advisoryTitle) {
     generatedParts.push(
-      `advisory ${data.advisoryTitle}${data.cveId ? ` (${data.cveId})` : ""}`,
+      `advisory ${data.advisoryTitle}${data.displayId ? ` (${data.displayId})` : ""}`,
     );
   }
   if (data.externalRecordId) {

@@ -498,9 +498,8 @@ describe("addNavigationLinks — existing behaviour is preserved", () => {
 describe("addNavigationLinks — work orders", () => {
   const vulnerability = () => ({
     id: "v_1",
-    cveId: "CVE-2017-0144",
-    cvssScore: 8.1,
-    inKEV: true,
+    displayId: "CVE-2017-0144",
+    records: [],
   });
 
   const workOrderRow = () => ({
@@ -508,7 +507,7 @@ describe("addNavigationLinks — work orders", () => {
     summary: "Patch EternalBlue on the imaging network",
     status: "IN_PROGRESS",
     category: "PATCH",
-    vulnerabilities: [{ id: "v_1", cveId: "CVE-2017-0144" }],
+    vulnerabilities: [{ id: "v_1", displayId: "CVE-2017-0144" }],
   });
 
   it("points a full vulnerability record at its work orders", () => {
@@ -522,7 +521,7 @@ describe("addNavigationLinks — work orders", () => {
     });
   });
 
-  it("leaves the { id, cveId } stubs nested in a work order alone", () => {
+  it("leaves the { id, displayId } stubs nested in a work order alone", () => {
     const result = addNavigationLinks(workOrderRow()) as {
       vulnerabilities: { _links?: unknown }[];
     };

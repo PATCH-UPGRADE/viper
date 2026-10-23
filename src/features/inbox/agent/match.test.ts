@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma } = vi.hoisted(() => {
+const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
   const prisma = {
     notificationDeviceGroupMapping: {
       upsert: vi.fn(),
@@ -28,11 +28,15 @@ const { mockPrisma } = vi.hoisted(() => {
       cb(prisma),
     ),
   };
-  return { mockPrisma: prisma };
+  return { mockPrisma: prisma, recordInboxCvss: vi.fn() };
 });
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/lib/router-utils", () => ({ resolveMatchingId: vi.fn() }));
+vi.mock("../utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils")>()),
+  recordInboxCvss,
+}));
 
 import { notRejected } from "../types";
 import type { Candidates } from "./candidate-search";
@@ -252,7 +256,7 @@ describe("applyDecisions — vulnerability mapping", () => {
         matches: [
           {
             id: "vuln-1",
-            cveId: "CVE-2026-0001",
+            displayId: "CVE-2026-0001",
             description: null,
             cvssScore: null,
             cvssVector: null,
@@ -342,7 +346,57 @@ describe("applyDecisions — vulnerability mapping", () => {
     );
 
     expect(summary).toMatchObject({ linked: 0, skipped: 1 });
-    expect(mockPrisma.vulnerability.findUnique).not.toHaveBeenCalled();
+    expect(recordInboxCvss).not.toHaveBeenCalled();
+  });
+
+  it("keeps the CVSS an update decision found, once the transaction has committed", async () => {
+    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+      count: 1,
+    });
+    const order: string[] = [];
+    mockPrisma.$transaction.mockImplementationOnce(async (cb) => {
+      const result = await cb(mockPrisma);
+      order.push("commit");
+      return result;
+    });
+    recordInboxCvss.mockImplementationOnce(async () => {
+      order.push("cvss");
+    });
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [
+        {
+          ...vulnDecision,
+          op: "update",
+          fields: { cvssScore: 8.2, cvssVector: "CVSS:3.1/AV:N" },
+        },
+      ],
+      vulnCandidates,
+    );
+
+    expect(summary).toMatchObject({ updated: 1 });
+    expect(recordInboxCvss).toHaveBeenCalledWith({
+      vulnerabilityId: "vuln-1",
+      notificationId: "n-1",
+      cvssScore: 8.2,
+      cvssVector: "CVSS:3.1/AV:N",
+    });
+    expect(order).toEqual(["commit", "cvss"]);
+  });
+
+  it("writes no CVSS for a link without a score or vector", async () => {
+    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    await applyDecisions(
+      { notificationId: "n-1" },
+      [vulnDecision],
+      vulnCandidates,
+    );
+
+    expect(recordInboxCvss).not.toHaveBeenCalled();
   });
 });
 

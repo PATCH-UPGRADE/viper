@@ -7,7 +7,7 @@ type IdentifierRow = {
   vulnerabilityId: string;
 };
 
-const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
+const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
   const identifiers: IdentifierRow[] = [];
   const SUBMITTED_AT = new Date("2026-10-21T12:00:00.000Z");
   const matches = (
@@ -67,12 +67,14 @@ const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
         ta3Submission: data.ta3Submission ? { createdAt: SUBMITTED_AT } : null,
       })),
       update: vi.fn(async ({ data }) => ({ id: "rec-1", ...data })),
+      upsert: vi.fn(async () => ({ id: "rec-inbox" })),
       findUnique: vi.fn(),
       deleteMany: vi.fn(async () => ({ count: 1 })),
     },
     metric: {
       findFirst: vi.fn(async () => null),
       deleteMany: vi.fn(async () => ({ count: 0 })),
+      createMany: vi.fn(async () => ({ count: 1 })),
     },
     tA3Submission: {
       findFirst: vi.fn(async () => null),
@@ -89,7 +91,6 @@ const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
     db,
     identifiers,
     sendWebhooks: vi.fn(async () => {}),
-    send: vi.fn(async () => undefined),
     SUBMITTED_AT,
   };
 });
@@ -97,13 +98,18 @@ const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: db }));
 vi.mock("@/lib/prisma-client-extensions", () => ({ sendWebhooks }));
-vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 
+import { inngest } from "@/inngest/client";
 import {
   createVulnerabilityRecord,
   deleteVulnerabilityRecord,
   updateVulnerabilityRecord,
+  upsertSourceRecord,
 } from "../records";
+
+// Stub only the method, so no test reaches an Inngest server (CI has none; a local dev server
+// would run enrichment against the dev database).
+const send = vi.spyOn(inngest, "send").mockResolvedValue({ ids: [] });
 
 const SARIF = { version: "2.1.0", runs: [] };
 
@@ -514,5 +520,57 @@ describe("deleteVulnerabilityRecord", () => {
     await expect(deleteVulnerabilityRecord("missing")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+});
+
+describe("upsertSourceRecord", () => {
+  const inbox = {
+    source: "INBOX" as const,
+    sourceId: "notif-1",
+    metrics: [{ type: "CVSS_V3_1" as const, score: 7.5 }],
+  };
+
+  it("upserts the record on (source, sourceId, vulnerability) and replaces its metrics", async () => {
+    await upsertSourceRecord("vuln-1", inbox);
+
+    expect(db.vulnerabilityRecord.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          source_sourceId_vulnerabilityId: {
+            source: "INBOX",
+            sourceId: "notif-1",
+            vulnerabilityId: "vuln-1",
+          },
+        },
+      }),
+    );
+    expect(db.metric.deleteMany).toHaveBeenCalledWith({
+      where: { recordId: "rec-inbox" },
+    });
+    expect(db.metric.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recordId: "rec-inbox",
+          type: "CVSS_V3_1",
+          score: 7.5,
+          severity: "High",
+        }),
+      ],
+    });
+  });
+
+  it("refreshes the vulnerability without creating one or requesting enrichment", async () => {
+    db.metric.findFirst.mockResolvedValueOnce({ severity: "High" } as never);
+
+    await upsertSourceRecord("vuln-1", inbox);
+
+    expect(db.vulnerability.create).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(db.vulnerability.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "vuln-1" },
+        data: expect.objectContaining({ severity: "High" }),
+      }),
+    );
   });
 });

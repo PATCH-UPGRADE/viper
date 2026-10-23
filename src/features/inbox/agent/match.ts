@@ -22,7 +22,7 @@ import {
   addProductAlias,
   enrichAssetIdentifiers,
   enrichVersionUdi,
-  enrichVulnerabilityCvss,
+  recordInboxCvss,
 } from "../utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
@@ -155,7 +155,7 @@ function renderCandidates(candidates: Candidates): string {
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | cvssScore: ${m.cvssScore ?? "(none)"} | cvssVector: ${m.cvssVector ?? "(none)"}`,
+                        ` - id: ${m.id} | displayId: ${m.displayId} | cvssScore: ${m.cvssScore ?? "(none)"} | cvssVector: ${m.cvssVector ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -333,6 +333,10 @@ export async function applyDecisions(
       candidates.assets.flatMap((e) => e.matches.map((m) => m.id)),
     ),
   };
+
+  // Written after the transaction commits: the record service writes the vulnerability row,
+  // which an "update" decision's description write holds locked until then.
+  const pendingCvss: Parameters<typeof recordInboxCvss>[0][] = [];
 
   await prisma.$transaction(async (tx) => {
     for (const decision of decisions) {
@@ -559,10 +563,11 @@ export async function applyDecisions(
             data: { description: data.description },
           });
         }
-        const cvssScore = data.cvssScore;
-        if (cvssScore !== null || data.cvssVector) {
-          await enrichVulnerabilityCvss(decision.targetId, {
-            cvssScore,
+        if (data.cvssScore !== undefined || data.cvssVector) {
+          pendingCvss.push({
+            vulnerabilityId: decision.targetId,
+            notificationId: owner.notificationId,
+            cvssScore: data.cvssScore,
             cvssVector: data.cvssVector,
           });
         }
@@ -663,6 +668,8 @@ export async function applyDecisions(
       }
     }
   });
+
+  for (const cvss of pendingCvss) await recordInboxCvss(cvss);
 
   return summary;
 }

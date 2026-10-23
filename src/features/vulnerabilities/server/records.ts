@@ -295,6 +295,49 @@ export async function deleteVulnerabilityRecord(recordId: string) {
   return { vulnerabilityId, vulnerabilityDeleted: count > 0 };
 }
 
+/**
+ * Create or update one source's record on a vulnerability the caller already knows, keyed by
+ * (source, sourceId), and replace its metrics. For writers that link to an existing
+ * vulnerability instead of resolving one from identifiers, such as the inbox.
+ */
+export async function upsertSourceRecord(
+  vulnerabilityId: string,
+  data: {
+    source: VulnerabilitySource;
+    sourceId: string;
+    summary?: string | null;
+    metrics: MetricInput[];
+  },
+) {
+  const { source, sourceId } = data;
+  const record = await prisma.$transaction(async (tx) => {
+    const record = await tx.vulnerabilityRecord.upsert({
+      where: {
+        source_sourceId_vulnerabilityId: { source, sourceId, vulnerabilityId },
+      },
+      create: {
+        vulnerabilityId,
+        source,
+        sourceId,
+        summary: data.summary ?? null,
+      },
+      update: { summary: data.summary },
+      select: { id: true },
+    });
+    await tx.metric.deleteMany({ where: { recordId: record.id } });
+    await tx.metric.createMany({
+      data: data.metrics.map((metric) => ({
+        ...toMetricCreate(metric),
+        recordId: record.id,
+      })),
+    });
+    return record;
+  });
+
+  await refreshVulnerability(vulnerabilityId);
+  return { recordId: record.id, vulnerabilityId };
+}
+
 async function findOrCreateVulnerability(
   data: VulnerabilityRecordData,
   identifiers: NormalizedIdentifier[],

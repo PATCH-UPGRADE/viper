@@ -345,7 +345,6 @@ describe("trackingRouter.update", () => {
     const start = new Date("2026-06-01T09:00:00Z");
     const end = new Date("2026-06-01T10:30:00Z");
     const before = new Date("2026-06-01T08:00:00Z");
-    const noTimes = { scheduledAt: null, scheduledEndTime: null };
     const stored = (overrides = {}) =>
       mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
         makeUpdateBefore({
@@ -364,7 +363,11 @@ describe("trackingRouter.update", () => {
     it.each([
       ["an end before the start", { scheduledEndTime: before }, {}],
       ["an end equal to the start", { scheduledEndTime: start }, {}],
-      ["an end without a start", { scheduledEndTime: end }, noTimes],
+      [
+        "an end without a start",
+        { scheduledEndTime: end },
+        { scheduledAt: null, scheduledEndTime: null },
+      ],
       ["a start at or past the stored end", { scheduledAt: end }, {}],
     ])("rejects %s", async (_name, input, overrides) => {
       stored(overrides);
@@ -379,6 +382,12 @@ describe("trackingRouter.update", () => {
       const scheduledEndTime = new Date("2026-06-01T11:00:00Z");
       await setup().update({ id: "t1", scheduledEndTime });
       expect(updateData()).toMatchObject({ scheduledEndTime });
+    });
+
+    it("skips the check when the request changes no time", async () => {
+      stored({ scheduledEndTime: before });
+      await setup().update({ id: "t1", summary: "New summary" });
+      expect(updateData()).toMatchObject({ summary: "New summary" });
     });
   });
 

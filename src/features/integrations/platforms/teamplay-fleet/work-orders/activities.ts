@@ -188,7 +188,6 @@ export function toCanonical(raw: FleetActivity): FleetWorkOrderItem {
     status: mapStatus(raw),
     category: mapCategory(raw),
     scheduledAt: plannedStart ?? toIso(raw.dueDate),
-    // An end that is missing or not after the planned start is left empty.
     scheduledEndTime:
       plannedStart &&
       plannedEnd &&

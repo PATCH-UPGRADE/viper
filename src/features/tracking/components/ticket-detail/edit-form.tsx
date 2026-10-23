@@ -76,6 +76,15 @@ const shiftEnd = (form: EditState, scheduledAt: string) =>
       )
     : form.scheduledEndTime;
 
+const endTimeError = ({ scheduledAt, scheduledEndTime }: EditState) => {
+  if (!scheduledEndTime) return null;
+  if (!scheduledAt) return "Set a start time first";
+  if (new Date(scheduledEndTime) <= new Date(scheduledAt)) {
+    return "The end time must be after the start time";
+  }
+  return null;
+};
+
 const editStateFingerprint = (state: EditState) =>
   JSON.stringify({
     ...state,
@@ -107,12 +116,7 @@ export const TicketEditForm = ({
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
 
-  const endError =
-    form.scheduledEndTime &&
-    (!form.scheduledAt ||
-      new Date(form.scheduledEndTime) <= new Date(form.scheduledAt))
-      ? "The end time must be after the start time"
-      : null;
+  const endError = endTimeError(form);
 
   const isDirty = editStateFingerprint(form) !== editStateFingerprint(initial);
   useBeforeUnload(isDirty);

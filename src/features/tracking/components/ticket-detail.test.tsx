@@ -493,13 +493,6 @@ describe("TicketEditForm", () => {
       scheduledAt: new Date(2026, 5, 1, 9, 0),
       scheduledEndTime: new Date(2026, 5, 1, 10, 30),
     });
-    const saved = async () => {
-      await userEvent
-        .setup()
-        .click(screen.getByRole("button", { name: /^save$/i }));
-      return mockMutate.mock.calls[0][0];
-    };
-
     it("flags an end that is not after the start and blocks Save", () => {
       render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
       const end = screen.getByLabelText(/scheduled end/i);
@@ -508,6 +501,17 @@ describe("TicketEditForm", () => {
       fireEvent.change(end, { target: { value: "2026-06-01T08:00" } });
 
       expect(screen.getByText(/end time must be after/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+
+    it("asks for a start when the end has none", () => {
+      render(<TicketEditForm data={scheduled} onCancel={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText(/scheduled for/i), {
+        target: { value: "" },
+      });
+
+      expect(screen.getByText(/set a start time first/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     });
 
@@ -521,7 +525,10 @@ describe("TicketEditForm", () => {
       expect(screen.getByLabelText(/scheduled end/i)).toHaveValue(
         "2026-06-02T14:30",
       );
-      expect((await saved()).scheduledEndTime).toEqual(
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: /^save$/i }));
+      expect(mockMutate.mock.calls[0][0].scheduledEndTime).toEqual(
         new Date(2026, 5, 2, 14, 30),
       );
     });

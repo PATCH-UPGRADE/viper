@@ -37,31 +37,6 @@ export const useSuspenseVulnerabilityPriorityMetrics = () => {
 };
 
 /**
- * Hook to create a new vulnerability
- */
-export const useCreateVulnerability = () => {
-  const queryClient = useQueryClient();
-  const trpc = useTRPC();
-
-  return useMutation(
-    trpc.vulnerabilities.create.mutationOptions({
-      onSuccess: () => {
-        toast.success("Vulnerability created");
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const baseKey = trpc.vulnerabilities.getMany.queryKey();
-            return query.queryKey[0] === baseKey[0];
-          },
-        });
-      },
-      onError: (error) => {
-        toast.error(`Failed to create vulnerability: ${error.message}`);
-      },
-    }),
-  );
-};
-
-/**
  * Hook to update a vulnerability
  */
 export const useUpdateVulnerability = () => {

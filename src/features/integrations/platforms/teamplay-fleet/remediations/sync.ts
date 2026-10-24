@@ -5,27 +5,78 @@ import type {
   SyncOutcome,
 } from "@/features/integrations/core/types";
 import { releaseScalarData } from "@/features/remediations/release";
-import { ResourceType } from "@/generated/prisma";
+import { ResourceType, VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
-import { resolveMatchingId } from "@/lib/router-utils";
-import { resolveOrMintVulnerabilities } from "../../medisao/vulnerabilities";
-import { fetchAdvisories } from "../advisories/advisories";
+import { resolveMatchingIdForDevice } from "@/lib/router-utils";
 import type { FleetConfig, FleetCreds } from "../config";
-import { type FleetRemediationItem, toRemediationItem } from "./feed";
-import { versionRangeOf } from "./products";
+import {
+  type FleetDevice,
+  type FleetRemediationItem,
+  fetchSystemUpdates,
+  fetchUpdateCves,
+  toRemediationItem,
+} from "./feed";
 
-/** Turn every active Fleet security advisory into the remediation it announces */
+/** The exact matching for one Fleet device, or null when the asset has no
+ * manufacturer or product to match on.
+ */
+async function matchingIdFor(device: FleetDevice): Promise<string | null> {
+  const { manufacturerId, productId, versionId, versionStatus } = device;
+  if (!manufacturerId || !productId) return null;
+  return resolveMatchingIdForDevice({
+    manufacturer: { id: manufacturerId },
+    product: { id: productId },
+    version: versionId
+      ? { id: versionId }
+      : {
+          status:
+            versionStatus === VersionStatus.NOT_APPLICABLE
+              ? "NOT_APPLICABLE"
+              : "UNKNOWN",
+        },
+  });
+}
+
 export async function syncRemediations(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
-  const advisories = await fetchAdvisories(ctx.session);
-  const items = advisories
-    .filter((a) => a.active !== false)
-    .map(toRemediationItem);
+  const { integrationId, integrationUserId } = ctx;
+
+  const devices = await prisma.externalAssetMapping.findMany({
+    where: { integrationId },
+    select: {
+      externalId: true,
+      item: {
+        select: {
+          manufacturerId: true,
+          productId: true,
+          versionId: true,
+          versionStatus: true,
+        },
+      },
+    },
+  });
+
+  const byNumber = new Map<string, FleetRemediationItem>();
+  for (const device of devices) {
+    for (const raw of await fetchSystemUpdates(
+      ctx.session,
+      device.externalId,
+    )) {
+      const item = byNumber.get(raw.number) ?? toRemediationItem(raw);
+      item.devices.push(device.item);
+      byNumber.set(raw.number, item);
+    }
+  }
+
+  const items = [...byNumber.values()];
   if (items.length === 0) return { cursor: null };
 
-  const { integrationId, integrationUserId } = ctx;
+  for (const item of items) {
+    item.cveIds = await fetchUpdateCves(ctx.session, item.externalId);
+    item.release.isSecurityUpdate = item.cveIds.length > 0 ? true : null;
+  }
+
   const outcome = await processIntegrationSync(
     prisma,
     {
@@ -33,44 +84,31 @@ export async function syncRemediations(
       mappingModel: prisma.externalRemediationMapping,
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetRemediationItem, userId) => {
-        const matchingIds: string[] = [];
-        for (const p of item.products) {
-          matchingIds.push(
-            await resolveMatchingId({
-              manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
-              product: p.product,
-              versionRange: versionRangeOf(p),
-            }),
-          );
+        const matchingIds = new Set<string>();
+        for (const device of item.devices) {
+          const id = await matchingIdFor(device);
+          if (id) matchingIds.add(id);
         }
-        const vulnerabilityIds = new Set<string>();
-        for (const deviceGroupMatchingId of matchingIds) {
-          const { ids } = await resolveOrMintVulnerabilities({
-            names: item.cveIds,
-            integrationId,
-            integrationUserId,
-            deviceGroupMatchingId,
-            context: `Named by teamplay Fleet advisory ${item.description}.`,
-          });
-          for (const id of ids.values()) vulnerabilityIds.add(id);
-        }
-        if (matchingIds.length === 0 && item.cveIds.length > 0) {
-          const held = await prisma.vulnerability.findMany({
-            where: { cveId: { in: item.cveIds } },
-            select: { id: true },
-          });
-          for (const { id } of held) vulnerabilityIds.add(id);
-        }
+
+        const held =
+          item.cveIds.length > 0
+            ? await prisma.vulnerability.findMany({
+                where: { cveId: { in: item.cveIds } },
+                select: { id: true },
+              })
+            : [];
+
         const fields = {
           description: item.description,
           narrative: item.narrative,
           isManufacturerRemediation: true,
           ...releaseScalarData(item.release, "stated"),
-          deviceGroupMatchings: { connect: matchingIds.map((id) => ({ id })) },
-          vulnerabilities: {
-            connect: [...vulnerabilityIds].map((id) => ({ id })),
+          deviceGroupMatchings: {
+            connect: [...matchingIds].map((id) => ({ id })),
           },
+          vulnerabilities: { connect: held.map(({ id }) => ({ id })) },
         };
+
         return {
           createData: { ...fields, userId },
           updateData: fields,
@@ -84,10 +122,8 @@ export async function syncRemediations(
     integrationId,
     ResourceType.Remediation,
   );
-
   if (outcome.shouldRetry) {
     throw new Error(`Fleet remediation sync incomplete: ${outcome.message}`);
   }
-
   return { cursor: null };
 }

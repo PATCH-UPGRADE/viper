@@ -1,48 +1,91 @@
-import { normalizeIdentifier } from "@/features/integrations/platforms/medisao/vulnerabilities";
+import { z } from "zod";
+import type { Session } from "@/features/integrations/core/types";
 import type { ReleaseScalars } from "@/features/remediations/release";
-import { RemediationCategory } from "@/generated/prisma";
-import { asDate } from "@/lib/date-utils";
-import {
-  externalIdOf,
-  type FleetAdvisory,
-  parseCveIds,
-} from "../advisories/advisories";
+import { RemediationCategory, type VersionStatus } from "@/generated/prisma";
+import { systemUpdatesUrl, updateCvesUrl } from "../urls";
 import { buildText } from "../utils";
-import { type FleetAffectedProduct, parseProductsAffected } from "./products";
 
+const fleetSystemUpdateSchema = z.object({
+  number: z.string(),
+  title: z.string().nullish(),
+  softwareVersion: z.string().nullish(),
+  statusModel: z.object({ typeStatus: z.string().nullish() }).nullish(),
+});
+
+export type FleetSystemUpdate = z.infer<typeof fleetSystemUpdateSchema>;
+
+const updateCvesSchema = z.object({
+  cves: z.array(z.object({ text: z.string() })).nullish(),
+});
+
+export interface FleetDevice {
+  manufacturerId: string | null;
+  productId: string | null;
+  versionId: string | null;
+  versionStatus: VersionStatus;
+}
 export interface FleetRemediationItem {
   externalId: string;
   description: string;
   narrative: string | null;
-  products: FleetAffectedProduct[];
-  cveIds: string[];
   release: ReleaseScalars;
+  devices: FleetDevice[];
+  cveIds: string[];
 }
 
-const describeFix = (products: FleetAffectedProduct[]): string | null => {
-  const lines = products
-    .filter((p) => p.fixedVersion)
-    .map(
-      (p) =>
-        `Update ${p.product}${p.versionLine ? ` ${p.versionLine}` : ""} to ${p.fixedVersion} or later.`,
-    );
-  return lines.length > 0 ? lines.join("\n") : null;
-};
+/** Fleet's typeStatus names how the update is delievered */
+const FLEET_CATEGORY = new Map<string, RemediationCategory>([
+  ["SYSTEM_UPDATES_RUH_REMOTE_UPDATE", RemediationCategory.SOFTWARE_UPDATE],
+]);
 
-export function toRemediationItem(raw: FleetAdvisory): FleetRemediationItem {
-  const products = parseProductsAffected(raw.productsAffected);
-  const label = buildText(raw.advisoryId);
-  const title = buildText(raw.title) ?? `Fleet advisory ${raw.id}`;
+export const toRemediationCategory = (
+  raw: FleetSystemUpdate,
+): RemediationCategory | null =>
+  FLEET_CATEGORY.get(raw.statusModel?.typeStatus ?? "") ?? null;
+
+export async function fetchSystemUpdates(
+  session: Session,
+  equipmentKey: string,
+): Promise<FleetSystemUpdate[]> {
+  const res = await session.request(systemUpdatesUrl(equipmentKey));
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    throw new Error(
+      `Fleet system updates for ${equipmentKey} returned ${res.status}`,
+    );
+  }
+  return z.array(fleetSystemUpdateSchema).parse(await res.json());
+}
+
+export async function fetchUpdateCves(
+  session: Session,
+  updateNumber: string,
+): Promise<string[]> {
+  const res = await session.request(updateCvesUrl(updateNumber));
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    throw new Error(
+      `Fleet CVEs for update ${updateNumber} returned ${res.status}`,
+    );
+  }
+  const { cves } = updateCvesSchema.parse(await res.json());
+  return [
+    ...new Set(
+      (cves ?? []).map((c) => c.text.trim().toUpperCase()).filter(Boolean),
+    ),
+  ];
+}
+
+export function toRemediationItem(
+  raw: FleetSystemUpdate,
+): FleetRemediationItem {
+  const version = buildText(raw.softwareVersion);
   return {
-    externalId: externalIdOf(raw),
-    description: label ? `${label}: ${title}` : title,
-    narrative: describeFix(products),
-    products,
-    cveIds: [...new Set(parseCveIds(raw.cveIds).map(normalizeIdentifier))],
-    release: {
-      category: RemediationCategory.SOFTWARE_UPDATE,
-      isSecurityUpdate: true,
-      publishedAt: asDate(raw.activationDate)?.toISOString() ?? null,
-    },
+    externalId: raw.number,
+    description: buildText(raw.title) ?? `Fleet system update ${raw.number}`,
+    narrative: version ? `Update to ${version}.` : null,
+    release: { category: toRemediationCategory(raw) },
+    devices: [],
+    cveIds: [],
   };
 }

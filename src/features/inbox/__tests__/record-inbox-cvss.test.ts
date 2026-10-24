@@ -74,22 +74,63 @@ describe("recordInboxCvss", () => {
     expect(upsertSourceRecord).not.toHaveBeenCalled();
   });
 
-  it("leaves a vulnerability that already has a CVSS score alone", async () => {
+  it("skips a score and vector some record already has", async () => {
     mockPrisma.metric.count.mockResolvedValue(1);
 
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
       notificationId: "notif-1",
-      cvssScore: 5,
+      cvssScore: 8.1,
+      cvssVector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
     });
 
     expect(mockPrisma.metric.count).toHaveBeenCalledWith({
       where: {
         record: { vulnerabilityId: "vuln-1" },
         type: { in: ["CVSS_V3_0", "CVSS_V3_1", "CVSS_V4_0"] },
-        score: { not: null },
+        score: 8.1,
+        vector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
       },
     });
     expect(upsertSourceRecord).not.toHaveBeenCalled();
+  });
+
+  it("compares only the score when the notification gives no vector", async () => {
+    mockPrisma.metric.count.mockResolvedValue(1);
+
+    await recordInboxCvss({
+      vulnerabilityId: "vuln-1",
+      notificationId: "notif-1",
+      cvssScore: 8.1,
+    });
+
+    expect(mockPrisma.metric.count).toHaveBeenCalledWith({
+      where: {
+        record: { vulnerabilityId: "vuln-1" },
+        type: { in: ["CVSS_V3_0", "CVSS_V3_1", "CVSS_V4_0"] },
+        score: 8.1,
+      },
+    });
+    expect(upsertSourceRecord).not.toHaveBeenCalled();
+  });
+
+  it("records a score that differs from the vulnerability's existing CVSS", async () => {
+    // No metric with this score: the vulnerability's TA3 CVSS says something else.
+    mockPrisma.metric.count.mockResolvedValue(0);
+
+    await recordInboxCvss({
+      vulnerabilityId: "vuln-1",
+      notificationId: "notif-1",
+      cvssScore: 7.5,
+    });
+
+    expect(upsertSourceRecord).toHaveBeenCalledWith(
+      "vuln-1",
+      expect.objectContaining({
+        source: "INBOX",
+        sourceId: "notif-1",
+        metrics: [{ type: "CVSS_V3_1", score: 7.5, vector: null }],
+      }),
+    );
   });
 });

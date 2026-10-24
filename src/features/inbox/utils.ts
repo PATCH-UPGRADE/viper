@@ -205,9 +205,11 @@ export async function enrichVersionUdi(
 
 /**
  * Keep a CVSS score the match step read out of a notification, as an INBOX record on the
- * vulnerability (one per notification). Only fills a gap: a vulnerability that already has a CVSS
- * score from any source is left alone, which also makes a re-run a no-op. A vector with no score
- * doesn't count, since nothing shows it, so a later notification can still add the score.
+ * vulnerability (one per notification). Skipped when a CVSS metric from any source, this
+ * notification's own record included, already has the same score and vector (each compared only
+ * when the notification gives it), so repeating a known value adds nothing and a re-run is a
+ * no-op. A different score or vector is written, and as the newest CVSS it becomes the one the
+ * vulnerability shows.
  *
  * Call it after the match transaction commits: the record service writes the vulnerability row,
  * which the transaction may hold locked.
@@ -225,14 +227,15 @@ export async function recordInboxCvss({
 }): Promise<void> {
   if (cvssScore == null && !cvssVector) return;
 
-  const existing = await prisma.metric.count({
+  const same = await prisma.metric.count({
     where: {
       record: { vulnerabilityId },
       type: { in: CVSS_METRIC_TYPES },
-      score: { not: null },
+      ...(cvssScore != null ? { score: cvssScore } : {}),
+      ...(cvssVector ? { vector: cvssVector } : {}),
     },
   });
-  if (existing > 0) return;
+  if (same > 0) return;
 
   await upsertSourceRecord(vulnerabilityId, {
     source: VulnerabilitySource.INBOX,

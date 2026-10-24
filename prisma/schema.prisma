@@ -801,6 +801,7 @@ enum VulnerabilitySource {
   CISA_KEV // known-exploited flag only
   AI // the AI crawler integration
   OTHER // an API client that isn't a TA3 performer
+  INBOX // CVSS an LLM read out of an inbox notification; sourceId is the notification id
   // TODO VW-516 or VW-583: Add GHSA
   // VW-583, add NVD
   // Future TODO: Add MANUAL when we support human changes

@@ -29,7 +29,7 @@ type MatchingWithRefs = MatchingLike & {
 
 function renderQuestionPrompt(args: {
   vulnerabilities: Array<{
-    cveId: string | null;
+    displayId: string;
     severity: string;
     description: string | null;
   }>;
@@ -50,8 +50,7 @@ function renderQuestionPrompt(args: {
     "## Linked vulnerabilities\n\n" +
       args.vulnerabilities
         .map(
-          (v) =>
-            `### ${v.cveId ?? "unknown CVE"} - ${v.severity}\n${v.description ?? ""}`,
+          (v) => `### ${v.displayId} - ${v.severity}\n${v.description ?? ""}`,
         )
         .join("\n\n"),
   );
@@ -92,7 +91,7 @@ function buildNoteLabels(args: {
     assets: { id: string; hostname: string | null; ip: string | null }[];
   }[];
   matchings: MatchingWithRefs[];
-  vulnerabilities: { id: string; cveId: string | null }[];
+  vulnerabilities: { id: string; displayId: string }[];
 }): NoteTargetLabels {
   return {
     assetLabel: new Map(
@@ -110,10 +109,9 @@ function buildNoteLabels(args: {
         deviceGroupMatchingLabel(matching) || matching.id,
       ]),
     ),
-    cveById: new Map(
+    displayIdById: new Map(
       args.vulnerabilities.map(
-        (vulnerability) =>
-          [vulnerability.id, vulnerability.cveId ?? vulnerability.id] as const,
+        (vulnerability) => [vulnerability.id, vulnerability.displayId] as const,
       ),
     ),
   };
@@ -250,7 +248,7 @@ export async function gatherQuestionContext(
 
       issueRenders.push({
         issueId: issue.id,
-        cve: v.cveId ?? v.id,
+        cve: v.displayId,
         matching,
         assetCount: groups.reduce(
           (num, groups) => num + groups.assets.length,
@@ -351,7 +349,7 @@ export async function gatherQuestionContextForIssue(
       issueRenders: [
         {
           issueId: issue.id,
-          cve: issue.vulnerability.cveId ?? issue.vulnerability.id,
+          cve: issue.vulnerability.displayId,
           matching,
           assetCount: groups.reduce((n, g) => n + g.assets.length, 0),
           statusNotes: issue.statusNotes,

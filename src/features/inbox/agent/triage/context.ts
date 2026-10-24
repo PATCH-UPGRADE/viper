@@ -185,7 +185,7 @@ export async function gatherTriageContext(
     matchingLabel: new Map(
       matchings.map((m) => [m.id, deviceGroupMatchingLabel(m)]),
     ),
-    cveById: new Map(vulnerabilities.map((v) => [v.id, v.cveId ?? v.id])),
+    displayIdById: new Map(vulnerabilities.map((v) => [v.id, v.displayId])),
   };
 
   const vulnInputs: VulnerabilityForMarkdown[] = vulnerabilities.map((v) => ({
@@ -202,7 +202,7 @@ export async function gatherTriageContext(
 
   const vexIssues: VexIssue[] = vulnerabilities.flatMap((v) =>
     v.issues.map((i) => ({
-      cve: v.cveId ?? v.id,
+      cve: v.displayId,
       status: i.status,
       notAffectedJustification: i.notAffectedJustification,
       statusConfidence: i.statusConfidence,

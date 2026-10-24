@@ -5,6 +5,8 @@
 
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
+import { summarizeRecordMetrics } from "@/features/vulnerabilities/utils";
+import type { Metric } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import type { MatchingLike } from "@/lib/device-matching";
 import {
@@ -67,6 +69,7 @@ export async function gatherVexContext(
                 },
               },
               issues: { where: { deviceGroupMatchingId: { not: null } } },
+              records: { select: { metrics: true } },
               // TODO: continue testing, may need to include asset-level issues
               // here as well
             },
@@ -138,7 +141,7 @@ export async function gatherVexContext(
       issues.push({ issueId: issue.id, vulnerabilityId: v.id, assetIds });
       issueRenders.push({
         issueId: issue.id,
-        cve: v.cveId ?? v.id,
+        cve: v.displayId,
         matching,
         groups,
         assetIds,
@@ -172,7 +175,9 @@ export async function gatherVexContext(
   const matchingLabel = new Map(
     matchings.map((m) => [m.id, deviceGroupMatchingLabel(m)]),
   );
-  const cveById = new Map(vulnerabilities.map((v) => [v.id, v.cveId ?? v.id]));
+  const displayIdById = new Map(
+    vulnerabilities.map((v) => [v.id, v.displayId]),
+  );
 
   const markdown = renderVexPrompt({
     sources: notification.sourceLinks.map((l) => l.sourceRecord),
@@ -181,7 +186,7 @@ export async function gatherVexContext(
     candidateGroups,
     issueRenders,
     notes,
-    labels: { assetLabel, groupLabel, matchingLabel, cveById },
+    labels: { assetLabel, groupLabel, matchingLabel, displayIdById },
   });
 
   return { notificationId, markdown, issues };
@@ -191,13 +196,12 @@ function renderVexPrompt(args: {
   sources: { markdown: string | null; channel: string }[];
   vulnerabilities: Array<{
     id: string;
-    cveId: string | null;
+    displayId: string;
     severity: string;
-    cvssScore: number | null;
+    records: { metrics: Metric[] }[];
     description: string | null;
     narrative: string | null;
     impact: string | null;
-    affectedComponents: string[];
   }>;
   remediations: Array<{
     id: string;
@@ -224,7 +228,7 @@ function renderVexPrompt(args: {
     assetLabel: Map<string, string>;
     groupLabel: Map<string, string>;
     matchingLabel: Map<string, string>;
-    cveById: Map<string, string>;
+    displayIdById: Map<string, string>;
   };
 }): string {
   const sections: string[] = [];
@@ -245,13 +249,10 @@ function renderVexPrompt(args: {
     "## Linked vulnerabilities\n\n" +
       args.vulnerabilities
         .map((v) => {
+          const cvssScore = summarizeRecordMetrics(v.records).cvss?.score;
           const lines = [
-            `### ${v.cveId ?? v.id} — ${v.severity}${v.cvssScore != null ? ` (CVSS ${v.cvssScore})` : ""}`,
+            `### ${v.displayId} — ${v.severity}${cvssScore != null ? ` (CVSS ${cvssScore})` : ""}`,
           ];
-          if (v.affectedComponents.length > 0)
-            lines.push(
-              `- **Affected Components**: ${v.affectedComponents.join(", ")}`,
-            );
           if (v.description) lines.push(`- **Description**: ${v.description}`);
           if (v.narrative)
             lines.push(`- **Exploit Narrative**: ${v.narrative}`);
@@ -334,7 +335,9 @@ export async function gatherVexContextForIssue(
 ): Promise<VexContext | null> {
   const issue = await prisma.issue.findUnique({
     where: { id: issueId },
-    include: { vulnerability: true },
+    include: {
+      vulnerability: { include: { records: { select: { metrics: true } } } },
+    },
   });
 
   if (!issue || !issue.deviceGroupMatchingId) return null;
@@ -379,11 +382,9 @@ export async function gatherVexContextForIssue(
   const matchingLabel = new Map<string, string>();
   matchingLabel.set(matching.id, deviceGroupMatchingLabel(matching));
 
-  const cveById = new Map<string, string>();
-  cveById.set(
-    issue.vulnerability.id,
-    issue.vulnerability.cveId ?? issue.vulnerability.id,
-  );
+  const displayIdById = new Map([
+    [issue.vulnerability.id, issue.vulnerability.displayId],
+  ]);
 
   let markdown = renderVexPrompt({
     sources,
@@ -393,7 +394,7 @@ export async function gatherVexContextForIssue(
     issueRenders: [
       {
         issueId: issue.id,
-        cve: issue.vulnerability.cveId ?? issue.vulnerability.id,
+        cve: issue.vulnerability.displayId,
         matching,
         groups,
         assetIds,
@@ -401,7 +402,7 @@ export async function gatherVexContextForIssue(
       },
     ],
     notes,
-    labels: { assetLabel, groupLabel, matchingLabel, cveById },
+    labels: { assetLabel, groupLabel, matchingLabel, displayIdById },
   });
 
   if (answeredQuestion) {

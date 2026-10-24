@@ -9,9 +9,7 @@ export type NoteTargetLabels = {
   assetLabel: Map<string, string>;
   groupLabel: Map<string, string>;
   matchingLabel: Map<string, string>;
-  // TODO: VW-540 the inbox contexts fill this from the legacy `cveId`. Fill it from `displayId`
-  // and rename it displayIdById when the inbox moves to identifiers.
-  cveById: Map<string, string>;
+  displayIdById: Map<string, string>;
 };
 
 export function renderNoteTarget(
@@ -26,7 +24,7 @@ export function renderNoteTarget(
     case "DEVICE_GROUP_MATCHING":
       return `Matching ${labels.matchingLabel.get(id) ?? id}`;
     case "VULNERABILITY":
-      return `Vulnerability ${labels.cveById.get(id) ?? id}`;
+      return `Vulnerability ${labels.displayIdById.get(id) ?? id}`;
     case "REMEDIATION":
       return `Remediation ${id}`;
     default:

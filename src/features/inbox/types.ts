@@ -80,7 +80,7 @@ export const notificationDetailInclude = {
       id: true,
       vulnerabilityId: true,
       vulnerability: {
-        select: { cveId: true, description: true, severity: true },
+        select: { displayId: true, severity: true },
       },
     },
   },

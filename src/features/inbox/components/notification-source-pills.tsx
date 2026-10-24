@@ -7,6 +7,7 @@ import {
   RssIcon,
 } from "lucide-react";
 import { useState } from "react";
+import { CVE_PATTERN } from "@/features/vulnerabilities/utils";
 import type {
   NotificationDetailSource,
   NotificationDetailWithRelations,
@@ -45,8 +46,8 @@ export function NotificationSourcePills({
   const cveIds = [
     ...new Set(
       notification.vulnerabilities
-        .map((mapping) => mapping.vulnerability.cveId)
-        .filter((cveId): cveId is string => cveId !== null),
+        .map((mapping) => mapping.vulnerability.displayId)
+        .filter((displayId) => CVE_PATTERN.test(displayId)),
     ),
   ];
 

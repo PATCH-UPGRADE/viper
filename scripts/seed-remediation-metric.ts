@@ -25,8 +25,6 @@ const FIXTURE_CVE = "CVE-2022-29875";
 const FIXTURE_VULNERABILITY_WHERE = {
   identifiers: { some: { value: FIXTURE_CVE } },
 } satisfies Prisma.VulnerabilityWhereInput;
-const ADVISORY_URL =
-  "https://www.siemens-healthineers.com/support-documentation/cybersecurity/ssa-220609";
 const MANUFACTURER = "Siemens Healthineers";
 const PRODUCT = "MAGNETOM NUMARIS X";
 const VERSION = "VA31A";
@@ -206,7 +204,6 @@ async function seedFixture(userId: string) {
   for (const spec of ASSET_SPECS) {
     const data = {
       ...spec,
-      upstreamApi: ADVISORY_URL,
       status: "Active" as AssetStatus,
       ...device,
       userId,

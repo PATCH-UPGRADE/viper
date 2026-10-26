@@ -272,22 +272,30 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
   it("passes yesterday's bullets through to the writer", async () => {
     // Exercises the parseBullets branch: every other test leaves the previous
     // debrief null, so the stored-JSON path was never run.
-    contextResolves([BULLET]);
-    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
-    const { step, logger } = makeStep();
+    // previousAgeDays counts UTC calendar days, and the stored debrief is 7 minutes old: pin the
+    // clock to midday so a run just after midnight UTC doesn't see it as a day old.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-25T12:00:00.000Z"));
+    try {
+      contextResolves([BULLET]);
+      mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+      const { step, logger } = makeStep();
 
-    await deptDebrief.handler({
-      event: event({ findings: "f" }),
-      step,
-      logger,
-    });
+      await deptDebrief.handler({
+        event: event({ findings: "f" }),
+        step,
+        logger,
+      });
 
-    expect(mockWriter).toHaveBeenCalledWith(
-      expect.objectContaining({
-        previousBullets: [BULLET],
-        previousAgeDays: 0,
-      }),
-    );
+      expect(mockWriter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previousBullets: [BULLET],
+          previousAgeDays: 0,
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("gives the writer each work order's id, so it can link one", async () => {

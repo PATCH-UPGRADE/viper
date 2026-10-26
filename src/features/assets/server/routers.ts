@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   assetNameSearchTerms,
   countAffectedRemediations,
+  type DeviceTypeSource,
   getAssetDeviceTypeLabel,
 } from "@/features/assets/utils";
 import { prepareDeviceTypeSlugs } from "@/features/device-types/server/apply-device-type";
@@ -17,21 +18,27 @@ import {
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { deviceIdentitySelect } from "@/lib/device-matching";
+import {
+  type DeviceIdentity,
+  deviceIdentitySelect,
+} from "@/lib/device-matching";
 import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
+  type PaginationInput,
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
   assetWhereForMatchings,
+  buildUpdatedAtFilter,
   deviceInputToAsset,
   fetchPaginated,
   findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
+import { sortByFields, sortFieldKey } from "@/lib/sort";
 import {
   baseProcedure,
   createTRPCRouter,
@@ -50,6 +57,12 @@ import {
   paginatedAssetResponseSchema,
   updateAssetSchema,
 } from "../types";
+import {
+  AFFECTED_ISSUE_SORT_KEYS,
+  affectedIssueSortValue,
+  countAffectedIssues,
+  isAffectedIssueSortKey,
+} from "./effective-issue-sort";
 import { processAssetIntegrationSync } from "./integration-sync";
 import { fetchUtilizationGrids } from "./utilization";
 
@@ -87,13 +100,107 @@ export function assetOrderBy(
       return { [key]: direction };
     }),
     { updatedAt: "desc" },
+    { id: "asc" },
   ];
+}
+
+/** The sort keys that assets.getMany accepts; it drops any other key. */
+export const ASSET_SORT_KEYS = new Set<string>([
+  "ip",
+  "hostname",
+  "role",
+  "networkSegment",
+  "serialNumber",
+  "macAddress",
+  "status",
+  "createdAt",
+  "updatedAt",
+  "deviceType",
+  ...AFFECTED_ISSUE_SORT_KEYS,
+]);
+
+/** The `sort` documentation for assets.getMany, shared by OpenAPI and the agent catalog. */
+export const ASSET_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...ASSET_SORT_KEYS].join(", ")}. affectedIssues and severity_Critical to severity_Low count the vulnerabilities that affect each asset, by severity. Unknown fields are ignored.`;
+
+const affectedIssueCountInclude = {
+  vulnerability: { select: { severity: true } },
+} satisfies Prisma.IssueInclude;
+
+async function withAffectedIssueCounts<T extends DeviceIdentity>(assets: T[]) {
+  const effectiveIssues = await resolveEffectiveIssuesByAsset(
+    assets,
+    affectedIssueCountInclude,
+  );
+  return assets.map((asset) => ({
+    ...asset,
+    affectedIssueCounts: countAffectedIssues(
+      effectiveIssues.get(asset.id) ?? [],
+    ),
+  }));
+}
+
+async function fetchAssetsWithAffectedIssueCounts(
+  where: Prisma.AssetWhereInput,
+  input: PaginationInput,
+  sortFields: string[],
+) {
+  const result = await fetchPaginated(prisma.asset, input, {
+    where,
+    include: assetInclude,
+    ...(sortFields.length > 0 && {
+      orderBy: assetOrderBy(sortFields.join(",")),
+    }),
+  });
+  return { ...result, items: await withAffectedIssueCounts(result.items) };
+}
+
+/** The in-memory sort value of an Asset column, for `sortByFields`. */
+function assetColumnSortValue(
+  asset: DeviceTypeSource,
+  key: string,
+): number | string {
+  if (key === "deviceType") return getAssetDeviceTypeLabel(asset) ?? "";
+  const val = (asset as Record<string, unknown>)[key];
+  if (val instanceof Date) return val.getTime();
+  return String(val ?? "");
+}
+
+// Loads every matching asset and sorts in memory, as getManyDashboardInternal
+// does: effective issues are resolved in JavaScript, so SQL cannot order by them.
+async function fetchAssetsSortedByAffectedIssues(
+  where: Prisma.AssetWhereInput,
+  input: PaginationInput,
+  sortFields: string[],
+) {
+  const assets = await prisma.asset.findMany({
+    where: { ...where, ...buildUpdatedAtFilter(input) },
+    include: assetInclude,
+  });
+  const meta = buildPaginationMeta(input, assets.length);
+  const rows = await withAffectedIssueCounts(assets);
+
+  const sorted = sortByFields(
+    rows,
+    sortFields,
+    (asset, key) =>
+      affectedIssueSortValue(asset.affectedIssueCounts, key) ??
+      assetColumnSortValue(asset, key),
+  );
+
+  return createPaginatedResponse(
+    sorted.slice(meta.skip, meta.skip + meta.take),
+    meta,
+  );
 }
 
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(paginationInputSchema)
+    .input(
+      paginationInputSchema.extend({
+        sort: z.string().default("").describe(ASSET_SORT_DESCRIPTION),
+      }),
+    )
     .meta({
       openapi: {
         method: "GET",
@@ -106,14 +213,18 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(paginatedAssetResponseSchema)
     .query(async ({ input }) => {
-      const { search } = input;
+      const { search, sort } = input;
 
       const where = createSearchFilter(search);
+      const sortFields = (sort ? sort.split(",") : []).filter((field) =>
+        ASSET_SORT_KEYS.has(sortFieldKey(field)),
+      );
 
-      const result = await fetchPaginated(prisma.asset, input, {
-        where: where,
-        include: assetInclude,
-      });
+      const result = sortFields.some((field) =>
+        isAffectedIssueSortKey(sortFieldKey(field)),
+      )
+        ? await fetchAssetsSortedByAffectedIssues(where, input, sortFields)
+        : await fetchAssetsWithAffectedIssueCounts(where, input, sortFields);
 
       return {
         ...result,
@@ -213,16 +324,13 @@ export const assetsRouter = createTRPCRouter({
         : {};
       const where = { ...createSearchFilter(search), ...importedFromSource };
 
-      const computedKeys = [
-        "severity_Critical",
-        "severity_High",
-        "severity_Medium",
-        "severity_Low",
+      const computedKeys: string[] = [
+        ...AFFECTED_ISSUE_SORT_KEYS,
         "remediations",
       ];
       const sortFields = sort ? sort.split(",").filter(Boolean) : [];
-      const hasComputedSort = sortFields.some((s) =>
-        computedKeys.some((key) => s === key || s === `-${key}`),
+      const hasComputedSort = sortFields.some((field) =>
+        computedKeys.includes(sortFieldKey(field)),
       );
 
       if (!hasComputedSort) {
@@ -244,13 +352,11 @@ export const assetsRouter = createTRPCRouter({
         };
       }
 
-      const totalCount = await prisma.asset.count({ where });
-      const meta = buildPaginationMeta(input, totalCount);
-
       const fetchedAssets = await prisma.asset.findMany({
-        where,
+        where: { ...where, ...buildUpdatedAtFilter(input) },
         include: assetDashboardInclude,
       });
+      const meta = buildPaginationMeta(input, fetchedAssets.length);
       const effectiveIssues = await resolveEffectiveIssuesByAsset(
         fetchedAssets,
         assetDashboardInclude.issues.include,
@@ -262,49 +368,25 @@ export const assetsRouter = createTRPCRouter({
 
       type AssetRow = (typeof allAssets)[number];
 
-      function activeBySeverity(asset: AssetRow, severity: Severity): number {
-        return asset.issues.filter(
-          (i) =>
-            i.status === IssueStatus.AFFECTED &&
-            i.vulnerability.severity === severity,
-        ).length;
-      }
-
       function getComputedValue(asset: AssetRow, key: string): number | string {
-        if (key.startsWith("severity_")) {
-          const severity = key.replace("severity_", "") as Severity;
-          return activeBySeverity(asset, severity);
-        }
+        const issueValue = affectedIssueSortValue(
+          countAffectedIssues(asset.issues),
+          key,
+        );
+        if (issueValue !== undefined) return issueValue;
         if (key === "remediations") {
           return countAffectedRemediations(asset.issues);
         }
-        if (key === "deviceType") return getAssetDeviceTypeLabel(asset) ?? "";
-        const val = (asset as Record<string, unknown>)[key];
-        return typeof val === "string" ? val : String(val ?? "");
+        return assetColumnSortValue(asset, key);
       }
 
-      allAssets.sort((a, b) => {
-        for (const field of sortFields) {
-          const desc = field.startsWith("-");
-          const key = desc ? field.slice(1) : field;
-          const aVal = getComputedValue(a, key);
-          const bVal = getComputedValue(b, key);
+      const sortedAssets = sortByFields(
+        allAssets,
+        sortFields,
+        getComputedValue,
+      );
 
-          let cmp: number;
-          if (typeof aVal === "number" && typeof bVal === "number") {
-            cmp = aVal - bVal;
-          } else {
-            cmp = String(aVal).localeCompare(String(bVal));
-          }
-
-          if (cmp !== 0) return desc ? -cmp : cmp;
-        }
-        return (
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
-      });
-
-      const items = allAssets.slice(meta.skip, meta.skip + meta.take);
+      const items = sortedAssets.slice(meta.skip, meta.skip + meta.take);
       return createPaginatedResponse(items, meta);
     }),
 

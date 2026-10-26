@@ -15,6 +15,7 @@ import {
   displayNameFor,
   requirePlatform,
 } from "../core/registry";
+import { suggestedPlatforms } from "../core/suggestions";
 import { effectiveSyncEvery } from "../core/sync/cadence";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
@@ -128,6 +129,8 @@ export const integrationsRouter = createTRPCRouter({
 
       return { ...result, items };
     }),
+
+  getSuggestions: protectedProcedure.query(() => suggestedPlatforms()),
 
   create: protectedProcedure
     .input(integrationInputSchema)

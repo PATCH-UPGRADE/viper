@@ -1,6 +1,12 @@
 // @vitest-environment node
+
+import { generateOpenApiDocument } from "trpc-to-openapi";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AFFECTED_ISSUE_SORT_KEYS } from "@/features/assets/server/effective-issue-sort";
+import { ASSET_SORT_DESCRIPTION } from "@/features/assets/server/routers";
+import { VULNERABILITY_SORT_DESCRIPTION } from "@/features/vulnerabilities/server/routers";
 import { createAgentCaller } from "@/trpc/agent-caller";
+import { appRouter } from "@/trpc/routers/_app";
 import {
   addNavigationLinks,
   capPageSize,
@@ -550,5 +556,86 @@ describe("addNavigationLinks — work orders", () => {
     }) as { _links?: unknown };
 
     expect(result._links).toBeUndefined();
+  });
+});
+
+describe("PLATFORM_CATALOG teaches ranking", () => {
+  it("names every asset sort key that needs effective issues", () => {
+    for (const key of AFFECTED_ISSUE_SORT_KEYS) {
+      expect(PLATFORM_CATALOG).toContain(key);
+    }
+    expect(PLATFORM_CATALOG).toContain("affectedIssueCounts");
+  });
+
+  it("names the date filter fields", () => {
+    expect(PLATFORM_CATALOG).toContain("lastUpdatedStartTime");
+    expect(PLATFORM_CATALOG).toContain("lastUpdatedEndTime");
+  });
+
+  // API clients read the sort fields from the OpenAPI spec, not from the
+  // catalog.
+  it.each([
+    ["/assets", ASSET_SORT_DESCRIPTION],
+    ["/vulnerabilities", VULNERABILITY_SORT_DESCRIPTION],
+    ["/assets/{id}/vulnerabilities", VULNERABILITY_SORT_DESCRIPTION],
+    ["/versions/{id}/vulnerabilities", VULNERABILITY_SORT_DESCRIPTION],
+  ])(
+    "documents the sort fields of GET %s in the OpenAPI spec",
+    (path, text) => {
+      const document = generateOpenApiDocument(appRouter, {
+        title: "test",
+        version: "1.0.0",
+        baseUrl: "http://localhost/api/v1",
+      });
+      const sort = document.paths?.[path]?.get?.parameters?.find(
+        (parameter) => "name" in parameter && parameter.name === "sort",
+      );
+      const schema = sort && "schema" in sort ? sort.schema : undefined;
+      expect(
+        schema && "description" in schema ? schema.description : undefined,
+      ).toBe(text);
+    },
+  );
+
+  // Postgres sorts the Severity and Priority enums in declaration order,
+  // Critical first, which is the reverse of what a model guesses.
+  it("says which direction puts Critical first", () => {
+    expect(PLATFORM_CATALOG).toContain('"severity" puts Critical first');
+    expect(PLATFORM_CATALOG).toContain('"priority" puts Critical first');
+  });
+
+  it("names exactly the procedures that cap pageSize, with their caps", () => {
+    const capped = PLATFORM_QUERY_PROCEDURES.flatMap((procedure) => {
+      const pageSize = capPageSize(procedure, { pageSize: 10_000 })?.pageSize;
+      const name = procedure.replace(".", "\\.");
+      return pageSize === 10_000 ? [] : [`${name} \\(at\\s+${pageSize}\\)`];
+    });
+    expect(capped).toHaveLength(2);
+    expect(PLATFORM_CATALOG).toMatch(
+      new RegExp(`Only ${capped.join(" and ")} cap pageSize`),
+    );
+  });
+
+  it("answers a ranking from page 1 and widens pageSize for a tie", () => {
+    expect(PLATFORM_CATALOG).toContain(
+      "Page 1 of a sorted query is the answer",
+    );
+    expect(PLATFORM_CATALOG).toMatch(
+      /larger pageSize: one call returns them, where reading the next pages takes\s+several/,
+    );
+  });
+
+  it("pages on with the same sort past the largest pageSize", () => {
+    expect(PLATFORM_CATALOG).toMatch(
+      /runs past the largest pageSize a procedure allows, read the next pages\s+with the same sort/,
+    );
+  });
+
+  // The chat prompts give a date with no time, so a rolling cutoff such as
+  // "the last 24 hours" cannot be computed there.
+  it("tells a model with only a date to use whole UTC days", () => {
+    expect(PLATFORM_CATALOG).toMatch(
+      /If you have only a date, use whole UTC days/,
+    );
   });
 });

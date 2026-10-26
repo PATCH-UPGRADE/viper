@@ -64,7 +64,7 @@ export async function runDebriefScout(): Promise<string> {
     {
       messages: [
         new HumanMessage(
-          "Survey the fleet and report this morning's findings.",
+          `Survey the fleet and report this morning's findings. The current time is ${new Date().toISOString()}.`,
         ),
       ],
     },

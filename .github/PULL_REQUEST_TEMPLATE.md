@@ -2,7 +2,7 @@
 
 <!-- Briefly: what does this PR do, and why? -->
 
-Jira ticket: VW-
+Jira ticket: [VW-XXX](https://northeastern-patch.atlassian.net/browse/VW-XXX)
 
 Link to UI mocks (if relevant):
 

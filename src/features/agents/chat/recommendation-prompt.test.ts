@@ -146,3 +146,23 @@ describe("recommendation prompt names the tools the recommendation node binds", 
     }
   });
 });
+
+describe("recommendation prompt ranking hints", () => {
+  it("starts a ranking from sorted vulnerability and asset queries", () => {
+    const prompt = buildRecommendationSystemPrompt("hospital administration");
+    expect(prompt).toContain('{ sort: "-inKEV,severity,-epss" }');
+    expect(prompt).toContain('{ sort: "-severity_Critical,-severity_High" }');
+  });
+
+  it("gives today's date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-21T15:00:00Z"));
+    try {
+      expect(
+        buildRecommendationSystemPrompt("hospital administration"),
+      ).toContain("Today is 2026-10-21 (UTC).");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

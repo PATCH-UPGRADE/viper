@@ -707,6 +707,19 @@ export async function resolvedAssetCount(
   });
 }
 
+export function buildUpdatedAtFilter(
+  input: Pick<PaginationInput, "lastUpdatedStartTime" | "lastUpdatedEndTime">,
+): { updatedAt?: { gte?: Date; lte?: Date } } {
+  const updatedAt: { gte?: Date; lte?: Date } = {};
+  if (input.lastUpdatedStartTime) {
+    updatedAt.gte = new Date(input.lastUpdatedStartTime);
+  }
+  if (input.lastUpdatedEndTime) {
+    updatedAt.lte = new Date(input.lastUpdatedEndTime);
+  }
+  return Object.keys(updatedAt).length > 0 ? { updatedAt } : {};
+}
+
 export async function fetchPaginated<
   TDelegate extends Pick<PrismaDelegate, "count" | "findMany">,
   TArgs extends Parameters<TDelegate["findMany"]>[0],
@@ -715,20 +728,7 @@ export async function fetchPaginated<
   input: PaginationInput,
   args: Omit<TArgs, "skip" | "take">,
 ) {
-  const updatedAtFilter: Record<string, Date> = {};
-  if (input.lastUpdatedStartTime) {
-    updatedAtFilter.gte = new Date(input.lastUpdatedStartTime);
-  }
-  if (input.lastUpdatedEndTime) {
-    updatedAtFilter.lte = new Date(input.lastUpdatedEndTime);
-  }
-
-  const where = {
-    ...args.where,
-    ...(Object.keys(updatedAtFilter).length > 0 && {
-      updatedAt: updatedAtFilter,
-    }),
-  };
+  const where = { ...args.where, ...buildUpdatedAtFilter(input) };
 
   const totalCount = await delegate.count({ where });
 

@@ -67,6 +67,7 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   definition: ConnectorDefinition<TConfig, TCreds>;  // platform, displayName, configSchema, credentialSchema
   sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
+  suggest?(ctx: SuggestCtx): Promise<Suggestion | null>;
   workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   remediations?: ResourceModule<unknown, unknown, TConfig, TCreds>;
@@ -111,6 +112,13 @@ puller loops and returns the cursor it reached; a pusher fires one request and r
 `pending: true` so the row stays `Pending` until the callback lands.
 
 `onCreate?()` runs once, after the row is created (`server/routers.ts`).
+
+`suggest?(ctx)` puts the platform in the "Suggested for you" section of the connectors page. It
+returns `{ reason }`, one sentence that tells the user why the platform fits, or `null`. The
+platform owns every condition, including "an integration of it already exists". `ctx.integrations`
+holds every Integration row, so a hook does not need to load them. `core/suggestions.ts` calls each
+hook and never branches on the platform. If a hook throws, core reports the error to Sentry and
+shows the other suggestions.
 
 Set `definition.singleton: true` if a hospital needs only one Integration of the platform. The
 `create` procedure rejects a second one with `CONFLICT`, and the catalog disables its "Add" button.

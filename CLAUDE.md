@@ -438,6 +438,18 @@ not copy that pattern for new work.
 - **Unit tests**: All AI prompts with golden samples
 - **Validation**: Time calculations, risk metrics, downtime estimates must be deterministic and testable
 
+### API Compatibility
+
+The external API (`/api/v1`) has no backwards compatibility guarantee. Breaking changes go into
+`v1` directly.
+
+- **Do not add compatibility code for a removed or renamed field.** This includes deprecated
+  aliases, `z.never()` fields with a custom error message, and a second accepted shape for the
+  same input.
+- When a change breaks the API schema, say so in the PR description.
+
+This rule covers the HTTP API (`/api/v1`) only.
+
 ## Testing
 
 Most of the suite is ordinary unit tests, but the API tests in `src/app/api/v1/__tests__/` drive a

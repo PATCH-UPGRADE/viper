@@ -716,8 +716,9 @@ model Vulnerability {
   description String?  @db.Text // description of vulnerability
   narrative   String?  @db.Text // how a vulnerability could be exploited
   impact      String?  @db.Text // clinical impact
-  // TODO: make this optional once readers handle a vulnerability with no rated metric
-  severity    Severity @default(Medium)
+  /// The newest rated metric's severity (CVSS or qualitative), recomputed whenever a record
+  /// changes. Null when no record rates it.
+  severity    Severity?
 
   deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
 

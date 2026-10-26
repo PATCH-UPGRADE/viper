@@ -145,7 +145,7 @@ function renderEscalationPrompt({
     `Affected assets: ${totalAssets}`,
     "",
     "## Advisory",
-    `${vuln.displayId} (severity: ${vuln.severity})`,
+    `${vuln.displayId} (severity: ${vuln.severity ?? "unrated"})`,
     "<untrusted_source_material>",
     vuln.description ?? "(no description provided)",
     "</untrusted_source_material>",

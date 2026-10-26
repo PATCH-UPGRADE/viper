@@ -573,7 +573,7 @@ const assetTicketItemSchema = z.object({ asset: linkedAssetSchema });
 const linkedVulnerabilitySchema = z.object({
   id: z.string(),
   displayId: z.string(),
-  severity: z.enum(Severity),
+  severity: z.enum(Severity).nullable(),
 });
 
 const linkedRemediationSchema = z.object({

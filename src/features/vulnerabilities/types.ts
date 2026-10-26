@@ -283,7 +283,7 @@ export const vulnerabilityResponseSchema = z.object({
   description: z.string().nullable(),
   narrative: z.string().nullable(),
   impact: z.string().nullable(),
-  severity: severitySchema,
+  severity: severitySchema.nullable(), // null when no record rates it
   identifiers: z.array(vulnerabilityIdentifierResponseSchema),
   // TODO: VW-541 show metrics per product (Affected) instead of per record
   records: z.array(vulnerabilityRecordWithUserResponseSchema),

@@ -30,7 +30,7 @@ type MatchingWithRefs = MatchingLike & {
 function renderQuestionPrompt(args: {
   vulnerabilities: Array<{
     displayId: string;
-    severity: string;
+    severity: string | null;
     description: string | null;
   }>;
   issueRenders: Array<{
@@ -50,7 +50,8 @@ function renderQuestionPrompt(args: {
     "## Linked vulnerabilities\n\n" +
       args.vulnerabilities
         .map(
-          (v) => `### ${v.displayId} - ${v.severity}\n${v.description ?? ""}`,
+          (v) =>
+            `### ${v.displayId} - ${v.severity ?? "unrated"}\n${v.description ?? ""}`,
         )
         .join("\n\n"),
   );

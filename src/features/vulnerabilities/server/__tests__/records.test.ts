@@ -382,13 +382,13 @@ describe("refreshing the vulnerability", () => {
     expect(data.severity).toBe("Medium");
   });
 
-  it("leaves the severity alone when no metric is rated", async () => {
+  it("clears the severity when no metric is rated", async () => {
     createsVulnerability("v-1");
 
     await createVulnerabilityRecord(ta3({ metrics: [] }));
 
     const [{ data }] = db.vulnerability.update.mock.calls[0];
-    expect(data).not.toHaveProperty("severity");
+    expect(data.severity).toBeNull();
   });
 });
 

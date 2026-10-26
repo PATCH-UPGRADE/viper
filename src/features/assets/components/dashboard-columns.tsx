@@ -3,7 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { severityConfig } from "@/components/severity-badge";
+import { SeverityBadge, severityConfig } from "@/components/severity-badge";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/ui/data-table";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
@@ -189,11 +189,9 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
   {
     accessorKey: "vulnerability.severity",
     header: "Severity",
-    cell: ({ row }) => {
-      const severity = row.original.vulnerability.severity;
-      const config = severityConfig[severity];
-      return <Badge className={config.badgeClassName}>{config.label}</Badge>;
-    },
+    cell: ({ row }) => (
+      <SeverityBadge severity={row.original.vulnerability.severity} />
+    ),
   },
   {
     accessorKey: "status",

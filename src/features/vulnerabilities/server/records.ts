@@ -399,7 +399,7 @@ async function refreshVulnerability(
       ...(matchings.length > 0
         ? { deviceGroupMatchings: { connect: matchings } }
         : {}),
-      ...(rated?.severity ? { severity: rated.severity } : {}),
+      severity: rated?.severity ?? null,
     },
     select: {
       deviceGroupMatchings: {

@@ -197,7 +197,7 @@ function renderVexPrompt(args: {
   vulnerabilities: Array<{
     id: string;
     displayId: string;
-    severity: string;
+    severity: string | null;
     records: { metrics: Metric[] }[];
     description: string | null;
     narrative: string | null;
@@ -251,7 +251,7 @@ function renderVexPrompt(args: {
         .map((v) => {
           const cvssScore = summarizeRecordMetrics(v.records).cvss?.score;
           const lines = [
-            `### ${v.displayId} — ${v.severity}${cvssScore != null ? ` (CVSS ${cvssScore})` : ""}`,
+            `### ${v.displayId} — ${v.severity ?? "unrated"}${cvssScore != null ? ` (CVSS ${cvssScore})` : ""}`,
           ];
           if (v.description) lines.push(`- **Description**: ${v.description}`);
           if (v.narrative)

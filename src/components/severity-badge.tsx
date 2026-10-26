@@ -29,7 +29,9 @@ export const severityConfig: Record<
   },
 };
 
-export const SeverityBadge = ({ severity }: { severity: Severity }) => {
+/** A vulnerability with no rated metric has no severity. */
+export const SeverityBadge = ({ severity }: { severity: Severity | null }) => {
+  if (!severity) return <Badge variant="outline">Unrated</Badge>;
   const config = severityConfig[severity];
   return <Badge className={config.badgeClassName}>{config.label}</Badge>;
 };

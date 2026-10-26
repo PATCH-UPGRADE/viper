@@ -33,7 +33,7 @@ export interface FleetRemediationItem {
   cveIds: string[];
 }
 
-/** Fleet's typeStatus names how the update is delievered */
+/** Fleet's typeStatus names how the update is delivered */
 const FLEET_CATEGORY = new Map<string, RemediationCategory>([
   ["SYSTEM_UPDATES_RUH_REMOTE_UPDATE", RemediationCategory.SOFTWARE_UPDATE],
 ]);

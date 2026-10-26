@@ -3,7 +3,7 @@ import type { AffectedIssueCounts } from "../types";
 
 type SeverityIssue = {
   status: IssueStatus;
-  vulnerability: { severity: Severity };
+  vulnerability: { severity: Severity | null };
 };
 
 /**
@@ -23,7 +23,10 @@ export function isAffectedIssueSortKey(key: string): boolean {
   return (AFFECTED_ISSUE_SORT_KEYS as readonly string[]).includes(key);
 }
 
-/** Counts the effective issues with status AFFECTED, in total and per severity. */
+/**
+ * Counts the effective issues with status AFFECTED, in total and per severity. An issue on an
+ * unrated vulnerability counts toward the total but no severity.
+ */
 export function countAffectedIssues(
   issues: SeverityIssue[],
 ): AffectedIssueCounts {
@@ -31,7 +34,8 @@ export function countAffectedIssues(
   for (const issue of issues) {
     if (issue.status !== IssueStatus.AFFECTED) continue;
     counts.total++;
-    counts[issue.vulnerability.severity]++;
+    const { severity } = issue.vulnerability;
+    if (severity) counts[severity]++;
   }
   return counts;
 }

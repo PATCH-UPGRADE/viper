@@ -99,19 +99,30 @@ function vulnerabilitySortFields(sort: string): string[] {
     );
 }
 
+/** Nullable columns: Postgres puts nulls first on a descending sort, so these say nulls last. */
+const NULLABLE_SORT_KEYS = new Set(["severity", "description"]);
+
 /**
  * The Prisma sort clauses for a comma-separated sort string, with unknown fields
  * dropped. EPSS and KEV have no column to sort on; a sort that names them goes
- * through fetchVulnerabilitiesSortedByMetrics instead.
+ * through fetchVulnerabilitiesSortedByMetrics instead. An unrated (null severity)
+ * row sorts last in both directions, as it does there.
  */
 export function vulnerabilitySortClauses(
   sort: string,
 ): Prisma.VulnerabilityOrderByWithRelationInput[] {
-  return vulnerabilitySortFields(sort).flatMap((field) =>
-    METRIC_SORT_KEYS.has(sortFieldKey(field))
-      ? []
-      : [{ [sortFieldKey(field)]: getSortValue(field) }],
-  );
+  return vulnerabilitySortFields(sort).flatMap((field) => {
+    const key = sortFieldKey(field);
+    if (METRIC_SORT_KEYS.has(key)) return [];
+    const direction = getSortValue(field);
+    return [
+      {
+        [key]: NULLABLE_SORT_KEYS.has(key)
+          ? { sort: direction, nulls: "last" }
+          : direction,
+      },
+    ];
+  });
 }
 
 const sortsByMetric = (sort: string) =>

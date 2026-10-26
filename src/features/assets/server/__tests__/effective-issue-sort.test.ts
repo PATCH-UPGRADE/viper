@@ -23,6 +23,14 @@ describe("countAffectedIssues", () => {
       ]),
     ).toEqual({ total: 2, Critical: 1, High: 0, Medium: 0, Low: 1 });
   });
+
+  it("counts an unrated vulnerability in the total only", () => {
+    expect(
+      countAffectedIssues([
+        { status: IssueStatus.AFFECTED, vulnerability: { severity: null } },
+      ]),
+    ).toEqual({ total: 1, Critical: 0, High: 0, Medium: 0, Low: 0 });
+  });
 });
 
 describe("affectedIssueSortValue", () => {

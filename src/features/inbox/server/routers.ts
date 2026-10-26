@@ -23,7 +23,11 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { assetWhereForMatchings, resolvedAssetCount } from "@/lib/router-utils";
+import {
+  assetWhereForMatchings,
+  buildUpdatedAtFilter,
+  resolvedAssetCount,
+} from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   fieldCorrectionInclude,
@@ -69,7 +73,14 @@ type AffectedMatchingContext = {
   // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
 
-const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
+export const NOTIFICATION_SORT_FIELDS = new Set([
+  "priority",
+  "updatedAt",
+  "createdAt",
+]);
+
+/** The `sort` documentation for notifications.getMany, shared with the agent catalog. */
+export const NOTIFICATION_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...NOTIFICATION_SORT_FIELDS].join(", ")}. priority sorts in enum order, so ascending puts Critical first and Unsorted last. With no sort, the newest update comes first. Unknown fields are ignored.`;
 
 function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
@@ -231,6 +242,7 @@ export const notificationsRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(
       paginationInputSchema.extend({
+        sort: z.string().default("").describe(NOTIFICATION_SORT_DESCRIPTION),
         priority: z.array(z.nativeEnum(Priority)).default([]),
         type: z.array(z.nativeEnum(NotificationType)).default([]),
       }),
@@ -243,13 +255,14 @@ export const notificationsRouter = createTRPCRouter({
           createSearchFilter(search),
           priority.length > 0 ? { priority: { in: priority } } : {},
           type.length > 0 ? { type: { in: type } } : {},
+          buildUpdatedAtFilter(input),
         ],
       };
 
       const sortClauses = sort
         ? sort.split(",").flatMap((s) => {
             const field = s.replace("-", "");
-            if (!ALLOWED_SORT_FIELDS.has(field)) return [];
+            if (!NOTIFICATION_SORT_FIELDS.has(field)) return [];
             return [{ [field]: getSortValue(s) }];
           })
         : [];

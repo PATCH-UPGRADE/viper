@@ -233,3 +233,12 @@ describe("buildWriterPrompt — previous debrief", () => {
     expect(prompt).toMatch(/never add a day for each debrief/);
   });
 });
+
+describe("SCOUT_SYSTEM_PROMPT — new notifications", () => {
+  it("fetches the notifications since yesterday with the date filter", () => {
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(
+      /since yesterday\. Fetch them with notifications\.getMany/,
+    );
+    expect(SCOUT_SYSTEM_PROMPT).toContain("lastUpdatedStartTime");
+  });
+});

@@ -49,3 +49,11 @@ export const advisoryWebUrl = (externalId: string): string =>
 
 export const ADVISORY_ATTACHMENT_HOST =
   "storage.fleet.siemens-healthineers.com";
+
+// The system updates Fleet has for one device
+export const systemUpdatesUrl = (equipmentKey: string): string =>
+  `https://${FLEET_HOST}/rest/v1/system-updates/ruh/equipment/${encodeURIComponent(equipmentKey)}`;
+
+// All the CVEs one update fixes. e.g. AX216/26/R
+export const updateCvesUrl = (updateNumber: string): string =>
+  `https://${FLEET_HOST}/rest/v1/system-updates/cves?updateNumber=${encodeURIComponent(updateNumber)}`;

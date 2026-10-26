@@ -3,6 +3,7 @@ import {
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
 } from "@/features/chat/utils";
+import { currentDateBlock } from "../shared/current-date";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
 
 export const RECOMMENDATION_TOOL_NAMES = new Set([
@@ -46,6 +47,12 @@ Fetch the specific records you need with query_platform_data — do not assume a
 inventory is already in context. Answer only from retrieved data or the persistent notes.
 
 ${PLATFORM_CATALOG}
+
+When you rank what to fix first, start from sorted queries and then read the top rows in
+detail: vulnerabilities.getMany with { sort: "-inKEV,severity,-epss" }, and
+assets.getMany with { sort: "-severity_Critical,-severity_High" } for the assets with the
+most critical exposure. A sorted page is where the ranking starts, not the ranking
+itself: weigh clinical impact as the failure mode framework says.
 
 Clinical workflows are retrievable here — the care pathways an asset supports. Use
 workflows.getManyByAsset for the workflows a specific asset participates in, or
@@ -208,6 +215,8 @@ export function buildRecommendationSystemPrompt(
   return `${RECOMMENDATION_PROMPT}
 
 ${reportInstructions}
+
+${currentDateBlock()}
 
 <role_focus_recommendation>The user has the role ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</role_focus_recommendation>${focus}`;
 }

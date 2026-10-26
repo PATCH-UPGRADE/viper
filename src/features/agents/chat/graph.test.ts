@@ -283,3 +283,17 @@ describe("recommendation model configuration", () => {
     expect(constructedModelFields[0]?.reasoning).toEqual({ effort: "none" });
   });
 });
+
+describe("buildSystemPrompt — current date", () => {
+  it("gives today's date, without the time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-21T15:00:00Z"));
+    try {
+      const prompt = buildSystemPrompt("hospital administration");
+      expect(prompt).toContain("Today is 2026-10-21 (UTC).");
+      expect(prompt).not.toContain("15:00");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

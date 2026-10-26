@@ -36,11 +36,16 @@ export const useAddedPlatforms = (): PlatformEnum[] =>
       [...new Set(data.items.map((item) => item.platform))].sort(),
   }).data;
 
+export const useSuspenseIntegrationSuggestions = () => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.integrations.getSuggestions.queryOptions());
+};
+
+// The whole router, so the suggestions refresh too: a platform's suggestion can depend on which integrations exist.
 const useInvalidateIntegrations = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  return () =>
-    queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
+  return () => queryClient.invalidateQueries(trpc.integrations.pathFilter());
 };
 
 export const useCreateIntegration = () => {

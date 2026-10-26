@@ -41,13 +41,6 @@ const matchingInclude = {
 
 // Validation schemas
 
-// Zod drops unknown keys, so without this a client that still sends the old
-// single-id field gets a 200 and a remediation with no vulnerability.
-const removedVulnerabilityIdSchema = z
-  .never({ error: "vulnerabilityId was removed. Use vulnerabilityIds." })
-  .optional()
-  .describe("Removed. Use vulnerabilityIds.");
-
 export const remediationInputSchema = z.object({
   devices: z
     .array(deviceInputSchema)
@@ -56,7 +49,6 @@ export const remediationInputSchema = z.object({
       "The devices that the remediation applies to. Each one names its version, a VERS range, or every version with vers:all/*.",
     ),
   vulnerabilityIds: z.array(z.string()).optional(),
-  vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   ...remediationImpactFieldsSchema.shape,
@@ -76,7 +68,6 @@ export const remediationUpdateSchema = z.object({
   devices: z.array(deviceInputSchema).optional(),
   // Replaces the whole set when present. An empty array clears every link.
   vulnerabilityIds: z.array(z.string()).optional(),
-  vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   ...remediationImpactFieldsSchema.shape,

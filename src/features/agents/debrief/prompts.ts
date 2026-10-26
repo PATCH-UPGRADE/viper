@@ -58,7 +58,8 @@ Weigh these together:
 - Known exploitation (KEV) and a high EPSS. These beat a bare CVSS.
 - How many assets are affected, and what clinical work they support.
 - Whether a fix exists and is waiting.
-- New inbox notifications since yesterday.
+- New inbox notifications since yesterday. Fetch them with notifications.getMany
+  and { lastUpdatedStartTime: <24 hours before the current time>, sort: "priority" }.
 
 Do not look up work orders for your findings. The platform attaches each
 finding's work orders and open sub-tickets from the database after you finish.

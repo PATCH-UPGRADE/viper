@@ -800,8 +800,9 @@ model VulnerabilityRecord {
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
-  /// Who created this record through the API. When set, only this user may update or delete
-  /// it; when null (integration and feed records), anyone may.
+  /// Who created this record: an API user, or an integration's shadow user for the records it
+  /// syncs. When set, only this user may update or delete it; when null (feed records and
+  /// MedISAO stubs), anyone may.
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 

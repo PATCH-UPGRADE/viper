@@ -37,7 +37,6 @@ import { resolveUpstreamApi, resolveWebUrl } from "./urls";
 /** Mapping model -> the resource whose module builds its urls. Total over the schema. */
 const RESOURCE_BY_MAPPING_MODEL: Record<string, ResourceType> = {
   ExternalAssetMapping: ResourceType.Asset,
-  ExternalVulnerabilityMapping: ResourceType.Vulnerability,
   ExternalVulnerabilityRecordMapping: ResourceType.Vulnerability,
   ExternalRemediationMapping: ResourceType.Remediation,
   ExternalDeviceArtifactMapping: ResourceType.DeviceArtifact,

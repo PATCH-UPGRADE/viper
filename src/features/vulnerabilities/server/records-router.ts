@@ -31,7 +31,6 @@ async function readRecord(id: string) {
 async function createRecord(input: VulnerabilityRecordInput, userId: string) {
   const { record } = await createVulnerabilityRecord(
     await recordDataFromInput(input, { userId }),
-    { actingUserId: userId },
   );
   return readRecord(record.id);
 }

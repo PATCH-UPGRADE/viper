@@ -177,6 +177,17 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
     // No identifiers given, so the vulnerability gets a VIPER ID.
     expect(detailRes.body.displayId).toMatch(/^VIPER-/);
     expect(detailRes.body.description).toBe(payload.details);
+    // The legacy flat fields are gone: identifiers, records and metrics replace them.
+    for (const legacy of [
+      "cveId",
+      "cvssScore",
+      "epss",
+      "inKEV",
+      "sarif",
+      "userId",
+    ]) {
+      expect(detailRes.body).not.toHaveProperty(legacy);
+    }
     expect(detailRes.body.records).toEqual([
       expect.objectContaining({
         id: recordId,

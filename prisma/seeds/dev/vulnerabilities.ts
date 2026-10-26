@@ -1,7 +1,6 @@
 import { upsertFeedRecord } from "@/features/vulnerabilities/server/feed-records";
 import {
   createVulnerabilityRecord,
-  cvssMetricType,
   type VulnerabilityRecordData,
 } from "@/features/vulnerabilities/server/records";
 import {
@@ -14,8 +13,26 @@ import prisma from "@/lib/db";
 import { matchingForDevice } from "./canonical-identity";
 import { deviceForSampleCpe } from "./device-groups";
 
-// Vulnerabilities — cpes is an array to support multi-device-group linking
-const SAMPLE_VULNERABILITIES = [
+interface SampleVulnerability {
+  cve: string;
+  /** Keys into SAMPLE_DEVICES (device-groups.ts), the device catalog the asset seed also uses. */
+  cpes: string[];
+  // TODO: VW-541 drop once priority moves to Issue.
+  priority: Priority;
+  /** What enrichment would write, without calling FIRST or CISA. */
+  feeds: { epss: number; inKev: boolean };
+  /**
+   * Created in order. The first creates the vulnerability. A second source with its own CVSS is
+   * what makes the vulnerability drawer show where the score came from and list each source.
+   * TA3 records are the seed user's; other sources have no owner.
+   */
+  records: Omit<
+    VulnerabilityRecordData,
+    "identifiers" | "deviceGroupMatchingIds" | "userId"
+  >[];
+}
+
+const SAMPLE_VULNERABILITIES: SampleVulnerability[] = [
   // ── CVE-2023-00001: Siemens Healthineers imaging firmware (High) ─────────────
   // Hypothetical CVE used for seed data, in the reserved-looking 00001 range so
   // it cannot be mistaken for a real Healthineers advisory. The advisory id and
@@ -26,104 +43,117 @@ const SAMPLE_VULNERABILITIES = [
   // are therefore what lets a mitigation plan resolve a teamplay Fleet work
   // order target — without it nothing in the seed exercises that path.
   {
-    cveId: "CVE-2023-00001",
-    severity: Severity.High,
-    cvssScore: 7.8,
-    epss: 0.08,
-    inKEV: false,
-    priority: Priority.High,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "ICS Security Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2023-00001",
-              level: "error",
-              message: {
-                text: "Siemens Healthineers imaging system service interface permits privilege escalation from an unprivileged local account (CWE-269)",
-              },
-            },
-          ],
-        },
-      ],
-    },
+    cve: "CVE-2023-00001",
     cpes: [
       "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
       "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
     ],
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-00001",
-    description:
-      "The service interface on Siemens Healthineers MAGNETOM and SOMATOM imaging systems does not correctly restrict privileges, so an unprivileged local account can escalate to administrative rights on the scanner console (CWE-269). Siemens services these systems under contract and supplies the firmware update.",
-    narrative:
-      "A technologist account on the MAGNETOM Sola or SOMATOM go.Top console can reach a service interface that fails to check privileges before running maintenance routines. From there an attacker gains administrative control of the scanner, which is enough to change imaging protocols, disable the device, or read prior studies held locally. The remediation is a firmware update that only Siemens field service can apply, because the hospital holds no service credentials for these consoles.",
-    impact:
-      "Radiology loses a scanner for the length of the service visit, and the department has one unit of each modality. An MRI outage pushes stroke and trauma imaging to CT or to a transfer, so the patch window has to sit outside the acute hours. Because Siemens performs the work, the hospital cannot schedule it alone — the work order has to reach teamplay Fleet.",
+    priority: Priority.High,
+    feeds: { epss: 0.08, inKev: false },
+    records: [
+      {
+        source: VulnerabilitySource.TA3,
+        details:
+          "The service interface on Siemens Healthineers MAGNETOM and SOMATOM imaging systems does not correctly restrict privileges, so an unprivileged local account can escalate to administrative rights on the scanner console (CWE-269). Siemens services these systems under contract and supplies the firmware update.",
+        metrics: [
+          { type: MetricType.CVSS_V3_1, score: 7.8, severity: Severity.High },
+        ],
+        ta3Submission: {
+          sarif: {
+            version: "2.1.0",
+            runs: [
+              {
+                tool: { driver: { name: "ICS Security Scanner" } },
+                results: [
+                  {
+                    ruleId: "CVE-2023-00001",
+                    level: "error",
+                    message: {
+                      text: "Siemens Healthineers imaging system service interface permits privilege escalation from an unprivileged local account (CWE-269)",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-00001",
+          narrative:
+            "A technologist account on the MAGNETOM Sola or SOMATOM go.Top console can reach a service interface that fails to check privileges before running maintenance routines. From there an attacker gains administrative control of the scanner, which is enough to change imaging protocols, disable the device, or read prior studies held locally. The remediation is a firmware update that only Siemens field service can apply, because the hospital holds no service credentials for these consoles.",
+          impact:
+            "Radiology loses a scanner for the length of the service visit, and the department has one unit of each modality. An MRI outage pushes stroke and trauma imaging to CT or to a transfer, so the patch window has to sit outside the acute hours. Because Siemens performs the work, the hospital cannot schedule it alone — the work order has to reach teamplay Fleet.",
+        },
+      },
+    ],
   },
   // ── CVE-2020-25175: GE Healthcare Credential Exposure (Critical) ─────────────
   {
-    cveId: "CVE-2020-25175",
-    severity: Severity.Critical,
-    cvssScore: 9.8,
-    epss: 0.35,
-    inKEV: false,
-    priority: Priority.Critical,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "ICS Security Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2020-25175",
-              level: "error",
-              message: {
-                text: "GE Healthcare imaging device transmits credentials with insufficient protection across the network (CWE-522/CWE-523)",
-              },
-            },
-          ],
-        },
-      ],
-    },
+    cve: "CVE-2020-25175",
     cpes: [
       "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
       "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
       "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
     ],
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2020-25175",
-    description:
-      "GE Healthcare imaging and ultrasound products may allow specific credentials to be exposed during transport over the network due to insufficiently protected credential transmission (CWE-522/CWE-523). Affects the BrightSpeed Elite Select CT scanner, LOGIQ e R7 portable ultrasound units, and Optima XR200amx X-ray system.",
-    narrative:
-      "The GE BrightSpeed Elite Select CT scanner, LOGIQ e R7 ultrasound units, and Optima XR200amx transmit service credentials with insufficient protection during normal network operations. An attacker with access to the DICOM VLAN can passively intercept these credentials and use them to gain unauthorized access to scanner configuration interfaces — potentially altering imaging protocols, disabling devices, or pivoting to connected workstations. GE Healthcare issued Security Bulletin GE-2020-004 recommending network isolation and firmware updates.",
-    impact:
-      "Credential compromise on imaging devices could allow attackers to alter scanner calibration or protocols, disabling devices during active patient care. In a radiology emergency workflow (stroke, trauma), device unavailability can directly delay time-critical diagnoses. The DICOM VLAN provides network adjacency to PACS and clinical workstations for further lateral movement.",
+    priority: Priority.Critical,
+    feeds: { epss: 0.35, inKev: false },
+    records: [
+      {
+        source: VulnerabilitySource.TA3,
+        details:
+          "GE Healthcare imaging and ultrasound products may allow specific credentials to be exposed during transport over the network due to insufficiently protected credential transmission (CWE-522/CWE-523). Affects the BrightSpeed Elite Select CT scanner, LOGIQ e R7 portable ultrasound units, and Optima XR200amx X-ray system.",
+        metrics: [
+          {
+            type: MetricType.CVSS_V3_1,
+            score: 9.8,
+            severity: Severity.Critical,
+          },
+        ],
+        ta3Submission: {
+          sarif: {
+            version: "2.1.0",
+            runs: [
+              {
+                tool: { driver: { name: "ICS Security Scanner" } },
+                results: [
+                  {
+                    ruleId: "CVE-2020-25175",
+                    level: "error",
+                    message: {
+                      text: "GE Healthcare imaging device transmits credentials with insufficient protection across the network (CWE-522/CWE-523)",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2020-25175",
+          narrative:
+            "The GE BrightSpeed Elite Select CT scanner, LOGIQ e R7 ultrasound units, and Optima XR200amx transmit service credentials with insufficient protection during normal network operations. An attacker with access to the DICOM VLAN can passively intercept these credentials and use them to gain unauthorized access to scanner configuration interfaces — potentially altering imaging protocols, disabling devices, or pivoting to connected workstations. GE Healthcare issued Security Bulletin GE-2020-004 recommending network isolation and firmware updates.",
+          impact:
+            "Credential compromise on imaging devices could allow attackers to alter scanner calibration or protocols, disabling devices during active patient care. In a radiology emergency workflow (stroke, trauma), device unavailability can directly delay time-critical diagnoses. The DICOM VLAN provides network adjacency to PACS and clinical workstations for further lateral movement.",
+        },
+      },
+      // A vendor advisory whose CVSS outranks the TA3 score (the newest CVSS wins for now).
+      {
+        source: VulnerabilitySource.VENDOR_ADVISORY,
+        sourceId: "GE-2020-004",
+        summary:
+          "GE Healthcare Security Bulletin GE-2020-004: credential exposure in imaging and ultrasound products",
+        details:
+          "GE Healthcare recommends isolating affected scanners on a dedicated imaging VLAN and applying the firmware update listed in the bulletin. Service credentials should be rotated by GE field service after the update.",
+        publishedAt: new Date("2020-12-08T00:00:00Z"),
+        metrics: [
+          {
+            type: MetricType.CVSS_V3_1,
+            score: 9.6,
+            vector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+          },
+        ],
+      },
+    ],
   },
   // ── CVE-2017-0144: EternalBlue / MS17-010 (SMBv1 RCE, Critical, KEV) ────────
   {
-    cveId: "CVE-2017-0144",
-    severity: Severity.Critical,
-    cvssScore: 9.8,
-    epss: 0.97,
-    inKEV: true,
-    priority: Priority.Critical,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Endpoint Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2017-0144",
-              level: "error",
-              message: {
-                text: "EternalBlue SMBv1 remote code execution on end-of-life Windows host — WannaCry/NotPetya exploit vector",
-              },
-            },
-          ],
-        },
-      ],
-    },
+    cve: "CVE-2017-0144",
     // Connects to both the EOL OS device groups AND the application-level device
     // groups
     cpes: [
@@ -134,243 +164,227 @@ const SAMPLE_VULNERABILITIES = [
       "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
       "cpe:2.3:h:dell:optiplex_790:-:*:*:*:*:*:*:*",
     ],
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2017-0144",
-    description:
-      "Windows SMBv1 remote code execution vulnerability (MS17-010) allows unauthenticated remote attackers to execute arbitrary code via crafted SMB packets. Exploited by WannaCry and NotPetya ransomware. End-of-life Windows 7 or Windows Server 2008 R2 devices cannot receive the MS17-010 patch through standard Windows Update.",
-    narrative:
-      "The EternalBlue exploit (developed by the NSA, leaked by the Shadow Brokers) is available in Metasploit and requires no authentication. WannaCry and NotPetya ransomware campaigns brought hospital imaging departments offline globally in 2017 using this exact vector. The CT acquisition workstation, PACS server, both radiology reading workstations, and the ED image viewer are all susceptible.",
-    impact:
-      "Ransomware infection or complete compromise of the entire imaging workflow chain: CT acquisition, PACS storage and routing, radiology reading, and ED viewing. A WannaCry-style attack would encrypt DICOM archives, disabling radiologist access to historical studies and blocking active imaging workflows. In a hospital without fallback procedures, this creates a patient safety emergency for active stroke, trauma, and critical care cases.",
+    priority: Priority.Critical,
+    feeds: { epss: 0.97, inKev: true },
+    records: [
+      {
+        source: VulnerabilitySource.TA3,
+        details:
+          "Windows SMBv1 remote code execution vulnerability (MS17-010) allows unauthenticated remote attackers to execute arbitrary code via crafted SMB packets. Exploited by WannaCry and NotPetya ransomware. End-of-life Windows 7 or Windows Server 2008 R2 devices cannot receive the MS17-010 patch through standard Windows Update.",
+        metrics: [
+          {
+            type: MetricType.CVSS_V3_1,
+            score: 9.8,
+            severity: Severity.Critical,
+          },
+        ],
+        ta3Submission: {
+          sarif: {
+            version: "2.1.0",
+            runs: [
+              {
+                tool: { driver: { name: "Endpoint Scanner" } },
+                results: [
+                  {
+                    ruleId: "CVE-2017-0144",
+                    level: "error",
+                    message: {
+                      text: "EternalBlue SMBv1 remote code execution on end-of-life Windows host — WannaCry/NotPetya exploit vector",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2017-0144",
+          narrative:
+            "The EternalBlue exploit (developed by the NSA, leaked by the Shadow Brokers) is available in Metasploit and requires no authentication. WannaCry and NotPetya ransomware campaigns brought hospital imaging departments offline globally in 2017 using this exact vector. The CT acquisition workstation, PACS server, both radiology reading workstations, and the ED image viewer are all susceptible.",
+          impact:
+            "Ransomware infection or complete compromise of the entire imaging workflow chain: CT acquisition, PACS storage and routing, radiology reading, and ED viewing. A WannaCry-style attack would encrypt DICOM archives, disabling radiologist access to historical studies and blocking active imaging workflows. In a hospital without fallback procedures, this creates a patient safety emergency for active stroke, trauma, and critical care cases.",
+        },
+      },
+      // A second TA3 submission from another tool: two SARIF logs and exploit links on one
+      // vulnerability. Its CVSS is newer, so it is the score the vulnerability shows.
+      {
+        source: VulnerabilitySource.TA3,
+        summary:
+          "EternalBlue confirmed on the PACS server by an exploit verification run",
+        metrics: [
+          {
+            type: MetricType.CVSS_V3_1,
+            score: 8.1,
+            vector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
+          },
+        ],
+        ta3Submission: {
+          sarif: {
+            version: "2.1.0",
+            runs: [
+              {
+                tool: { driver: { name: "Exploit Verification Harness" } },
+                results: [
+                  {
+                    ruleId: "CVE-2017-0144",
+                    level: "error",
+                    message: {
+                      text: "MS17-010 exploit attempt against the Centricity PACS-IW server returned a SYSTEM shell; SMBv1 is enabled and unpatched",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          exploitUri:
+            "https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/windows/smb/ms17_010_eternalblue.rb",
+          narrative:
+            "A verification run against the Centricity PACS-IW server reproduced the EternalBlue exploit without credentials, confirming the host accepts SMBv1 and lacks MS17-010.",
+          impact:
+            "Confirms the PACS server itself, not only the reading workstations, can be taken over remotely, which puts the image archive and its routing to the ED in scope.",
+        },
+      },
+    ],
   },
   // ── CVE-2016-6366: EXTRABACON — Cisco ASA SNMP Buffer Overflow (High, KEV) ──
   {
-    cveId: "CVE-2016-6366",
-    severity: Severity.High,
-    cvssScore: 8.8,
-    epss: 0.21,
-    inKEV: true,
-    priority: Priority.High,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Network Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2016-6366",
-              level: "warning",
-              message: {
-                text: "Cisco ASA SNMP buffer overflow (EXTRABACON) allows unauthenticated remote code execution on ASA OS 8.x",
-              },
-            },
-          ],
-        },
-      ],
-    },
+    cve: "CVE-2016-6366",
     cpes: [
       "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
       "cpe:2.3:a:cisco:adaptive_security_appliance_software:8.2:*:*:*:*:*:*:*",
     ],
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2016-6366",
-    description:
-      "Buffer overflow in the SNMP code of Cisco ASA Software versions 8.4 and earlier allows unauthenticated remote attackers to execute arbitrary code or reload the device via crafted SNMPv2c packets. Disclosed by the Shadow Brokers as the EXTRABACON exploit. Both ASA 5505 devices in this network (remote radiology VPN gateway and perimeter firewall) run ASA OS 8.2.",
-    narrative:
-      "Both Cisco ASA 5505 appliances — the remote radiology VPN gateway and the perimeter firewall — run ASA OS 8.2, falling within the EXTRABACON exploit range (ASA 8.4 and earlier). The exploit is publicly available and was part of the NSA Equation Group toolkit leaked by the Shadow Brokers in 2016. An attacker on the same network segment as the SNMP management interface can send crafted SNMPv2c packets to gain unauthenticated remote code execution. Compromise of the VPN gateway directly cuts off remote radiologist access; compromise of the firewall exposes the full hospital network.",
-    impact:
-      "Compromise of the VPN gateway severs remote radiologist connectivity, disabling after-hours imaging coverage and potentially delaying critical results. Compromise of the perimeter firewall allows the attacker to modify security policy, intercept all DICOM/HL7 traffic, and pivot freely into clinical VLANs containing imaging devices, PACS, and patient monitoring infrastructure.",
+    priority: Priority.High,
+    feeds: { epss: 0.21, inKev: true },
+    records: [
+      {
+        source: VulnerabilitySource.TA3,
+        details:
+          "Buffer overflow in the SNMP code of Cisco ASA Software versions 8.4 and earlier allows unauthenticated remote attackers to execute arbitrary code or reload the device via crafted SNMPv2c packets. Disclosed by the Shadow Brokers as the EXTRABACON exploit. Both ASA 5505 devices in this network (remote radiology VPN gateway and perimeter firewall) run ASA OS 8.2.",
+        metrics: [
+          { type: MetricType.CVSS_V3_1, score: 8.8, severity: Severity.High },
+        ],
+        ta3Submission: {
+          sarif: {
+            version: "2.1.0",
+            runs: [
+              {
+                tool: { driver: { name: "Network Scanner" } },
+                results: [
+                  {
+                    ruleId: "CVE-2016-6366",
+                    level: "warning",
+                    message: {
+                      text: "Cisco ASA SNMP buffer overflow (EXTRABACON) allows unauthenticated remote code execution on ASA OS 8.x",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2016-6366",
+          narrative:
+            "Both Cisco ASA 5505 appliances — the remote radiology VPN gateway and the perimeter firewall — run ASA OS 8.2, falling within the EXTRABACON exploit range (ASA 8.4 and earlier). The exploit is publicly available and was part of the NSA Equation Group toolkit leaked by the Shadow Brokers in 2016. An attacker on the same network segment as the SNMP management interface can send crafted SNMPv2c packets to gain unauthenticated remote code execution. Compromise of the VPN gateway directly cuts off remote radiologist access; compromise of the firewall exposes the full hospital network.",
+          impact:
+            "Compromise of the VPN gateway severs remote radiologist connectivity, disabling after-hours imaging coverage and potentially delaying critical results. Compromise of the perimeter firewall allows the attacker to modify security policy, intercept all DICOM/HL7 traffic, and pivot freely into clinical VLANs containing imaging devices, PACS, and patient monitoring infrastructure.",
+        },
+      },
+    ],
   },
   // ── CVE-2021-12345: Baxter Sigma Spectrum Buffer Overflow (High) ────────────
   // Hypothetical CVE used for seed data — drives the "Update Baxter Infusion
   // Pumps Firmware" change ticket and creates Issue records for all 23 pumps.
   {
-    cveId: "CVE-2021-12345",
-    severity: Severity.High,
-    cvssScore: 8.1,
-    epss: 0.04,
-    inKEV: false,
-    priority: Priority.High,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Medical Device Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2021-12345",
-              level: "warning",
-              message: {
-                text: "Baxter Sigma Spectrum infusion pump firmware contains a buffer overflow in the wireless management interface allowing remote code execution from the same wireless segment",
-              },
-            },
-          ],
-        },
-      ],
-    },
+    cve: "CVE-2021-12345",
     cpes: ["cpe:2.3:h:baxter:sigma_spectrum:-:*:*:*:*:*:*:*"],
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2021-12345",
-    description:
-      "Buffer overflow in the wireless management interface of Baxter Sigma Spectrum infusion pumps running firmware versions prior to 8.x allows an attacker on the same wireless segment to execute arbitrary code or crash the device via crafted management packets. All 23 Sigma Spectrum pumps on WARD-VLAN-20 are running the vulnerable firmware (v1.2.3).",
-    narrative:
-      "The Baxter Sigma Spectrum pump fleet on the medical-surgical floor is running firmware v1.2.3, which contains a buffer overflow in the wireless management interface. An attacker with access to WARD-VLAN-20 can send crafted management packets to crash a pump or execute code in the pump's control context. Baxter has issued an updated firmware release that addresses the vulnerability, but each pump must be taken out of service, updated, and clinically validated before being returned to patient use.",
-    impact:
-      "A successful exploit could cause a pump to crash mid-infusion, interrupting medication delivery to a patient. In the worst case, code execution could allow an attacker to alter infusion parameters (rate, volume, dose) — a direct patient-safety risk for any patient on continuous IV medication. With all 23 pumps running the vulnerable firmware, a worm-style attack could disable the entire medical-surgical infusion fleet simultaneously.",
+    priority: Priority.High,
+    feeds: { epss: 0.04, inKev: false },
+    records: [
+      {
+        source: VulnerabilitySource.TA3,
+        details:
+          "Buffer overflow in the wireless management interface of Baxter Sigma Spectrum infusion pumps running firmware versions prior to 8.x allows an attacker on the same wireless segment to execute arbitrary code or crash the device via crafted management packets. All 23 Sigma Spectrum pumps on WARD-VLAN-20 are running the vulnerable firmware (v1.2.3).",
+        metrics: [
+          { type: MetricType.CVSS_V3_1, score: 8.1, severity: Severity.High },
+        ],
+        ta3Submission: {
+          sarif: {
+            version: "2.1.0",
+            runs: [
+              {
+                tool: { driver: { name: "Medical Device Scanner" } },
+                results: [
+                  {
+                    ruleId: "CVE-2021-12345",
+                    level: "warning",
+                    message: {
+                      text: "Baxter Sigma Spectrum infusion pump firmware contains a buffer overflow in the wireless management interface allowing remote code execution from the same wireless segment",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2021-12345",
+          narrative:
+            "The Baxter Sigma Spectrum pump fleet on the medical-surgical floor is running firmware v1.2.3, which contains a buffer overflow in the wireless management interface. An attacker with access to WARD-VLAN-20 can send crafted management packets to crash a pump or execute code in the pump's control context. Baxter has issued an updated firmware release that addresses the vulnerability, but each pump must be taken out of service, updated, and clinically validated before being returned to patient use.",
+          impact:
+            "A successful exploit could cause a pump to crash mid-infusion, interrupting medication delivery to a patient. In the worst case, code execution could allow an attacker to alter infusion parameters (rate, volume, dose) — a direct patient-safety risk for any patient on continuous IV medication. With all 23 pumps running the vulnerable firmware, a worm-style attack could disable the entire medical-surgical infusion fleet simultaneously.",
+        },
+      },
+    ],
   },
 ];
-
-/**
- * More records for a vulnerability above, keyed by its CVE, created after its first one. A second
- * source with its own CVSS is what makes the vulnerability drawer show where the score came from
- * and list each source. TA3 records are the seed user's; other sources have no owner.
- */
-const ADDITIONAL_RECORDS: Record<
-  string,
-  Omit<
-    VulnerabilityRecordData,
-    "identifiers" | "deviceGroupMatchingIds" | "userId"
-  >[]
-> = {
-  // A second TA3 submission from another tool: two SARIF logs and exploit links on one
-  // vulnerability. Its CVSS is newer, so it is the score the vulnerability shows.
-  "CVE-2017-0144": [
-    {
-      source: VulnerabilitySource.TA3,
-      summary:
-        "EternalBlue confirmed on the PACS server by an exploit verification run",
-      metrics: [
-        {
-          type: MetricType.CVSS_V3_1,
-          score: 8.1,
-          vector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
-        },
-      ],
-      ta3Submission: {
-        sarif: {
-          version: "2.1.0",
-          runs: [
-            {
-              tool: { driver: { name: "Exploit Verification Harness" } },
-              results: [
-                {
-                  ruleId: "CVE-2017-0144",
-                  level: "error",
-                  message: {
-                    text: "MS17-010 exploit attempt against the Centricity PACS-IW server returned a SYSTEM shell; SMBv1 is enabled and unpatched",
-                  },
-                },
-              ],
-            },
-          ],
-        },
-        exploitUri:
-          "https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/windows/smb/ms17_010_eternalblue.rb",
-        narrative:
-          "A verification run against the Centricity PACS-IW server reproduced the EternalBlue exploit without credentials, confirming the host accepts SMBv1 and lacks MS17-010.",
-        impact:
-          "Confirms the PACS server itself, not only the reading workstations, can be taken over remotely, which puts the image archive and its routing to the ED in scope.",
-      },
-    },
-  ],
-  // A vendor advisory whose CVSS outranks the TA3 score (the newest CVSS wins for now).
-  "CVE-2020-25175": [
-    {
-      source: VulnerabilitySource.VENDOR_ADVISORY,
-      sourceId: "GE-2020-004",
-      summary:
-        "GE Healthcare Security Bulletin GE-2020-004: credential exposure in imaging and ultrasound products",
-      details:
-        "GE Healthcare recommends isolating affected scanners on a dedicated imaging VLAN and applying the firmware update listed in the bulletin. Service credentials should be rotated by GE field service after the update.",
-      publishedAt: new Date("2020-12-08T00:00:00Z"),
-      metrics: [
-        {
-          type: MetricType.CVSS_V3_1,
-          score: 9.6,
-          vector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
-        },
-      ],
-    },
-  ],
-};
 
 export async function seedVulnerabilities(userId: string) {
   console.log("\n🌱 Seeding vulnerabilities...");
 
   // Sequential so shared DeviceGroupMatching find-or-create is race-free.
   const vulnerabilities = [];
-  for (const vulnerability of SAMPLE_VULNERABILITIES) {
-    const {
-      cpes,
-      cveId,
-      severity,
-      cvssScore,
-      epss,
-      inKEV,
-      priority,
-      sarif,
-      exploitUri,
-      description,
-      narrative,
-      impact,
-    } = vulnerability;
-
-    const devices = [];
+  for (const {
+    cve,
+    cpes,
+    priority,
+    feeds,
+    records,
+  } of SAMPLE_VULNERABILITIES) {
+    const matchingIds = [];
     for (const cpe of cpes) {
       const device = await deviceForSampleCpe(cpe);
-      if (device) devices.push(device);
+      const id = device && (await matchingForDevice(device));
+      if (id) matchingIds.push(id);
     }
-
-    if (devices.length === 0) {
+    if (matchingIds.length === 0) {
       console.warn(`⚠️  No sample devices found for CPEs: ${cpes.join(", ")}`);
       continue;
     }
 
-    // Connect a shared matching per distinct device identity so the match
-    // resolver (and issue-creation extension) link them back correctly.
-    const matchingIds = [];
-    for (const device of devices) {
-      const id = await matchingForDevice(device);
-      if (id) matchingIds.push(id);
-    }
-
-    const { vulnerabilityId } = await createVulnerabilityRecord(
-      {
-        source: VulnerabilitySource.TA3,
-        identifiers: [cveId],
-        details: description,
-        metrics: [{ type: cvssMetricType(), score: cvssScore, severity }],
+    let vulnerabilityId: string | null = null;
+    for (const record of records) {
+      const created = await createVulnerabilityRecord({
+        ...record,
+        identifiers: [cve],
         deviceGroupMatchingIds: matchingIds,
-        ta3Submission: { sarif, narrative, impact, exploitUri },
-        userId,
-      },
-      { actingUserId: userId },
-    );
-    for (const record of ADDITIONAL_RECORDS[cveId] ?? []) {
-      await createVulnerabilityRecord(
-        {
-          ...record,
-          identifiers: [cveId],
-          deviceGroupMatchingIds: matchingIds,
-          userId: record.source === VulnerabilitySource.TA3 ? userId : null,
-        },
-        { actingUserId: userId },
-      );
+        userId: record.source === VulnerabilitySource.TA3 ? userId : null,
+      });
+      vulnerabilityId ??= created.vulnerabilityId;
     }
-    // What enrichment would write, without calling FIRST or CISA.
+    if (!vulnerabilityId) continue;
+
     await upsertFeedRecord({
       vulnerabilityId,
-      cve: cveId,
-      metric: { source: "FIRST_EPSS", score: epss, percentile: null },
+      cve,
+      metric: { source: "FIRST_EPSS", score: feeds.epss, percentile: null },
     });
     await upsertFeedRecord({
       vulnerabilityId,
-      cve: cveId,
-      metric: { source: "CISA_KEV", inKev: inKEV },
+      cve,
+      metric: { source: "CISA_KEV", inKev: feeds.inKev },
     });
     // TODO: VW-541 drop this update once priority moves to Issue.
-    const created = await prisma.vulnerability.update({
-      where: { id: vulnerabilityId },
-      data: { priority },
-    });
-    vulnerabilities.push(created);
+    vulnerabilities.push(
+      await prisma.vulnerability.update({
+        where: { id: vulnerabilityId },
+        data: { priority },
+      }),
+    );
   }
 
   console.log(`✅ Seeded ${vulnerabilities.length} vulnerabilities`);

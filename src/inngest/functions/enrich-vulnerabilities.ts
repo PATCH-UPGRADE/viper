@@ -144,7 +144,7 @@ export const enrichVulnerability = inngest.createFunction(
     );
 
     await step.run("write-feed-records", async () => {
-      // When FIRST has no score, the EPSS record and column keep their last value.
+      // When FIRST has no score, the EPSS record keeps its last value.
       if (epss) {
         await upsertFeedRecord({
           vulnerabilityId: vulnerability.id,
@@ -163,17 +163,10 @@ export const enrichVulnerability = inngest.createFunction(
         metric: { source: "CISA_KEV", inKev: inKEV },
       });
 
-      // TODO: VW-540 legacy columns, still read by the UI, entity filters and the inbox.
       // TODO: VW-541 priority moves to Issue.
-      const now = new Date();
       await prisma.vulnerability.update({
         where: { id: vulnerability.id },
-        data: {
-          ...(epss ? { epss: epss.score, updatedEpss: now } : {}),
-          inKEV,
-          updatedInKev: now,
-          priority,
-        },
+        data: { priority },
       });
     });
 

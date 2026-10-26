@@ -2,7 +2,6 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import {
-  CVE_PATTERN,
   CVSS_METRIC_TYPES,
   cvssBand,
   FEED_SOURCES,
@@ -129,21 +128,13 @@ function toSubmissionCreate(
 /**
  * Add one source's statement about a vulnerability. The vulnerability is found by the record's
  * identifiers, or created when none of them is known yet.
- *
- * `actingUserId` only fills the legacy `Vulnerability.userId` column.
- * TODO: VW-540 remove `actingUserId` once `Vulnerability.userId` is dropped; ownership is
- * `data.userId` on the record.
  */
-export async function createVulnerabilityRecord(
-  data: VulnerabilityRecordData,
-  { actingUserId }: { actingUserId: string },
-) {
+export async function createVulnerabilityRecord(data: VulnerabilityRecordData) {
   assertSubmissionMatchesSource(data.source, data.ta3Submission);
   const identifiers = normalizeIdentifiers(data.identifiers ?? []);
   const { vulnerabilityId, created } = await findOrCreateVulnerability(
     data,
     identifiers,
-    actingUserId,
   );
 
   const record = await prisma
@@ -341,7 +332,6 @@ export async function upsertSourceRecord(
 async function findOrCreateVulnerability(
   data: VulnerabilityRecordData,
   identifiers: NormalizedIdentifier[],
-  actingUserId: string,
 ): Promise<{ vulnerabilityId: string; created: boolean }> {
   const values = identifiers.map((identifier) => identifier.value);
   const existing = await findVulnerabilityByIdentifiers(prisma, values);
@@ -350,7 +340,6 @@ async function findOrCreateVulnerability(
   const all = identifiers.length > 0 ? identifiers : [mintViperIdentifier()];
   // `all` is never empty, so there is always a display ID.
   const displayId = computeDisplayId(all) as string;
-  const cvss = data.metrics?.find((metric) => isCvss(metric.type));
   const severity = (data.metrics ?? [])
     .map(toMetricCreate)
     .find(
@@ -368,14 +357,6 @@ async function findOrCreateVulnerability(
         narrative: data.ta3Submission?.narrative ?? null,
         impact: data.ta3Submission?.impact ?? null,
         ...(severity ? { severity } : {}),
-        // TODO: VW-540 legacy columns, still read by the UI and inbox.
-        cveId: CVE_PATTERN.test(displayId) ? displayId : null,
-        cvssScore: cvss?.score ?? null,
-        cvssVector: cvss?.vector ?? null,
-        sarif: data.ta3Submission?.sarif ?? {},
-        exploitUri: data.ta3Submission?.exploitUri ?? null,
-        deviceArtifactId: data.ta3Submission?.deviceArtifactId ?? null,
-        userId: actingUserId,
       },
       select: { id: true },
     });

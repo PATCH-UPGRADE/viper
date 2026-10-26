@@ -1,8 +1,17 @@
+// Run with the server-only stub, since it creates vulnerabilities through the record service:
+//   npx tsx --require ./prisma/seeds/stub-server-only.cjs scripts/seed-advisory-environment.ts
+import {
+  createVulnerabilityRecord,
+  type VulnerabilityRecordData,
+} from "@/features/vulnerabilities/server/records";
 import {
   type AssetStatus,
+  MetricType,
+  type Prisma,
   ScopeTargetModel,
   Severity,
   VersionStatus,
+  VulnerabilitySource,
 } from "@/generated/prisma";
 import {
   deviceIdentitySelect,
@@ -17,6 +26,26 @@ const SEED_USER_EMAIL = "user@example.com";
 const SYNGO_PLAZA_CVE = "CVE-2024-52334";
 const DESERIALIZATION_CVE = "CVE-2022-29875";
 const ADVISORY_CVES = [SYNGO_PLAZA_CVE, DESERIALIZATION_CVE];
+const ADVISORY_VULNERABILITY_WHERE = {
+  identifiers: { some: { value: { in: ADVISORY_CVES } } },
+} satisfies Prisma.VulnerabilityWhereInput;
+
+/**
+ * Create a vulnerability through the record service, which also opens the baseline Issues on its
+ * matchings. The service copies narrative and impact only from a TA3 submission, so a vendor
+ * advisory's are written onto the vulnerability here.
+ */
+async function createAdvisoryVulnerability(
+  record: VulnerabilityRecordData,
+  curated: { narrative: string; impact: string },
+) {
+  const { vulnerabilityId } = await createVulnerabilityRecord(record);
+  return prisma.vulnerability.update({
+    where: { id: vulnerabilityId },
+    data: curated,
+    select: { id: true },
+  });
+}
 
 const SYNGO_PLAZA_EXCEPTION_SERIAL = "SYNGO-PLZ-VB30E-003";
 const DESERIALIZATION_EXCEPTION_SERIAL = "MAGNETOM-VA30A-001";
@@ -208,10 +237,10 @@ async function resetInboxEnvironment() {
     where: { isDraft: true },
   });
   const remediations = await prisma.remediation.deleteMany({
-    where: { vulnerabilities: { some: { cveId: { in: ADVISORY_CVES } } } },
+    where: { vulnerabilities: { some: ADVISORY_VULNERABILITY_WHERE } },
   });
   const vulnerabilities = await prisma.vulnerability.deleteMany({
-    where: { cveId: { in: ADVISORY_CVES } },
+    where: ADVISORY_VULNERABILITY_WHERE,
   });
   const notes = await prisma.note.deleteMany({
     where: {
@@ -305,43 +334,31 @@ async function seedSyngoPlazaEnvironment(userId: string) {
     assets.push(await upsertAsset(assetFields, device, userId));
   }
 
-  const vulnerability = await prisma.vulnerability.create({
-    data: {
-      cveId: SYNGO_PLAZA_CVE,
-      // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
-      // vulnerability by its CVE and would create a duplicate. Create it through that instead.
-      displayId: SYNGO_PLAZA_CVE,
-      severity: Severity.Medium,
-      cvssScore: 5.3,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
-      description:
+  const vulnerability = await createAdvisoryVulnerability(
+    {
+      source: VulnerabilitySource.VENDOR_ADVISORY,
+      sourceId: "SSA-016040",
+      identifiers: [SYNGO_PLAZA_CVE],
+      details:
         "syngo.plaza VB30E contains an insecure password encryption vulnerability that could allow an attacker to extract original passwords and might gain unauthorized access.",
+      metrics: [
+        {
+          type: MetricType.CVSS_V3_1,
+          score: 5.3,
+          vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+          severity: Severity.Medium,
+        },
+      ],
+      deviceGroupMatchingIds: [matching.id],
+      userId: null,
+    },
+    {
       narrative:
         "The affected application does not encrypt passwords properly. An attacker who can read the stored credential material can recover the original passwords and use them to authenticate as a legitimate user.",
       impact:
         "Unauthorized access to the syngo.plaza PACS system used to display, process, and report on diagnostic images, including mammographic images.",
-      userId,
-      sarif: {
-        version: "2.1.0",
-        runs: [
-          {
-            tool: { driver: { name: "Siemens Healthineers PSIRT" } },
-            results: [
-              {
-                ruleId: SYNGO_PLAZA_CVE,
-                level: "warning",
-                message: {
-                  text: "Insecure password encryption in syngo.plaza VB30E (SSA-016040)",
-                },
-              },
-            ],
-          },
-        ],
-      },
-      // Must be inline: the extension opens baseline Issues only for matchings linked in this create.
-      deviceGroupMatchings: { connect: { id: matching.id } },
     },
-  });
+  );
 
   await prisma.remediation.create({
     data: {
@@ -475,42 +492,31 @@ async function seedDeserializationEnvironment(userId: string) {
     assets.push(await upsertAsset(assetFields, device, userId));
   }
 
-  const vulnerability = await prisma.vulnerability.create({
-    data: {
-      cveId: DESERIALIZATION_CVE,
-      // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
-      // vulnerability by its CVE and would create a duplicate. Create it through that instead.
-      displayId: DESERIALIZATION_CVE,
-      severity: Severity.Critical,
-      cvssScore: 9.8,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C",
-      description:
+  const vulnerability = await createAdvisoryVulnerability(
+    {
+      source: VulnerabilitySource.VENDOR_ADVISORY,
+      sourceId: "SSA-220609",
+      identifiers: [DESERIALIZATION_CVE],
+      details:
         "The application deserialises untrusted data without sufficient validations, which could result in an arbitrary deserialization. This could allow an unauthenticated attacker to execute code in the affected system if ports 32912/tcp or 32914/tcp are reachable.",
+      metrics: [
+        {
+          type: MetricType.CVSS_V3_1,
+          score: 9.8,
+          vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C",
+          severity: Severity.Critical,
+        },
+      ],
+      deviceGroupMatchingIds: matchings.map((m) => m.id),
+      userId: null,
+    },
+    {
       narrative:
         "An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on an affected system can send a crafted serialized payload. Because the application deserializes untrusted data without validation (CWE-502), the payload is instantiated and can execute arbitrary code under the syngo platform's privileges.",
       impact:
         "Remote code execution on imaging systems (MRI, CT, PET/CT, SPECT/CT, mammography) and the syngo.via viewing and reporting platform, potentially disrupting diagnostic imaging workflows across radiology and nuclear medicine.",
-      userId,
-      sarif: {
-        version: "2.1.0",
-        runs: [
-          {
-            tool: { driver: { name: "Siemens Healthineers PSIRT" } },
-            results: [
-              {
-                ruleId: DESERIALIZATION_CVE,
-                level: "error",
-                message: {
-                  text: "Deserialization of untrusted data in Siemens Healthineers syngo platform (SSA-220609)",
-                },
-              },
-            ],
-          },
-        ],
-      },
-      deviceGroupMatchings: { connect: matchings.map((m) => ({ id: m.id })) },
     },
-  });
+  );
 
   await prisma.remediation.create({
     data: {
@@ -549,7 +555,7 @@ async function printEnvironmentSummary() {
 
   for (const cveId of ADVISORY_CVES) {
     const vulnerability = await prisma.vulnerability.findFirst({
-      where: { cveId },
+      where: { identifiers: { some: { value: cveId } } },
       include: { deviceGroupMatchings: true, issues: true },
     });
 
@@ -592,7 +598,7 @@ async function printEnvironmentSummary() {
 
     if (baseline !== matchings) {
       failures.push(
-        `${cveId}: ${matchings} matching(s) but ${baseline} baseline issue(s) — the vulnerability must connect its matchings inline in the same create() call`,
+        `${cveId}: ${matchings} matching(s) but ${baseline} baseline issue(s) — create the vulnerability through createVulnerabilityRecord, which opens them`,
       );
     }
     if (assetLevel !== 0) {
@@ -616,7 +622,7 @@ async function printEnvironmentSummary() {
   const notedIds = new Set(notesByAsset.map((note) => note.instanceId));
 
   const allMatchings = await prisma.deviceGroupMatching.findMany({
-    where: { vulnerabilities: { some: { cveId: { in: ADVISORY_CVES } } } },
+    where: { vulnerabilities: { some: ADVISORY_VULNERABILITY_WHERE } },
   });
   const reachable = new Set(
     (await assetsInScopeOf(allMatchings)).map((a) => a.serialNumber),

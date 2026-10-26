@@ -46,7 +46,7 @@ interface AdvisoryFixture {
   /** Parsed by the platform's own schema before anything is written. */
   doc: unknown;
   /** Must already exist in `SAMPLE_VULNERABILITIES`, or the advisory is skipped. */
-  cveId: string;
+  cve: string;
   copy: AdvisoryCopy;
 }
 
@@ -54,7 +54,7 @@ interface AdvisoryFixture {
 // One device group, 23 assets. The narrowest advisory in the set, and the one
 // that drives the existing "Update Baxter Infusion Pumps Firmware" ticket.
 const BAXTER: AdvisoryFixture = {
-  cveId: "CVE-2021-12345",
+  cve: "CVE-2021-12345",
   doc: {
     document: {
       title: "Baxter Sigma Spectrum Infusion Pump",
@@ -197,7 +197,7 @@ const BAXTER: AdvisoryFixture = {
 // Three device groups from one advisory, which is what exercises the
 // multi-matching fan-out on the notification.
 const GE_HEALTHCARE: AdvisoryFixture = {
-  cveId: "CVE-2020-25175",
+  cve: "CVE-2020-25175",
   doc: {
     document: {
       title: "GE Healthcare Imaging and Ultrasound Products",
@@ -345,7 +345,7 @@ const GE_HEALTHCARE: AdvisoryFixture = {
 // Not a medical advisory. Here so the set covers the network side of the
 // inventory, and so one advisory in the seed carries a restrictive TLP.
 const CISCO_ASA: AdvisoryFixture = {
-  cveId: "CVE-2016-6366",
+  cve: "CVE-2016-6366",
   doc: {
     document: {
       title: "Cisco Adaptive Security Appliance SNMP Remote Code Execution",
@@ -560,7 +560,7 @@ const seedAdvisory = async (
   const trackingId = parsed.document.tracking.id;
 
   const vulnerability = await prisma.vulnerability.findFirst({
-    where: { cveId: fixture.cveId },
+    where: { identifiers: { some: { value: fixture.cve } } },
     select: {
       id: true,
       deviceGroupMatchings: { select: { id: true } },
@@ -568,7 +568,7 @@ const seedAdvisory = async (
   });
   if (!vulnerability) {
     console.warn(
-      `⚠️  ${fixture.cveId} is not seeded — skipping ${trackingId}. Run \`npm run seed\` first.`,
+      `⚠️  ${fixture.cve} is not seeded — skipping ${trackingId}. Run \`npm run seed\` first.`,
     );
     return 0;
   }
@@ -614,7 +614,7 @@ const seedAdvisory = async (
         create: {
           vulnerabilityId: vulnerability.id,
           confidence: ConfidenceLevel.Matched,
-          reasonWhy: `The advisory names ${fixture.cveId} directly.`,
+          reasonWhy: `The advisory names ${fixture.cve} directly.`,
         },
       },
       deviceGroupsMatchings: {
@@ -642,7 +642,7 @@ const seedAdvisory = async (
   });
 
   console.log(
-    `  ✅ ${trackingId} → ${fixture.cveId}, ${vulnerability.deviceGroupMatchings.length} device group matching(s)`,
+    `  ✅ ${trackingId} → ${fixture.cve}, ${vulnerability.deviceGroupMatchings.length} device group matching(s)`,
   );
   return vulnerability.deviceGroupMatchings.length;
 };

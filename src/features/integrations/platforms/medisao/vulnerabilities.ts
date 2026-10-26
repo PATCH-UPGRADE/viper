@@ -18,10 +18,6 @@ export const normalizeIdentifier = (name: string): string => {
 interface ResolveOrMintInput {
   /** Identifiers exactly as MedISAO sent them */
   names: string[];
-  /** The integration's shadow user. Only fills the legacy Vulnerability.userId column. */
-  // TODO: VW-540 Vulnerability.userId will be removed later in this stack of PRs; drop this field
-  // (and the actingUserId it feeds) then.
-  integrationUserId: string;
   /** The channel's matching. A stub minted here is attached to it; a held vulnerability is not. */
   deviceGroupMatchingId: string;
 }
@@ -51,7 +47,6 @@ interface ResolveOrMintResult {
  */
 export async function resolveOrMintVulnerabilities({
   names,
-  integrationUserId, // TODO VW-540, remove this when Vulnerability.userId is deleted
   deviceGroupMatchingId,
 }: ResolveOrMintInput): Promise<ResolveOrMintResult> {
   const ids = new Map<string, string>();
@@ -88,16 +83,13 @@ export async function resolveOrMintVulnerabilities({
     if (found.has(value)) continue;
     try {
       const { vulnerabilityId, vulnerabilityCreated } =
-        await createVulnerabilityRecord(
-          {
-            source: VulnerabilitySource.OTHER,
-            sourceId: value,
-            identifiers: [name],
-            deviceGroupMatchingIds: [deviceGroupMatchingId],
-            userId: null,
-          },
-          { actingUserId: integrationUserId },
-        );
+        await createVulnerabilityRecord({
+          source: VulnerabilitySource.OTHER,
+          sourceId: value,
+          identifiers: [name],
+          deviceGroupMatchingIds: [deviceGroupMatchingId],
+          userId: null,
+        });
       link(value, vulnerabilityId);
       if (vulnerabilityCreated) created += 1;
     } catch (error) {

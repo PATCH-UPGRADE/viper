@@ -25,7 +25,6 @@ import {
 import { requireExistence } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
-  LEGACY_VULNERABILITY_OMIT,
   paginatedVulnerabilityResponseSchema,
   toPrioritizedVulnerability,
   toVulnerabilityResponse,
@@ -245,7 +244,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const result = await fetchPaginated(prisma.vulnerability, pagination, {
         where,
         include: vulnerabilityByPriorityInclude,
-        omit: LEGACY_VULNERABILITY_OMIT,
       });
       return {
         ...result,

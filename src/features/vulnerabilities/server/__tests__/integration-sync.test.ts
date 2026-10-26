@@ -76,7 +76,6 @@ describe("processVulnerabilityIntegrationSync", () => {
     );
     expect(mocks.createVulnerabilityRecord).toHaveBeenCalledWith(
       expect.objectContaining({ data: true }),
-      { actingUserId: "shadow-1" },
     );
     expect(mocks.mapping.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

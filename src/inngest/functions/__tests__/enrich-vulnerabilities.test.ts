@@ -139,7 +139,7 @@ describe("enrichVulnerability", () => {
     expect(mockUpsertFeedRecord).not.toHaveBeenCalled();
   });
 
-  it("writes the EPSS and KEV records and the legacy columns", async () => {
+  it("writes the EPSS and KEV records and the priority", async () => {
     hasVulnerability({ cvss: 9.8 });
     respond({ epss: { epss: "0.2", percentile: "0.95" } });
 
@@ -158,11 +158,7 @@ describe("enrichVulnerability", () => {
     });
     expect(mockPrisma.vulnerability.update).toHaveBeenCalledWith({
       where: { id: "v-1" },
-      data: expect.objectContaining({
-        epss: 0.2,
-        inKEV: true,
-        priority: "Critical",
-      }),
+      data: { priority: "Critical" },
     });
     expect(result).toMatchObject({ enriched: true, priority: "Critical" });
   });
@@ -208,9 +204,7 @@ describe("enrichVulnerability", () => {
     );
     expect(sources).toEqual(["CISA_KEV"]);
     const { data } = mockPrisma.vulnerability.update.mock.calls[0][0];
-    expect(data).not.toHaveProperty("epss");
-    expect(data).not.toHaveProperty("updatedEpss");
-    expect(data.priority).toBe("Unsorted");
+    expect(data).toEqual({ priority: "Unsorted" });
   });
 
   it("computes priority from the newest CVSS metric", async () => {

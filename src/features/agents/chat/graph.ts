@@ -14,6 +14,7 @@ import {
   vulnerabilityToMarkdown,
 } from "@/lib/markdown";
 import { buildAgentGraph } from "../shared/build-graph";
+import { currentDateBlock } from "../shared/current-date";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
 import { buildAgentTools } from "../tools/registry";
@@ -75,6 +76,10 @@ context. When a question needs specific records, fetch them with
 query_platform_data and answer from what you retrieve — never invent ids, CVSS
 scores, versions, or hostnames. A decision or plan is the exception: hand it to
 request_recommendation without fetching first.
+
+For a ranking question of fact (the highest or lowest severity, the assets with the
+most issues, the most urgent or newest notifications), send sort or the date fields
+as the catalog shows, and answer from page 1.
 
 ${PLATFORM_CATALOG}
 
@@ -168,7 +173,9 @@ export function buildSystemPrompt(
     : "";
   return `${BASE_PROMPT}
 
-<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>${reportsBias}${focus}`;
+<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>
+
+${currentDateBlock()}${reportsBias}${focus}`;
 }
 
 export function buildChatGraph({

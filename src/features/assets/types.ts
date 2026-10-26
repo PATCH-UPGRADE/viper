@@ -88,6 +88,15 @@ export const assetArrayInputSchema = z.object({
   assets: z.array(assetInputSchema).nonempty(),
 });
 
+export const affectedIssueCountsSchema = z.object({
+  total: z.number().int(),
+  Critical: z.number().int(),
+  High: z.number().int(),
+  Medium: z.number().int(),
+  Low: z.number().int(),
+});
+export type AffectedIssueCounts = z.infer<typeof affectedIssueCountsSchema>;
+
 export const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string().nullable(),
@@ -153,6 +162,7 @@ export const assetResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
   notes: z.array(scopedNoteSchema).optional(),
+  affectedIssueCounts: affectedIssueCountsSchema.optional(),
 });
 export type AssetResponse = z.infer<typeof assetResponseSchema>;
 

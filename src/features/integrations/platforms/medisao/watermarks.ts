@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { asDate } from "@/lib/date-utils";
 import type { Cursor } from "../../core/types";
 
 /**
@@ -13,12 +14,6 @@ export type ChannelWatermarks = z.infer<typeof cursorSchema>;
 export const parseCursor = (cursor: Cursor | null): ChannelWatermarks => {
   const parsed = cursorSchema.safeParse(cursor);
   return parsed.success ? parsed.data : {};
-};
-
-export const asDate = (value: string | undefined): Date | null => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 export const sinceFor = (

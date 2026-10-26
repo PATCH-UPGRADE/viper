@@ -23,6 +23,7 @@ vi.mock("@/features/notes/server/get-relevant-notes", () => ({
   attachNote: vi.fn(async (_scope: string, row: unknown) => row),
 }));
 
+import { MetricType, Prisma } from "@/generated/prisma";
 import { createCallerFactory } from "@/trpc/init";
 import { vulnerabilitiesRouter, vulnerabilitySortClauses } from "../routers";
 
@@ -52,18 +53,18 @@ const setup = () => {
 };
 
 describe("vulnerabilitySortClauses", () => {
-  it("sorts by severity, and by EPSS with unscored rows last", () => {
+  // EPSS and KEV live in metrics, so they sort in memory, not in an orderBy.
+  it("builds clauses for columns only, leaving EPSS and KEV out", () => {
     expect(vulnerabilitySortClauses("severity,-epss")).toEqual([
       { severity: "asc" },
-      { epss: { sort: "desc", nulls: "last" } },
     ]);
-    expect(vulnerabilitySortClauses("epss")).toEqual([
-      { epss: { sort: "asc", nulls: "last" } },
+    expect(vulnerabilitySortClauses("-inKEV,priority")).toEqual([
+      { priority: "asc" },
     ]);
   });
 
   it("drops a field it does not allow", () => {
-    expect(vulnerabilitySortClauses("cvssScore,-inKEV")).toEqual([]);
+    expect(vulnerabilitySortClauses("cvssScore,cveId,displayId")).toEqual([]);
     expect(vulnerabilitySortClauses("")).toEqual([]);
   });
 });
@@ -113,5 +114,92 @@ describe("vulnerabilities.getManyByAsset and getMany sort", () => {
       { updatedAt: "desc" },
       { id: "asc" },
     ]);
+  });
+});
+
+describe("vulnerabilities.getMany sorted by EPSS or KEV", () => {
+  const at = new Date("2026-01-01");
+  const metric = (type: MetricType, value: number | boolean) => ({
+    id: `${type}-${value}`,
+    recordId: "record",
+    type,
+    vector: null,
+    score:
+      type === MetricType.EPSS ? new Prisma.Decimal(value as number) : null,
+    percentile: null,
+    severity: null,
+    flag: type === MetricType.KEV ? (value as boolean) : null,
+    createdAt: at,
+    updatedAt: at,
+  });
+  const row = (id: string, epss: number | null, inKev: boolean | null) => ({
+    id,
+    createdAt: at,
+    updatedAt: at,
+    priority: "Unsorted",
+    severity: "High",
+    description: null,
+    records: [
+      {
+        metrics: [
+          ...(epss === null ? [] : [metric(MetricType.EPSS, epss)]),
+          ...(inKev === null ? [] : [metric(MetricType.KEV, inKev)]),
+        ],
+      },
+    ],
+  });
+  const rows = [
+    row("a", 0.2, false),
+    row("b", null, null), // never scored, never checked against KEV
+    row("c", 0.9, true),
+    row("d", 0.5, false),
+  ];
+
+  /** The ids of the page, in the order the router asked for them. */
+  const pageIds = async (input: {
+    sort: string;
+    page?: number;
+    pageSize?: number;
+  }) => {
+    mockPrisma.vulnerability.findMany
+      .mockResolvedValueOnce(rows)
+      .mockResolvedValueOnce([]);
+    const result = await setup().getMany(input);
+    const [args] = mockPrisma.vulnerability.findMany.mock.calls.at(-1) ?? [];
+    return { ids: args.where.id.in, totalCount: result.totalCount };
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sorts by the newest EPSS score, with unscored rows last both ways", async () => {
+    expect((await pageIds({ sort: "-epss" })).ids).toEqual([
+      "c",
+      "d",
+      "a",
+      "b",
+    ]);
+    expect((await pageIds({ sort: "epss" })).ids).toEqual(["a", "d", "c", "b"]);
+  });
+
+  it("puts KEV-listed vulnerabilities first with -inKEV", async () => {
+    expect((await pageIds({ sort: "-inKEV,-epss" })).ids).toEqual([
+      "c",
+      "d",
+      "a",
+      "b",
+    ]);
+  });
+
+  it("pages through the sorted rows", async () => {
+    const page = await pageIds({ sort: "-epss", page: 2, pageSize: 2 });
+    expect(page.ids).toEqual(["a", "b"]);
+    expect(page.totalCount).toBe(4);
+  });
+
+  it("does not use an orderBy for the sort", async () => {
+    await pageIds({ sort: "-epss" });
+    const [args] = mockPrisma.vulnerability.findMany.mock.calls[0];
+    expect(args.orderBy).toBeUndefined();
+    expect(mockPrisma.vulnerability.count).not.toHaveBeenCalled();
   });
 });

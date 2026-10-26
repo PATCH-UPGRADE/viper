@@ -5,6 +5,7 @@ import type {
   SyncOutcome,
 } from "@/features/integrations/core/types";
 import { releaseScalarData } from "@/features/remediations/release";
+import { normalizeIdentifiers } from "@/features/vulnerabilities/server/identity";
 import { ResourceType, VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveMatchingIdForDevice } from "@/lib/router-utils";
@@ -16,6 +17,21 @@ import {
   fetchUpdateCves,
   toRemediationItem,
 } from "./feed";
+
+/**
+ * The vulnerabilities Viper already holds for these CVE IDs, found by identifier. A CVE Viper
+ * doesn't hold is left out: the remediation is linked to it only once it arrives.
+ */
+export async function heldVulnerabilities(
+  cveIds: string[],
+): Promise<{ id: string }[]> {
+  const values = normalizeIdentifiers(cveIds).map(({ value }) => value);
+  if (values.length === 0) return [];
+  return prisma.vulnerability.findMany({
+    where: { identifiers: { some: { value: { in: values } } } },
+    select: { id: true },
+  });
+}
 
 /** The exact matching for one Fleet device, or null when the asset has no
  * manufacturer or product to match on.
@@ -90,13 +106,7 @@ export async function syncRemediations(
           if (id) matchingIds.add(id);
         }
 
-        const held =
-          item.cveIds.length > 0
-            ? await prisma.vulnerability.findMany({
-                where: { cveId: { in: item.cveIds } },
-                select: { id: true },
-              })
-            : [];
+        const held = await heldVulnerabilities(item.cveIds);
 
         const fields = {
           description: item.description,

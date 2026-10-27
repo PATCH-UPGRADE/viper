@@ -1365,6 +1365,7 @@ enum PlatformEnum {
   FLEET
   MEDISAO
   PARTNER
+  SERVICENOW
 }
 
 // Traffic Light Protocol, governs information sharing

@@ -1,7 +1,13 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangleIcon, ExternalLinkIcon, WrenchIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  BadgeCheckIcon,
+  CalendarIcon,
+  ExternalLinkIcon,
+  WrenchIcon,
+} from "lucide-react";
 import Link from "next/link";
 import {
   EmptyView,
@@ -39,6 +45,7 @@ import {
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
 import { hasStatedImpact } from "../impact";
+import { formatReleaseDate, manufacturerLink } from "../release";
 import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
@@ -342,14 +349,21 @@ export const RemediationCard = ({
     .map((a) => a.latestArtifact)
     .filter((a) => a != null);
 
+  const link = manufacturerLink(remediation.externalMappings);
+
   return (
     <Card key={remediation.id} className="gap-2">
       <CardHeader>
-        <div className="flex items-start">
+        <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base font-medium">
             <span className="font-semibold">Remediation: </span>
             {remediation.id}
           </CardTitle>
+          {remediation.isManufacturerRemediation && (
+            <Badge variant="outline" className="shrink-0 text-primary">
+              <BadgeCheckIcon className="size-3" /> From manufacturer
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -358,6 +372,28 @@ export const RemediationCard = ({
             {remediation.description}
           </p>
         )}
+        {(remediation.publishedAt || link) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            {remediation.publishedAt && (
+              <span className="inline-flex items-center gap-1 front-medium text-foreground">
+                <CalendarIcon className="size-3.5 text-muted-foreground" />
+                Released {formatReleaseDate(remediation.publishedAt)}
+              </span>
+            )}
+            {link && (
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                View on {link.label}
+                <ExternalLinkIcon className="size-3 shrink-0" />
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <span>By {remediation.user.name}</span>
           <span>•</span>

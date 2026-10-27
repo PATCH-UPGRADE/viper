@@ -2,6 +2,7 @@ import type { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { matchingForDevice } from "./canonical-identity";
 import { deviceForSampleCpe } from "./device-groups";
+
 interface SampleRemediation {
   cpe: string;
   fixUri: string;

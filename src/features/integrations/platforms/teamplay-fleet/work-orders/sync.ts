@@ -101,6 +101,9 @@ async function ingestFleetWorkOrders(
           status: item.status,
           category: item.category,
           scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
+          scheduledEndTime: item.scheduledEndTime
+            ? new Date(item.scheduledEndTime)
+            : null,
           sourceLabel: FLEET_SOURCE_LABEL,
         };
         return {

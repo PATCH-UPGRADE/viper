@@ -46,6 +46,7 @@ type EditState = {
   descriptionsByDept: Record<string, string>;
   assigneeId: string;
   scheduledAt: string;
+  scheduledEndTime: string;
 };
 
 const buildEditState = (data: TicketDetail): EditState => ({
@@ -60,7 +61,29 @@ const buildEditState = (data: TicketDetail): EditState => ({
   ),
   assigneeId: data.assignee?.id ?? UNASSIGNED,
   scheduledAt: toDateTimeLocal(data.scheduledAt),
+  scheduledEndTime: toDateTimeLocal(data.scheduledEndTime),
 });
+
+// Moving the start moves the end by the same amount.
+const shiftEnd = (form: EditState, scheduledAt: string) =>
+  form.scheduledAt && form.scheduledEndTime && scheduledAt
+    ? toDateTimeLocal(
+        new Date(
+          new Date(form.scheduledEndTime).getTime() +
+            new Date(scheduledAt).getTime() -
+            new Date(form.scheduledAt).getTime(),
+        ),
+      )
+    : form.scheduledEndTime;
+
+const endTimeError = ({ scheduledAt, scheduledEndTime }: EditState) => {
+  if (!scheduledEndTime) return null;
+  if (!scheduledAt) return "Set a start time first";
+  if (new Date(scheduledEndTime) <= new Date(scheduledAt)) {
+    return "The end time must be after the start time";
+  }
+  return null;
+};
 
 const editStateFingerprint = (state: EditState) =>
   JSON.stringify({
@@ -92,6 +115,8 @@ export const TicketEditForm = ({
   const update = useUpdateTicket(data.id);
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
+
+  const endError = endTimeError(form);
 
   const isDirty = editStateFingerprint(form) !== editStateFingerprint(initial);
   useBeforeUnload(isDirty);
@@ -143,7 +168,7 @@ export const TicketEditForm = ({
 
   const handleSubmit = () => {
     const trimmedSummary = form.summary.trim();
-    if (!trimmedSummary) return;
+    if (!trimmedSummary || endError) return;
     const descriptions = form.departmentIds
       .map((id) => ({
         departmentId: id,
@@ -162,6 +187,9 @@ export const TicketEditForm = ({
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
+        scheduledEndTime: form.scheduledEndTime
+          ? new Date(form.scheduledEndTime)
+          : null,
       },
       { onSuccess: () => onCancel() },
     );
@@ -247,9 +275,37 @@ export const TicketEditForm = ({
               type="datetime-local"
               value={form.scheduledAt}
               onChange={(e) =>
-                setForm((f) => ({ ...f, scheduledAt: e.target.value }))
+                setForm((f) => ({
+                  ...f,
+                  scheduledAt: e.target.value,
+                  scheduledEndTime: shiftEnd(f, e.target.value),
+                }))
               }
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-scheduled-end">Scheduled end</Label>
+            <Input
+              id="ticket-scheduled-end"
+              type="datetime-local"
+              value={form.scheduledEndTime}
+              aria-invalid={!!endError}
+              aria-describedby={
+                endError ? "ticket-scheduled-end-error" : undefined
+              }
+              onChange={(e) =>
+                setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
+              }
+            />
+            {endError && (
+              <p
+                id="ticket-scheduled-end-error"
+                className="text-xs text-destructive"
+              >
+                {endError}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -353,7 +409,7 @@ export const TicketEditForm = ({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={update.isPending}>
+        <Button type="submit" disabled={update.isPending || !!endError}>
           {update.isPending ? "Saving..." : "Save"}
         </Button>
         <Button

@@ -1,13 +1,91 @@
 import "server-only";
-import { type Prisma, SourceChannel } from "@/generated/prisma";
+import { recordCreationActivity } from "@/features/tracking/server/activities";
+import {
+  type Prisma,
+  ResourceType,
+  SourceChannel,
+  type TicketCategory,
+  type TicketStatus,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { IntegrationResponse } from "@/lib/schemas";
 import { sourceContentHash } from "@/lib/source-hash";
+import { processIntegrationSync } from "./upsert";
 
 /** What a pulled work order must carry for its snapshot. */
 export interface WorkOrderSourceItem {
   externalId: string;
   raw: Prisma.InputJsonValue;
   body: string;
+}
+
+/** A work order pulled from a platform, mapped onto the ticket fields. */
+export interface PulledWorkOrder extends WorkOrderSourceItem {
+  summary: string;
+  status: TicketStatus;
+  category: TicketCategory;
+  scheduledAt: string | null;
+  scheduledEndTime: string | null;
+}
+
+/**
+ * Upsert pulled work orders as tickets, then record a snapshot of each one.
+ *
+ * For a repeated `externalId`, only the last item is ingested.
+ */
+export async function ingestPulledWorkOrders(
+  allItems: PulledWorkOrder[],
+  {
+    integrationId,
+    integrationUserId,
+    sourceLabel,
+  }: { integrationId: string; integrationUserId: string; sourceLabel: string },
+): Promise<IntegrationResponse> {
+  const items = [
+    ...new Map(allItems.map((item) => [item.externalId, item])).values(),
+  ];
+
+  const response = await processIntegrationSync(
+    prisma,
+    {
+      model: prisma.workOrderTicket,
+      mappingModel: prisma.externalWorkOrderMapping,
+      // Every other ingest path records this, so a synced work order gets the
+      // same "created" entry in its timeline.
+      onItemCreated: (id: string) => recordCreationActivity(id),
+      // finalize-sync already records this attempt. A second write
+      // double-counts consecutiveFailures.
+      shouldRecordSyncOutcome: false,
+      transformInputItem: async (item: PulledWorkOrder, userId: string) => {
+        const fields = {
+          summary: item.summary,
+          body: item.body,
+          status: item.status,
+          category: item.category,
+          scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
+          scheduledEndTime: item.scheduledEndTime
+            ? new Date(item.scheduledEndTime)
+            : null,
+          sourceLabel,
+        };
+        return {
+          createData: { ...fields, creatorId: userId },
+          // Never reassign the creator on re-sync. Only refresh mutable fields.
+          updateData: fields,
+          // A work order has no natural business key, so with no external
+          // mapping there is nothing to match on and the ticket is new.
+          uniqueFieldConditions: [],
+          artifactsData: undefined,
+        };
+      },
+    },
+    { items },
+    integrationUserId,
+    integrationId,
+    ResourceType.WorkOrder,
+  );
+  await recordWorkOrderSources(items, integrationId);
+  return response;
 }
 
 /**

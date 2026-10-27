@@ -1,10 +1,6 @@
 import "server-only";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
-import { recordWorkOrderSources } from "@/features/integrations/core/sync/work-order-sources";
-import { recordCreationActivity } from "@/features/tracking/server/activities";
-import { ResourceType } from "@/generated/prisma";
+import { ingestPulledWorkOrders } from "@/features/integrations/core/sync/work-order-sources";
 import prisma from "@/lib/db";
-import type { IntegrationResponse } from "@/lib/schemas";
 import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import {
@@ -74,56 +70,6 @@ export async function reconcileProvisionalMappings(
   }
 }
 
-async function ingestFleetWorkOrders(
-  items: FleetWorkOrderItem[],
-  integrationId: string,
-): Promise<IntegrationResponse> {
-  const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
-    where: { id: integrationId },
-    select: { integrationUserId: true },
-  });
-
-  return processIntegrationSync(
-    prisma,
-    {
-      model: prisma.workOrderTicket,
-      mappingModel: prisma.externalWorkOrderMapping,
-      // Every other ingest path records this, so a Fleet-synced work order gets
-      // the same "created" entry in its timeline.
-      onItemCreated: (id: string) => recordCreationActivity(id),
-      // finalize-sync already records this attempt; a second write double-counts
-      // consecutiveFailures.
-      shouldRecordSyncOutcome: false,
-      transformInputItem: async (item: FleetWorkOrderItem, userId: string) => {
-        const fields = {
-          summary: item.summary,
-          body: item.body,
-          status: item.status,
-          category: item.category,
-          scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
-          scheduledEndTime: item.scheduledEndTime
-            ? new Date(item.scheduledEndTime)
-            : null,
-          sourceLabel: FLEET_SOURCE_LABEL,
-        };
-        return {
-          createData: { ...fields, creatorId: userId },
-          // Never reassign the creator on re-sync; only refresh mutable fields.
-          updateData: fields,
-          // A work order has no natural business key, so with no external
-          // mapping there is nothing to match on and the ticket is new.
-          uniqueFieldConditions: [],
-          artifactsData: undefined,
-        };
-      },
-    },
-    { items },
-    integrationUserId,
-    integrationId,
-    ResourceType.WorkOrder,
-  );
-}
-
 export async function syncWorkOrders(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
@@ -143,8 +89,11 @@ export async function syncWorkOrders(
   const items = [...byExternalId.values()];
 
   await reconcileProvisionalMappings(items, ctx.integrationId);
-  const response = await ingestFleetWorkOrders(items, ctx.integrationId);
-  await recordWorkOrderSources(items, ctx.integrationId);
+  const response = await ingestPulledWorkOrders(items, {
+    integrationId: ctx.integrationId,
+    integrationUserId: ctx.integrationUserId,
+    sourceLabel: FLEET_SOURCE_LABEL,
+  });
 
   // Throwing makes finalize-sync record Error.
   if (response.shouldRetry) {

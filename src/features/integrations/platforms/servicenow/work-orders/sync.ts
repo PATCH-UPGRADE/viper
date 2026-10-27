@@ -1,9 +1,5 @@
 import "server-only";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
-import { recordWorkOrderSources } from "@/features/integrations/core/sync/work-order-sources";
-import { recordCreationActivity } from "@/features/tracking/server/activities";
-import { ResourceType } from "@/generated/prisma";
-import prisma from "@/lib/db";
+import { ingestPulledWorkOrders } from "@/features/integrations/core/sync/work-order-sources";
 import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { ServiceNowConfig, ServiceNowCreds } from "../config";
 import {
@@ -28,48 +24,12 @@ export async function syncWorkOrders(
     }
     cursor = page.cursor;
   }
-  const items = [...byExternalId.values()];
 
-  const response = await processIntegrationSync(
-    prisma,
-    {
-      model: prisma.workOrderTicket,
-      mappingModel: prisma.externalWorkOrderMapping,
-      onItemCreated: (id: string) => recordCreationActivity(id),
-      // finalize-sync already records this attempt. A second write double-counts
-      // consecutiveFailures.
-      shouldRecordSyncOutcome: false,
-      transformInputItem: async (
-        item: ServiceNowWorkOrderItem,
-        userId: string,
-      ) => {
-        const fields = {
-          summary: item.summary,
-          body: item.body,
-          status: item.status,
-          category: item.category,
-          scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
-          scheduledEndTime: item.scheduledEndTime
-            ? new Date(item.scheduledEndTime)
-            : null,
-          sourceLabel: SERVICENOW_SOURCE_LABEL,
-        };
-        return {
-          createData: { ...fields, creatorId: userId },
-          updateData: fields,
-          // A work order has no natural business key, so with no external
-          // mapping there is nothing to match on and the ticket is new.
-          uniqueFieldConditions: [],
-          artifactsData: undefined,
-        };
-      },
-    },
-    { items },
-    ctx.integrationUserId,
-    ctx.integrationId,
-    ResourceType.WorkOrder,
-  );
-  await recordWorkOrderSources(items, ctx.integrationId);
+  const response = await ingestPulledWorkOrders([...byExternalId.values()], {
+    integrationId: ctx.integrationId,
+    integrationUserId: ctx.integrationUserId,
+    sourceLabel: SERVICENOW_SOURCE_LABEL,
+  });
 
   // Throwing makes finalize-sync record Error.
   if (response.shouldRetry) {

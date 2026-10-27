@@ -18,9 +18,27 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { SourceChannel } from "@/generated/prisma";
+const { mockProcessIntegrationSync } = vi.hoisted(() => ({
+  mockProcessIntegrationSync: vi.fn(),
+}));
+
+vi.mock("../upsert", () => ({
+  processIntegrationSync: mockProcessIntegrationSync,
+}));
+vi.mock("@/features/tracking/server/activities", () => ({
+  recordCreationActivity: vi.fn(),
+}));
+
+import {
+  ResourceType,
+  SourceChannel,
+  TicketCategory,
+  TicketStatus,
+} from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
 import {
+  ingestPulledWorkOrders,
+  type PulledWorkOrder,
   recordWorkOrderSources,
   type WorkOrderSourceItem,
 } from "../work-order-sources";
@@ -122,5 +140,80 @@ describe("recordWorkOrderSources", () => {
       mockPrisma.externalSourceRecordMapping.findMany,
     ).not.toHaveBeenCalled();
     expect(mockPrisma.sourceRecord.createManyAndReturn).not.toHaveBeenCalled();
+  });
+});
+
+describe("ingestPulledWorkOrders", () => {
+  const pulled: PulledWorkOrder = {
+    ...item,
+    summary: "CHG0000001: Rollback Oracle Version",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.OTHER,
+    scheduledAt: "2026-04-16T23:00:00Z",
+    scheduledEndTime: null,
+  };
+  const options = {
+    integrationId: "int-1",
+    integrationUserId: "user-1",
+    sourceLabel: "ServiceNow",
+  };
+  const response = {
+    message: "success",
+    createdItemsCount: 1,
+    updatedItemsCount: 0,
+    shouldRetry: false,
+  };
+
+  beforeEach(() => {
+    mockProcessIntegrationSync.mockResolvedValue(response);
+  });
+
+  it("maps each item onto the ticket fields with the source label", async () => {
+    await ingestPulledWorkOrders([pulled], options);
+
+    const [, config, input, userId, integrationId, resource] =
+      mockProcessIntegrationSync.mock.calls[0];
+    expect(input).toEqual({ items: [pulled] });
+    expect([userId, integrationId, resource]).toEqual([
+      "user-1",
+      "int-1",
+      ResourceType.WorkOrder,
+    ]);
+
+    const fields = {
+      summary: pulled.summary,
+      body: pulled.body,
+      status: TicketStatus.TO_DO,
+      category: TicketCategory.OTHER,
+      scheduledAt: new Date("2026-04-16T23:00:00Z"),
+      scheduledEndTime: null,
+      sourceLabel: "ServiceNow",
+    };
+    await expect(
+      config.transformInputItem(pulled, "user-1"),
+    ).resolves.toMatchObject({
+      createData: { ...fields, creatorId: "user-1" },
+      updateData: fields,
+    });
+  });
+
+  it("ingests only the last item of a repeated externalId", async () => {
+    const newer = { ...pulled, status: TicketStatus.DONE };
+
+    await ingestPulledWorkOrders([pulled, newer], options);
+
+    expect(mockProcessIntegrationSync.mock.calls[0][2]).toEqual({
+      items: [newer],
+    });
+  });
+
+  it("records the snapshots after the ingest and returns its response", async () => {
+    const result = await ingestPulledWorkOrders([pulled], options);
+
+    expect(result).toBe(response);
+    expect(mockPrisma.sourceRecord.createManyAndReturn).toHaveBeenCalled();
+    expect(mockProcessIntegrationSync.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPrisma.externalWorkOrderMapping.findMany.mock.invocationCallOrder[0],
+    );
   });
 });

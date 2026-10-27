@@ -165,11 +165,22 @@ async function fetchPage(
 /** Round-tripped through `IntegrationResourceSync.cursor`. */
 interface ChangeRequestsCursor {
   /**
-   * The highest raw `sys_updated_on` this integration has seen, in UTC.
+   * The highest raw `sys_updated_on` this integration has seen, in UTC, but
+   * never later than the limit that `listChanged` sets.
    * `sysparm_query` compares it as UTC too, whatever the API user's time zone.
    */
   updatedOn: string;
 }
+
+/**
+ * How far behind the start of the sync the saved cursor must stay. The margin
+ * covers a difference between the VIPER clock and the ServiceNow clock.
+ */
+const CURSOR_CLOCK_MARGIN_MS = 5 * 60 * 1000;
+
+/** A `Date` in the raw `sys_updated_on` format, in UTC. */
+const toServiceNowDateTime = (date: Date): string =>
+  date.toISOString().slice(0, 19).replace("T", " ");
 
 const versionOf = (r: ChangeRequest): string =>
   `${r.sys_id}@${r.sys_updated_on}`;
@@ -194,11 +205,20 @@ const watermarkOf = (cursor: Cursor | null): string | null => {
  * is yielded again, so the same `sys_id` can occur twice. The caller keeps the
  * last one. A filter by id alone drops the repeat: the cursor then moves past
  * the new version, and VIPER keeps the old one until the record changes again.
+ *
+ * The saved cursor never passes the start of the sync, minus a clock margin. A
+ * record with a future `sys_updated_on` (an import or a script can set one)
+ * otherwise moves the cursor past every real edit, and the sync stops seeing
+ * changes. That record comes back on every sync instead, and the content hash
+ * stops it from writing a new snapshot.
  */
 export async function* listChanged(
   session: Session,
   cursor: Cursor | null,
 ): AsyncIterable<Page<ChangeRequest>> {
+  const limit = toServiceNowDateTime(
+    new Date(Date.now() - CURSOR_CLOCK_MARGIN_MS),
+  );
   let since = watermarkOf(cursor);
   let offset = 0;
   const seen = new Set<string>();
@@ -220,7 +240,8 @@ export async function* listChanged(
       offset += PAGE_SIZE;
     }
 
-    yield { items: fresh, cursor: since ? { updatedOn: since } : null };
+    const saved = since && since > limit ? limit : since;
+    yield { items: fresh, cursor: saved ? { updatedOn: saved } : null };
     if (records.length < PAGE_SIZE) return;
   }
 }

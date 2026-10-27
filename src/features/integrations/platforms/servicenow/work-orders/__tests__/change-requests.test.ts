@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -205,6 +205,58 @@ describe("listChanged", () => {
 
     expect(urls[1].searchParams.get("sysparm_offset")).toBe(String(PAGE_SIZE));
     expect(pages.flatMap((p) => p.items)).toHaveLength(PAGE_SIZE + 1);
+  });
+
+  describe("with a record dated in the future", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date("2026-05-02T10:00:00Z") });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("keeps the cursor behind the start of the sync", async () => {
+      const future = record({
+        sys_id: "f0",
+        sys_updated_on: "2035-08-22 12:30:56",
+      });
+      const { session } = fakeSession([[record(), future]]);
+
+      const pages = await collect(listChanged(session, null));
+
+      expect(pages.at(-1)?.items).toContainEqual(future);
+      expect(pages.at(-1)?.cursor).toEqual({
+        updatedOn: "2026-05-02 09:55:00",
+      });
+    });
+
+    it("pulls back a cursor that is already past the limit", async () => {
+      const future = record({
+        sys_id: "f0",
+        sys_updated_on: "2035-08-22 12:30:56",
+      });
+      const { session } = fakeSession([[future]]);
+
+      const pages = await collect(
+        listChanged(session, { updatedOn: "2035-08-22 12:30:56" }),
+      );
+
+      expect(pages.at(-1)?.cursor).toEqual({
+        updatedOn: "2026-05-02 09:55:00",
+      });
+    });
+
+    it("keeps a cursor that is older than the limit", async () => {
+      const { session } = fakeSession([
+        [record({ sys_updated_on: "2026-05-02 09:54:59" })],
+      ]);
+
+      const pages = await collect(listChanged(session, null));
+
+      expect(pages.at(-1)?.cursor).toEqual({
+        updatedOn: "2026-05-02 09:54:59",
+      });
+    });
   });
 
   it("reports an HTML response instead of failing to parse it", async () => {

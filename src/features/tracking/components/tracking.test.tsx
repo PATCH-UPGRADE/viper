@@ -644,6 +644,18 @@ describe("TrackingList — source column", () => {
     expect(screen.getByText("Armis")).toBeInTheDocument();
   });
 
+  it("shows the service name, not the creator, for a synced ticket with no snapshot", () => {
+    renderWith({
+      sourceLinks: [],
+      sourceLabel: "ServiceNow",
+      creator: { id: "u9", name: "ServiceNow Integration", image: null },
+    });
+    expect(screen.getByText("ServiceNow")).toBeInTheDocument();
+    expect(
+      screen.queryByText("ServiceNow Integration"),
+    ).not.toBeInTheDocument();
+  });
+
   it("falls back to the channel name when sourceLabel is null", () => {
     renderWith({
       sourceLinks: [{ sourceRecord: { channel: "Email" } }],

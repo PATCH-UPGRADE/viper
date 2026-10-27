@@ -277,8 +277,8 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     cell: ({ row }) => {
       const t = row.original;
       const source = t.sourceLinks[0]?.sourceRecord;
-      // No ingested source ⇒ manually created: show the creator.
-      if (!source) {
+      // No ingested source and no label ⇒ manually created: show the creator.
+      if (!source && !t.sourceLabel) {
         return (
           <div className="flex items-center gap-2">
             <UserAvatar user={t.creator} className="size-5 text-[10px]" />
@@ -286,12 +286,13 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
           </div>
         );
       }
-      const Icon = channelIcons[source.channel];
+      // A ticket from an outside source can carry a label without a snapshot.
+      const Icon = source ? channelIcons[source.channel] : BoxIcon;
       return (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Icon className="size-3.5 shrink-0" />
           <span className="text-sm truncate">
-            {t.sourceLabel ?? source.channel}
+            {t.sourceLabel ?? source?.channel}
           </span>
         </div>
       );

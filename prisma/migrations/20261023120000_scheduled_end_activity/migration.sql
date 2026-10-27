@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TicketActivityType" ADD VALUE 'SCHEDULED_END_CHANGED';

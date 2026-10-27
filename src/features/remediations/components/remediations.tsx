@@ -375,7 +375,7 @@ export const RemediationCard = ({
         {(remediation.publishedAt || link) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             {remediation.publishedAt && (
-              <span className="inline-flex items-center gap-1 front-medium text-foreground">
+              <span className="inline-flex items-center gap-1 font-medium text-foreground">
                 <CalendarIcon className="size-3.5 text-muted-foreground" />
                 Released {formatReleaseDate(remediation.publishedAt)}
               </span>

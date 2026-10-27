@@ -2,7 +2,6 @@ import { z } from "zod";
 import { CSV_UPLOAD_DISPLAY_NAME } from "@/features/integrations/platforms/csv-upload/contract";
 import { IssueStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import { isSecurityRelated } from "../remediations/release";
-import { IssueWithRelations } from "../issues/types";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
 export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";

@@ -1,10 +1,10 @@
 import "server-only";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { recordWorkOrderSources } from "@/features/integrations/core/sync/work-order-sources";
 import { recordCreationActivity } from "@/features/tracking/server/activities";
-import { ResourceType, SourceChannel } from "@/generated/prisma";
+import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import type { IntegrationResponse } from "@/lib/schemas";
-import { sourceContentHash } from "@/lib/source-hash";
 import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import {
@@ -121,138 +121,13 @@ async function ingestFleetWorkOrders(
   );
 }
 
-/**
- * Record what each activity looked like on this poll.
- *
- * Snapshots are append-only and deduplicate on `contentHash`, so an unchanged
- * activity costs no write. The mapping owns the snapshots, which keeps the
- * record off the global `(channel, externalId)` unique key that only channels
- * without a mapping use.
- *
- * Fleet cannot filter its activities by change, so every poll carries the whole
- * collection. The work is therefore batched into a fixed number of queries: a
- * per-activity round trip would cost thousands of them an hour to discover that
- * nothing moved.
- */
-async function recordSources(
-  items: FleetWorkOrderItem[],
-  integrationId: string,
-): Promise<void> {
-  if (items.length === 0) return;
-
-  const tickets = await prisma.externalWorkOrderMapping.findMany({
-    where: {
-      integrationId,
-      externalId: { in: items.map((item) => item.externalId) },
-    },
-    select: { externalId: true, itemId: true },
-  });
-  const ticketByExternalId = new Map(
-    tickets.map((t) => [t.externalId, t.itemId]),
-  );
-
-  // An activity the ingest could not land has nothing to attach a snapshot to.
-  const landed = items.filter((item) =>
-    ticketByExternalId.has(item.externalId),
-  );
-  if (landed.length === 0) return;
-
-  const lastSynced = new Date();
-  const existing = await prisma.externalSourceRecordMapping.findMany({
-    where: {
-      integrationId,
-      externalId: { in: landed.map((item) => item.externalId) },
-    },
-    select: { id: true, externalId: true },
-  });
-  const mappingIdByExternalId = new Map(
-    existing.map((mapping) => [mapping.externalId, mapping.id]),
-  );
-
-  const missing = landed.filter(
-    (item) => !mappingIdByExternalId.has(item.externalId),
-  );
-  if (missing.length > 0) {
-    const created =
-      await prisma.externalSourceRecordMapping.createManyAndReturn({
-        data: missing.map((item) => ({
-          integrationId,
-          externalId: item.externalId,
-          lastSynced,
-        })),
-        select: { id: true, externalId: true },
-      });
-    for (const mapping of created) {
-      mappingIdByExternalId.set(mapping.externalId, mapping.id);
-    }
-  }
-  if (existing.length > 0) {
-    await prisma.externalSourceRecordMapping.updateMany({
-      where: { id: { in: existing.map((mapping) => mapping.id) } },
-      data: { lastSynced },
-    });
-  }
-
-  // Newest snapshot per mapping in one query, so the hash comparison below
-  // needs no further round trips.
-  const newest = await prisma.sourceRecord.findMany({
-    where: { mappingId: { in: [...mappingIdByExternalId.values()] } },
-    orderBy: [{ mappingId: "asc" }, { observedAt: "desc" }],
-    distinct: ["mappingId"],
-    select: { mappingId: true, contentHash: true },
-  });
-  const newestHashByMappingId = new Map(
-    newest.map((record) => [record.mappingId, record.contentHash]),
-  );
-
-  const changed: {
-    item: FleetWorkOrderItem;
-    mappingId: string;
-    contentHash: string;
-  }[] = [];
-  for (const item of landed) {
-    const mappingId = mappingIdByExternalId.get(item.externalId);
-    if (!mappingId) continue;
-    const contentHash = sourceContentHash(item.raw, item.body);
-    if (newestHashByMappingId.get(mappingId) === contentHash) continue;
-    changed.push({ item, mappingId, contentHash });
-  }
-  if (changed.length === 0) return;
-
-  const records = await prisma.sourceRecord.createManyAndReturn({
-    data: changed.map(({ item, mappingId, contentHash }) => ({
-      channel: SourceChannel.Integration,
-      mappingId,
-      contentHash,
-      raw: item.raw,
-      markdown: item.body,
-    })),
-    select: { id: true, mappingId: true },
-  });
-  const recordIdByMappingId = new Map(
-    records.map((record) => [record.mappingId, record.id]),
-  );
-
-  await prisma.sourceLink.createMany({
-    data: changed.flatMap(({ item, mappingId }) => {
-      const sourceRecordId = recordIdByMappingId.get(mappingId);
-      const workOrderTicketId = ticketByExternalId.get(item.externalId);
-      if (!sourceRecordId || !workOrderTicketId) return [];
-      return [{ sourceRecordId, workOrderTicketId }];
-    }),
-    skipDuplicates: true,
-  });
-}
-
 export async function syncWorkOrders(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
   const { session } = ctx;
 
   // Keyed by externalId so one activity appearing twice in a response is carried
-  // once. A repeat would otherwise write two identical snapshots, only one of
-  // which gets a SourceLink, because the hash comparison reads the newest
-  // stored record and cannot see a sibling created in the same pass.
+  // once.
   const byExternalId = new Map<string, FleetWorkOrderItem>();
   let cursor: Cursor | null = null;
   for await (const page of listChanged(session, ctx.cursor)) {
@@ -266,7 +141,7 @@ export async function syncWorkOrders(
 
   await reconcileProvisionalMappings(items, ctx.integrationId);
   const response = await ingestFleetWorkOrders(items, ctx.integrationId);
-  await recordSources(items, ctx.integrationId);
+  await recordWorkOrderSources(items, ctx.integrationId);
 
   // Throwing makes finalize-sync record Error.
   if (response.shouldRetry) {

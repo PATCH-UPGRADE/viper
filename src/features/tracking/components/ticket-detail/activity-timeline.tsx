@@ -1,6 +1,6 @@
 "use client";
 
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import {
   ActivityTimeline,
   actorFromUser,
@@ -26,6 +26,14 @@ import { categoryLabels, StatusChip } from "./shared";
 
 type Comment = TicketDetail["comments"][number];
 type Activity = TicketDetail["activities"][number];
+
+const DATE_AND_TIME = "MMM d, yyyy 'at' h:mm a";
+
+// "from 9:00 AM to 10:00 AM on Oct 26, 2026", or full dates on both sides.
+const timeChange = (from: Date, to: Date) =>
+  isSameDay(from, to)
+    ? `from ${format(from, "h:mm a")} to ${format(to, "h:mm a")} on ${format(to, "MMM d, yyyy")}`
+    : `from ${format(from, DATE_AND_TIME)} to ${format(to, DATE_AND_TIME)}`;
 
 const SetField = ({ label, value }: { label: string; value: string }) => (
   <span>
@@ -190,13 +198,7 @@ const renderActivity = (a: Activity): React.ReactNode => {
       if (!from && to)
         return <>scheduled for {format(to, "MMM d, yyyy 'at' h:mm a")}</>;
       if (from && !to) return "cleared the scheduled time";
-      if (from && to)
-        return (
-          <>
-            rescheduled from {format(from, "MMM d")} to{" "}
-            {format(to, "MMM d, yyyy 'at' h:mm a")}
-          </>
-        );
+      if (from && to) return `rescheduled ${timeChange(from, to)}`;
       return "changed the scheduled time";
     }
     case "SCHEDULED_END_CHANGED": {
@@ -205,13 +207,7 @@ const renderActivity = (a: Activity): React.ReactNode => {
       if (!from && to)
         return <>set the end time to {format(to, "MMM d, yyyy 'at' h:mm a")}</>;
       if (from && !to) return "cleared the end time";
-      if (from && to)
-        return (
-          <>
-            changed the end time from {format(from, "MMM d")} to{" "}
-            {format(to, "MMM d, yyyy 'at' h:mm a")}
-          </>
-        );
+      if (from && to) return `changed the end time ${timeChange(from, to)}`;
       return "changed the end time";
     }
     case "SUMMARY_CHANGED":

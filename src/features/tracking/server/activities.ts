@@ -174,10 +174,20 @@ export async function recordUpdateActivities(
       data: { from: before.scheduledAt, to: input.scheduledAt ?? null },
     });
   }
+  // An end that moved by the same amount as the start is part of one
+  // reschedule, and the SCHEDULED_AT_CHANGED entry already shows it.
+  const endMovedWithStart =
+    before.scheduledAt &&
+    before.scheduledEndTime &&
+    input.scheduledAt &&
+    input.scheduledEndTime &&
+    input.scheduledEndTime.getTime() - before.scheduledEndTime.getTime() ===
+      input.scheduledAt.getTime() - before.scheduledAt.getTime();
   if (
     input.scheduledEndTime !== undefined &&
     (input.scheduledEndTime?.getTime() ?? null) !==
-      (before.scheduledEndTime?.getTime() ?? null)
+      (before.scheduledEndTime?.getTime() ?? null) &&
+    !endMovedWithStart
   ) {
     rows.push({
       type: "SCHEDULED_END_CHANGED",

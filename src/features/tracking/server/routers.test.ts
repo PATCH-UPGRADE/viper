@@ -2296,6 +2296,30 @@ describe("activity writes", () => {
     ]);
   });
 
+  it("writes only SCHEDULED_AT_CHANGED when the end moves with the start", async () => {
+    const start = new Date("2026-06-01T09:00:00Z");
+    const end = new Date("2026-06-01T10:30:00Z");
+    const newStart = new Date("2026-06-02T13:00:00Z");
+    const newEnd = new Date("2026-06-02T14:30:00Z");
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeUpdateBefore({ scheduledAt: start, scheduledEndTime: end }),
+    );
+
+    await setup().update({
+      id: "t1",
+      scheduledAt: newStart,
+      scheduledEndTime: newEnd,
+    });
+
+    const [arg] = mockPrisma.ticketActivity.createMany.mock.calls[0];
+    expect(arg.data).toEqual([
+      expect.objectContaining({
+        type: "SCHEDULED_AT_CHANGED",
+        data: { from: start, to: newStart },
+      }),
+    ]);
+  });
+
   it("writes no SCHEDULED_END_CHANGED row when the end time is unchanged", async () => {
     const start = new Date("2026-06-01T09:00:00Z");
     const end = new Date("2026-06-01T10:30:00Z");

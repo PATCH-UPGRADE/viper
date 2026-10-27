@@ -1428,22 +1428,38 @@ describe("TicketDetailContent — view mode", () => {
 
   it.each([
     [
+      "SCHEDULED_END_CHANGED",
       { from: new Date(2026, 5, 1, 10, 30), to: new Date(2026, 5, 2, 14, 30) },
-      /changed the end time from Jun 1 to Jun 2, 2026 at 2:30 PM/,
+      /changed the end time from Jun 1, 2026 at 10:30 AM to Jun 2, 2026 at 2:30 PM/,
     ],
     [
+      "SCHEDULED_END_CHANGED",
+      { from: new Date(2026, 5, 1, 10, 30), to: new Date(2026, 5, 1, 11, 0) },
+      /changed the end time from 10:30 AM to 11:00 AM on Jun 1, 2026/,
+    ],
+    [
+      "SCHEDULED_END_CHANGED",
       { from: null, to: new Date(2026, 5, 2, 14, 30) },
       /set the end time to Jun 2, 2026 at 2:30 PM/,
     ],
-    [{ from: new Date(2026, 5, 1, 10, 30), to: null }, /cleared the end time/],
-  ])("renders a SCHEDULED_END_CHANGED entry for %o", (data, text) => {
+    [
+      "SCHEDULED_END_CHANGED",
+      { from: new Date(2026, 5, 1, 10, 30), to: null },
+      /cleared the end time/,
+    ],
+    [
+      "SCHEDULED_AT_CHANGED",
+      { from: new Date(2026, 5, 1, 9, 0), to: new Date(2026, 5, 1, 13, 0) },
+      /rescheduled from 9:00 AM to 1:00 PM on Jun 1, 2026/,
+    ],
+  ] as const)("renders a %s entry for %o", (type, data, text) => {
     renderDetail({
       activities: [
         {
           id: "e1",
           ticketId: "ticket-1",
           userId: "u1",
-          type: "SCHEDULED_END_CHANGED",
+          type,
           data,
           createdAt: new Date("2026-05-15T12:00:00Z"),
           user: { id: "u1", name: "Alice", image: null, integrationUser: null },
@@ -1451,7 +1467,7 @@ describe("TicketDetailContent — view mode", () => {
       ],
     });
 
-    const entry = screen.getByLabelText("Activity: SCHEDULED_END_CHANGED");
+    const entry = screen.getByLabelText(`Activity: ${type}`);
     expect(within(entry).getByText(text)).toBeInTheDocument();
   });
 });

@@ -5,6 +5,8 @@ import { TRPCError } from "@trpc/server";
 import type { TransactionClient } from "@/lib/db";
 
 export const CVE_PATTERN = /^CVE-\d{4}-\d{4,}$/i;
+/** Every stored CVE `value` starts with this: values are upper-cased. */
+export const CVE_PREFIX = "CVE-";
 const GHSA_PATTERN = /^GHSA(-[0-9a-z]{4}){3}$/i;
 const VIPER_PREFIX = "VIPER-";
 

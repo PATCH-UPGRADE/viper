@@ -7,7 +7,7 @@ type IdentifierRow = {
   vulnerabilityId: string;
 };
 
-const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
+const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
   const identifiers: IdentifierRow[] = [];
   const SUBMITTED_AT = new Date("2026-10-21T12:00:00.000Z");
   const matches = (
@@ -89,6 +89,7 @@ const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
     db,
     identifiers,
     sendWebhooks: vi.fn(async () => {}),
+    send: vi.fn(async () => undefined),
     SUBMITTED_AT,
   };
 });
@@ -96,6 +97,7 @@ const { db, identifiers, sendWebhooks, SUBMITTED_AT } = vi.hoisted(() => {
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: db }));
 vi.mock("@/lib/prisma-client-extensions", () => ({ sendWebhooks }));
+vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 
 import {
   createVulnerabilityRecord,
@@ -225,6 +227,30 @@ describe("createVulnerabilityRecord", () => {
     expect(db.vulnerabilityRecord.create.mock.calls[0][0].data).toMatchObject({
       vulnerabilityId: "v-1",
     });
+  });
+
+  it("requests enrichment once for a vulnerability it creates", async () => {
+    createsVulnerability("v-1");
+
+    await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({
+      name: "vulnerability/enrich.requested",
+      data: { vulnerabilityId: "v-1" },
+    });
+  });
+
+  it("doesn't request enrichment when the vulnerability already exists", async () => {
+    identifiers.push({
+      value: "CVE-2024-1234",
+      displayValue: "CVE-2024-1234",
+      vulnerabilityId: "v-1",
+    });
+
+    await createVulnerabilityRecord(ta3(), { actingUserId: "user-2" });
+
+    expect(send).not.toHaveBeenCalled();
   });
 
   it("joins the winner when a concurrent request created the vulnerability first", async () => {

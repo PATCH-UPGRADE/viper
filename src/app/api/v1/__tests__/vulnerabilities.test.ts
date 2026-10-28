@@ -177,6 +177,16 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
     // No identifiers given, so the vulnerability gets a VIPER ID.
     expect(detailRes.body.displayId).toMatch(/^VIPER-/);
     expect(detailRes.body.description).toBe(payload.details);
+    expect(detailRes.body.records).toEqual([
+      expect.objectContaining({
+        id: recordId,
+        source: "TA3",
+        sourceId: payload.sourceId,
+        user: expect.objectContaining({ id: res.body.userId }),
+        metrics: [expect.objectContaining({ type: "CVSS_V3_1", score: 8.1 })],
+        ta3Submission: expect.objectContaining({ recordId, vulnerabilityId }),
+      }),
+    ]);
 
     // One issue per affected device group, not one per asset.
     const foundIssue = await prisma.issue.findMany({
@@ -264,6 +274,23 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
       .set(authHeader);
     expect(detailRes.body.displayId).toBe(cve);
     expect(detailRes.body.deviceGroupMatchings.length).toBe(2);
+    expect(detailRes.body.identifiers).toContainEqual(
+      expect.objectContaining({ value: cve }),
+    );
+    expect(detailRes.body.records.map((r: { id: string }) => r.id)).toEqual([
+      first.body.id,
+      second.body.id,
+    ]);
+
+    // Search matches identifiers, case-insensitively.
+    const searchRes = await request(BASE_URL)
+      .get("/vulnerabilities")
+      .query({ search: cve.toLowerCase() })
+      .set(authHeader);
+    expect(searchRes.status).toBe(200);
+    expect(searchRes.body.items.map((v: { id: string }) => v.id)).toContain(
+      first.body.vulnerabilityId,
+    );
 
     // Not the last record any more: the vulnerability stays.
     const deleteRes = await request(BASE_URL)

@@ -813,7 +813,7 @@ enum MetricType {
   CVSS_V4_0
   QUALITATIVE // plain "HIGH" from a tool or team, with no vector
   EPSS // score = probability, percentile set
-  KEV // present = in the KEV catalog
+  KEV // flag: true = in the KEV catalog, false = checked and not listed
 }
 
 /// Every ID a vulnerability is known by, one row per ID. The unique constraint makes a CVE ID
@@ -902,6 +902,7 @@ model Metric {
   score      Decimal?   @db.Decimal(7, 5) // CVSS base 0–10, EPSS probability 0–1
   percentile Decimal?   @db.Decimal(6, 5) // EPSS percentile
   severity   Severity?
+  flag       Boolean? // yes/no, currently used for just KEV
   // Consider adding: assertedBy String? // Who inside the source made the assessment: "nvd@nist.gov", a CNA, a user id.
   // Consider adding: assessedAt DateTime?
   // Consider adding: extra      Json? // environmental/threat metrics, KEV dates, etc.

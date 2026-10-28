@@ -40,6 +40,7 @@ import { type AssetWithIssueRelations, locationSchema } from "../types";
 import {
   getAssetDeviceTypeLabel,
   getAssetTitle,
+  securityRemediationsOf,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
@@ -350,18 +351,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
 // ============================================================================
 
 function RemediationsSection({ asset }: { asset: AssetWithIssueRelations }) {
-  const seen = new Set<string>();
-  const remediations: AssetWithIssueRelations["issues"][number]["vulnerability"]["remediations"][number][] =
-    [];
-
-  for (const issue of asset.issues) {
-    for (const rem of issue.vulnerability.remediations) {
-      if (!seen.has(rem.id)) {
-        seen.add(rem.id);
-        remediations.push(rem);
-      }
-    }
-  }
+  const remediations = securityRemediationsOf(asset.issues);
 
   if (remediations.length === 0) {
     return (
@@ -586,9 +576,7 @@ export function AssetDashboardDrawer({
 }: AssetDashboardDrawerProps) {
   const { userRole } = useChatUI();
 
-  const uniqueRemediationCount = new Set(
-    asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
-  ).size;
+  const uniqueRemediationCount = securityRemediationsOf(asset.issues).length;
 
   const suggestedQuestions: Partial<Record<UserRole, SuggestedQuestion[]>> = {
     CISO: [

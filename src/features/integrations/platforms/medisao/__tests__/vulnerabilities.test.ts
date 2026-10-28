@@ -19,7 +19,6 @@ const { normalizeIdentifier, resolveOrMintVulnerabilities } = await import(
 const resolve = (names: string[]) =>
   resolveOrMintVulnerabilities({
     names,
-    integrationUserId: "shadow-user",
     deviceGroupMatchingId: "matching-1",
   });
 
@@ -73,16 +72,13 @@ describe("resolveOrMintVulnerabilities", () => {
   it("mints an unknown CVE as an OTHER record on the matching", async () => {
     const { ids, created } = await resolve(["CVE-2026-0002"]);
 
-    expect(records.createVulnerabilityRecord).toHaveBeenCalledWith(
-      {
-        source: "OTHER",
-        sourceId: "CVE-2026-0002",
-        identifiers: ["CVE-2026-0002"],
-        deviceGroupMatchingIds: ["matching-1"],
-        userId: null,
-      },
-      { actingUserId: "shadow-user" },
-    );
+    expect(records.createVulnerabilityRecord).toHaveBeenCalledWith({
+      source: "OTHER",
+      sourceId: "CVE-2026-0002",
+      identifiers: ["CVE-2026-0002"],
+      deviceGroupMatchingIds: ["matching-1"],
+      userId: null,
+    });
     expect(ids.get("CVE-2026-0002")).toBe("minted-CVE-2026-0002");
     expect(created).toBe(1);
   });

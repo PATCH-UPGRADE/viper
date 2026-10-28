@@ -429,18 +429,20 @@ export const assetsRouter = createTRPCRouter({
 
     for (const effectiveIssues of effectiveIssuesByAssetId.values()) {
       for (const issue of effectiveIssues) {
-        const severityCounts = counts[issue.vulnerability.severity];
+        // An unrated vulnerability counts toward the totals but no severity bucket.
+        const { severity } = issue.vulnerability;
+        const severityCounts = severity ? counts[severity] : null;
         const hasRemediation = issue.vulnerability._count.remediations > 0;
 
         if (issue.status === IssueStatus.AFFECTED) {
-          severityCounts.active++;
+          if (severityCounts) severityCounts.active++;
           totals.active++;
           if (hasRemediation) {
-            severityCounts.activeWithRemediations++;
+            if (severityCounts) severityCounts.activeWithRemediations++;
             totals.activeWithRemediations++;
           }
         } else if (issue.status === IssueStatus.FIXED) {
-          severityCounts.remediated++;
+          if (severityCounts) severityCounts.remediated++;
           totals.remediated++;
         }
       }

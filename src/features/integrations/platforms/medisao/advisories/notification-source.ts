@@ -33,7 +33,7 @@ const SOURCE_LABEL = "MedISAO";
  */
 export const linkAdvisoryEntities =
   (advisory: MedIsaoAdvisoryItem): LinkEntities =>
-  (step, notificationId, ctx) =>
+  (step, notificationId) =>
     step.run("link-channel-entities", async () => {
       if (!notificationId) {
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
@@ -68,31 +68,8 @@ export const linkAdvisoryEntities =
         update: { confidence: "Matched", reasonWhy },
       });
 
-      if (!ctx) {
-        throw new Error(
-          "A MedISAO advisory is linked without its SourceRecord",
-        );
-      }
-      const { mapping } = await prisma.sourceRecord.findUniqueOrThrow({
-        where: { id: ctx.sourceId },
-        select: {
-          mapping: {
-            select: {
-              integrationId: true,
-              integration: { select: { integrationUserId: true } },
-            },
-          },
-        },
-      });
-      if (!mapping) {
-        throw new Error(
-          `SourceRecord ${ctx.sourceId} has no integration mapping`,
-        );
-      }
-
       const { ids, created } = await resolveOrMintVulnerabilities({
         names: advisory.vulnerabilityIds,
-        integrationUserId: mapping.integration.integrationUserId,
         deviceGroupMatchingId,
       });
 

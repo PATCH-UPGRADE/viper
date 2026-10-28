@@ -10,7 +10,6 @@ const prismaMock = {
     updateMany: vi.fn(),
   },
   vulnerabilityIdentifier: { findMany: vi.fn() },
-  sourceRecord: { findUniqueOrThrow: vi.fn() },
 };
 vi.mock("@/lib/db", () => ({ default: prismaMock }));
 
@@ -68,12 +67,6 @@ beforeEach(() => {
       vulnerabilityCreated: true,
     }),
   );
-  prismaMock.sourceRecord.findUniqueOrThrow.mockResolvedValue({
-    mapping: {
-      integrationId: "int-1",
-      integration: { integrationUserId: "shadow-user" },
-    },
-  });
   resolveMatchingId.mockResolvedValue("matching-1");
 });
 
@@ -145,7 +138,6 @@ describe("the advisory linker", () => {
         sourceId: "CVE-2026-0002",
         deviceGroupMatchingIds: ["matching-1"],
       }),
-      { actingUserId: "shadow-user" },
     );
     const [[{ data: links, skipDuplicates }]] =
       prismaMock.notificationVulnerabilityMapping.createMany.mock.calls;

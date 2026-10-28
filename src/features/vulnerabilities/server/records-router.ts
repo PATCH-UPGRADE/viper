@@ -31,7 +31,6 @@ async function readRecord(id: string) {
 async function createRecord(input: VulnerabilityRecordInput, userId: string) {
   const { record } = await createVulnerabilityRecord(
     await recordDataFromInput(input, { userId }),
-    { actingUserId: userId },
   );
   return readRecord(record.id);
 }
@@ -90,7 +89,7 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
         tags: ["Vulnerabilities"],
         summary: "Update Vulnerability Record",
         description:
-          "Update a record. Fields left out are unchanged; metrics replace the record's metrics, and devices are added to the vulnerability. A record created through the API can only be updated by the user who created it.",
+          "Update a record. Fields left out are unchanged; metrics replace the record's metrics, and devices are added to the vulnerability. A record can only be updated by the user who created it; records an integration synced belong to that integration.",
       },
     })
     .output(vulnerabilityRecordResponseSchema)
@@ -120,7 +119,7 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
         tags: ["Vulnerabilities"],
         summary: "Delete Vulnerability Record",
         description:
-          "Delete a record. Deleting a vulnerability's last record (other than EPSS and KEV ones) deletes the vulnerability too. A record created through the API can only be deleted by the user who created it.",
+          "Delete a record. Deleting a vulnerability's last record (other than EPSS and KEV ones) deletes the vulnerability too. A record can only be deleted by the user who created it; records an integration synced belong to that integration.",
       },
     })
     .output(vulnerabilityRecordDeleteResponseSchema)

@@ -62,7 +62,7 @@ const newestFirst = <T extends { updatedAt: Date }>(metrics: T[]): T[] =>
 /**
  * Every CVSS metric that has a score, newest first. The first is the one a vulnerability shows:
  * newest is the latest updatedAt, the same rule enrichment and the vulnerability's severity use.
- * TODO: VW-540 replace "newest CVSS wins" once there's a precedence rule between sources.
+ * TODO: VW-585 replace "newest CVSS wins" once there's a precedence rule between sources.
  */
 export function cvssScores<M extends MetricResponse>(
   metrics: M[],

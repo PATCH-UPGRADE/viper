@@ -57,11 +57,7 @@ describe("every include that selects mappings still resolves", () => {
     const resource = ResourceType.Vulnerability;
     expect(
       mappingPaths("Vulnerability", { include: vulnerabilityInclude }),
-    ).toEqual([
-      { path: ["records", "externalMappings"], resource },
-      // TODO: VW-540 drop the vulnerability-level path with the legacy mappings.
-      { path: ["externalMappings"], resource },
-    ]);
+    ).toEqual([{ path: ["records", "externalMappings"], resource }]);
   });
 
   it("vulnerabilityByPriorityInclude", () => {

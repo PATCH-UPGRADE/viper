@@ -31,8 +31,7 @@ const errorMessage = (error: unknown) =>
  * Not the generic processIntegrationSync: records go through the record service, which finds the
  * vulnerability and opens Issues for new devices.
  *
- * @param integrationUserId The integration's shadow user. Integration records have no owner; it
- *   only fills the legacy Vulnerability.userId column.
+ * @param integrationUserId The integration's shadow user, who owns created VulnerabilityRecord's
  * @param options.source Every record's source, for integrations with one (the AI crawler).
  *   Otherwise each item's source follows the API rules.
  */
@@ -92,9 +91,8 @@ export async function processVulnerabilityIntegrationSync(
       const { record } = await createVulnerabilityRecord(
         await recordDataFromInput(recordInput, {
           source: options.source,
-          userId: null,
+          userId: integrationUserId,
         }),
-        { actingUserId: integrationUserId },
       );
       try {
         await prisma.externalVulnerabilityRecordMapping.create({

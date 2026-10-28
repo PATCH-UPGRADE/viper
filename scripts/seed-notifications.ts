@@ -1,8 +1,16 @@
+// Run with the server-only stub, since it creates vulnerabilities through the record service:
+//   npx tsx --require ./prisma/seeds/stub-server-only.cjs scripts/seed-notifications.ts
 import type { HospitalImpact } from "@/features/inbox/types";
+import { normalizeIdentifier } from "@/features/vulnerabilities/server/identity";
+import {
+  createVulnerabilityRecord,
+  type VulnerabilityRecordData,
+} from "@/features/vulnerabilities/server/records";
 import {
   type AssetStatus,
   ConfidenceLevel,
   IssueStatus,
+  MetricType,
   NotAffectedJustification,
   NotificationType,
   Priority,
@@ -11,6 +19,7 @@ import {
   SourceChannel,
   Tlp,
   VersionStatus,
+  VulnerabilitySource,
 } from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
 import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
@@ -20,6 +29,32 @@ import prisma from "../src/lib/db";
 const SEED_USER = {
   email: "user@example.com",
 };
+
+/**
+ * The vulnerability that holds the record's first identifier, or a new one created through the
+ * record service. The service copies narrative and impact only from a TA3 submission, so a
+ * vendor advisory's are written onto the vulnerability here.
+ */
+async function findOrCreateAdvisoryVulnerability(
+  record: VulnerabilityRecordData,
+  curated: { narrative: string; impact: string },
+) {
+  const value = normalizeIdentifier(record.identifiers?.[0] ?? "")?.value;
+  const existing = value
+    ? await prisma.vulnerability.findFirst({
+        where: { identifiers: { some: { value } } },
+        select: { id: true },
+      })
+    : null;
+  if (existing) return existing;
+
+  const { vulnerabilityId } = await createVulnerabilityRecord(record);
+  return prisma.vulnerability.update({
+    where: { id: vulnerabilityId },
+    data: curated,
+    select: { id: true },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Canonical entity helpers
@@ -164,46 +199,31 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       },
     }));
 
-  const vulnerability =
-    (await prisma.vulnerability.findFirst({
-      where: { cveId: "CVE-2024-52334" },
-    })) ??
-    (await prisma.vulnerability.create({
-      data: {
-        cveId: "CVE-2024-52334",
-        // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
-        // vulnerability by its CVE and would create a duplicate. Create it through that instead.
-        displayId: "CVE-2024-52334",
-        severity: Severity.Medium,
-        cvssScore: 5.3,
-        cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
-        description:
-          "syngo.plaza VB30E contains an insecure password encryption vulnerability that could allow an attacker to extract original passwords and might gain unauthorized access.",
-        narrative:
-          "The affected application does not encrypt passwords properly. An attacker who can read the stored credential material can recover the original passwords and use them to authenticate as a legitimate user.",
-        impact:
-          "Unauthorized access to the syngo.plaza PACS system used to display, process, and report on diagnostic images, including mammography.",
-        userId,
-        sarif: {
-          version: "2.1.0",
-          runs: [
-            {
-              tool: { driver: { name: "Siemens Healthineers PSIRT" } },
-              results: [
-                {
-                  ruleId: "CVE-2024-52334",
-                  level: "warning",
-                  message: {
-                    text: "Insecure password encryption in syngo.plaza VB30E (SSA-016040)",
-                  },
-                },
-              ],
-            },
-          ],
+  const vulnerability = await findOrCreateAdvisoryVulnerability(
+    {
+      source: VulnerabilitySource.VENDOR_ADVISORY,
+      sourceId: "SSA-016040",
+      identifiers: ["CVE-2024-52334"],
+      details:
+        "syngo.plaza VB30E contains an insecure password encryption vulnerability that could allow an attacker to extract original passwords and might gain unauthorized access.",
+      metrics: [
+        {
+          type: MetricType.CVSS_V3_1,
+          score: 5.3,
+          vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+          severity: Severity.Medium,
         },
-        deviceGroupMatchings: { connect: { id: matching.id } },
-      },
-    }));
+      ],
+      deviceGroupMatchingIds: [matching.id],
+      userId: null,
+    },
+    {
+      narrative:
+        "The affected application does not encrypt passwords properly. An attacker who can read the stored credential material can recover the original passwords and use them to authenticate as a legitimate user.",
+      impact:
+        "Unauthorized access to the syngo.plaza PACS system used to display, process, and report on diagnostic images, including mammography.",
+    },
+  );
 
   const remediation =
     (await prisma.remediation.findFirst({
@@ -590,49 +610,31 @@ async function seedDeserializationScenario(userId: string) {
     matchings.push(await upsertDeserializationMatching(spec));
   }
 
-  const vulnerability =
-    (await prisma.vulnerability.findFirst({
-      where: { cveId: "CVE-2022-29875" },
-    })) ??
-    (await prisma.vulnerability.create({
-      data: {
-        cveId: "CVE-2022-29875",
-        // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
-        // vulnerability by its CVE and would create a duplicate. Create it through that instead.
-        displayId: "CVE-2022-29875",
-        severity: Severity.Critical,
-        cvssScore: 9.8,
-        cvssVector:
-          "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C",
-        description:
-          "The application deserialises untrusted data without sufficient validations, which could result in an arbitrary deserialization. This could allow an unauthenticated attacker to execute code in the affected system if ports 32912/tcp or 32914/tcp are reachable.",
-        narrative:
-          "An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on an affected system can send a crafted serialized payload. Because the application deserializes untrusted data without validation (CWE-502), the payload is instantiated and can execute arbitrary code under the syngo platform's privileges.",
-        impact:
-          "Remote code execution on imaging systems (MRI, CT, PET/CT, SPECT/CT, mammography) and the syngo.via viewing/reporting platform, potentially disrupting diagnostic imaging workflows across radiology and nuclear medicine.",
-        userId,
-        sarif: {
-          version: "2.1.0",
-          runs: [
-            {
-              tool: { driver: { name: "Siemens Healthineers PSIRT" } },
-              results: [
-                {
-                  ruleId: "CVE-2022-29875",
-                  level: "error",
-                  message: {
-                    text: "Deserialization of untrusted data in Siemens Healthineers syngo platform (SSA-220609)",
-                  },
-                },
-              ],
-            },
-          ],
+  const vulnerability = await findOrCreateAdvisoryVulnerability(
+    {
+      source: VulnerabilitySource.VENDOR_ADVISORY,
+      sourceId: "SSA-220609",
+      identifiers: ["CVE-2022-29875"],
+      details:
+        "The application deserialises untrusted data without sufficient validations, which could result in an arbitrary deserialization. This could allow an unauthenticated attacker to execute code in the affected system if ports 32912/tcp or 32914/tcp are reachable.",
+      metrics: [
+        {
+          type: MetricType.CVSS_V3_1,
+          score: 9.8,
+          vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C",
+          severity: Severity.Critical,
         },
-        deviceGroupMatchings: {
-          connect: matchings.map((m) => ({ id: m.id })),
-        },
-      },
-    }));
+      ],
+      deviceGroupMatchingIds: matchings.map((m) => m.id),
+      userId: null,
+    },
+    {
+      narrative:
+        "An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on an affected system can send a crafted serialized payload. Because the application deserializes untrusted data without validation (CWE-502), the payload is instantiated and can execute arbitrary code under the syngo platform's privileges.",
+      impact:
+        "Remote code execution on imaging systems (MRI, CT, PET/CT, SPECT/CT, mammography) and the syngo.via viewing/reporting platform, potentially disrupting diagnostic imaging workflows across radiology and nuclear medicine.",
+    },
+  );
 
   // Assets, keyed to their exact-version DeviceGroups. Sequential for the same
   // reason as the matchings: multiple assets share a product/version DeviceGroup

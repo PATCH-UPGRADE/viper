@@ -56,10 +56,18 @@ describe("vulnerabilitySortClauses", () => {
   // EPSS and KEV live in metrics, so they sort in memory, not in an orderBy.
   it("builds clauses for columns only, leaving EPSS and KEV out", () => {
     expect(vulnerabilitySortClauses("severity,-epss")).toEqual([
-      { severity: "asc" },
+      { severity: { sort: "asc", nulls: "last" } },
     ]);
     expect(vulnerabilitySortClauses("-inKEV,priority")).toEqual([
       { priority: "asc" },
+    ]);
+  });
+
+  // Postgres puts nulls first on a descending sort; an unrated row is never the answer.
+  it("sorts unrated severity and a missing description last both ways", () => {
+    expect(vulnerabilitySortClauses("-severity,description")).toEqual([
+      { severity: { sort: "desc", nulls: "last" } },
+      { description: { sort: "asc", nulls: "last" } },
     ]);
   });
 
@@ -90,7 +98,7 @@ describe("vulnerabilities.getManyByAsset and getMany sort", () => {
 
     const [args] = mockPrisma.vulnerability.findMany.mock.calls[0];
     expect(args.orderBy).toEqual([
-      { severity: "asc" },
+      { severity: { sort: "asc", nulls: "last" } },
       { updatedAt: "desc" },
       { id: "asc" },
     ]);
@@ -110,7 +118,7 @@ describe("vulnerabilities.getManyByAsset and getMany sort", () => {
 
     const [args] = mockPrisma.vulnerability.findMany.mock.calls[0];
     expect(args.orderBy).toEqual([
-      { severity: "desc" },
+      { severity: { sort: "desc", nulls: "last" } },
       { updatedAt: "desc" },
       { id: "asc" },
     ]);

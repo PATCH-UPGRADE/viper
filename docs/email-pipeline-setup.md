@@ -101,7 +101,7 @@ The pipeline makes several OpenAI calls (relevance triage, classification, entit
 ## 7. Prepare the hospital environment (optional)
 
 ```bash
-npx tsx scripts/seed-advisory-environment.ts
+npx tsx --require ./prisma/seeds/stub-server-only.cjs scripts/seed-advisory-environment.ts
 ```
 
 Seeds the assets, device groups and vulnerabilities for two Siemens Healthineers advisories so the VEX, triage and mitigation agents have something real to link to. **Wipes all notifications** — it's local-only and creates no notification itself.

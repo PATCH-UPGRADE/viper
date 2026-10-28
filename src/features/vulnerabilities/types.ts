@@ -283,31 +283,15 @@ export const vulnerabilityResponseSchema = z.object({
   description: z.string().nullable(),
   narrative: z.string().nullable(),
   impact: z.string().nullable(),
-  severity: severitySchema,
+  severity: severitySchema.nullable(), // null when no record rates it
   identifiers: z.array(vulnerabilityIdentifierResponseSchema),
   // TODO: VW-541 show metrics per product (Affected) instead of per record
   records: z.array(vulnerabilityRecordWithUserResponseSchema),
+  // TODO: VW-541 replaced by Affected
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   createdAt: z.date(),
   updatedAt: z.date(),
   notes: z.array(scopedNoteSchema).optional(),
-
-  // <Getting removed in VW-540>
-  // Legacy flat fields, kept until the UI and other consumers read identifiers and records.
-  cveId: z.string().nullable(),
-  cvssScore: z.number().nullable(),
-  cvssVector: z.string().nullable(),
-  epss: z.number().nullable(),
-  updatedEpss: z.date().nullable(),
-  inKEV: z.boolean(),
-  updatedInKev: z.date().nullable(),
-  sarif: z.any(), // JSON data - Prisma JsonValue type
-  exploitUri: z.string().nullable(),
-  affectedComponents: z.array(z.string()),
-  userId: z.string(),
-  user: userSchema,
-  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
-  externalMappings: z.array(externalMappingResponseSchema),
-  // </Getting removed in VW-540>
 });
 export type VulnerabilityResponse = z.infer<typeof vulnerabilityResponseSchema>;
 
@@ -341,10 +325,8 @@ export const vulnerabilityInclude = {
     include: recordWithUserInclude,
     orderBy: { createdAt: "asc" },
   },
-  // TODO: VW-540 legacy relations, removed with the flat fields above
-  user: userIncludeSelect,
+  // TODO: VW-541 replaced by Affected
   deviceGroupMatchings: deviceGroupMatchingInclude,
-  externalMappings: externalMappingSelect,
 } satisfies Prisma.VulnerabilityInclude;
 
 /** A vulnerability's records with their owners, Decimals converted to numbers. */
@@ -370,25 +352,6 @@ export function toVulnerabilityResponse(
     records: toRecordsWithUser(vulnerability.records),
   };
 }
-
-/** Legacy columns the prioritized view must not read. */
-// TODO: VW-540 delete once the columns are dropped.
-export const LEGACY_VULNERABILITY_OMIT = {
-  cveId: true,
-  cvssScore: true,
-  cvssVector: true,
-  epss: true,
-  updatedEpss: true,
-  inKEV: true,
-  updatedInKev: true,
-  sarif: true,
-  exploitUri: true,
-  affectedComponents: true,
-  userId: true,
-  alohaStatus: true,
-  alohaLog: true,
-  deviceArtifactId: true,
-} satisfies Prisma.VulnerabilityOmit;
 
 export const vulnerabilityByPriorityInclude = {
   records: {
@@ -425,7 +388,6 @@ export const vulnerabilityByPriorityInclude = {
 export function toPrioritizedVulnerability(
   vulnerability: Prisma.VulnerabilityGetPayload<{
     include: typeof vulnerabilityByPriorityInclude;
-    omit: typeof LEGACY_VULNERABILITY_OMIT;
   }>,
 ) {
   return {

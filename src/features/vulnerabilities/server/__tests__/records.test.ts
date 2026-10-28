@@ -144,9 +144,7 @@ describe("createVulnerabilityRecord", () => {
   it("creates a vulnerability for an unknown CVE, with its record, metric and submission", async () => {
     createsVulnerability("v-1");
 
-    const result = await createVulnerabilityRecord(ta3(), {
-      actingUserId: "user-1",
-    });
+    const result = await createVulnerabilityRecord(ta3());
 
     expect(result).toMatchObject({
       vulnerabilityId: "v-1",
@@ -162,10 +160,6 @@ describe("createVulnerabilityRecord", () => {
       narrative: "How it's exploited",
       impact: "Pumps stop",
       severity: "Critical",
-      cveId: "CVE-2024-1234",
-      cvssScore: 9.8,
-      sarif: SARIF,
-      userId: "user-1",
     });
 
     const [{ data: record }] = db.vulnerabilityRecord.create.mock.calls[0];
@@ -183,7 +177,7 @@ describe("createVulnerabilityRecord", () => {
   it("attaches the devices and opens their baseline Issues", async () => {
     createsVulnerability("v-1");
 
-    await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
+    await createVulnerabilityRecord(ta3());
 
     const [{ data }] = db.vulnerability.update.mock.calls[0];
     expect(data.deviceGroupMatchings).toEqual({
@@ -215,7 +209,6 @@ describe("createVulnerabilityRecord", () => {
 
     const result = await createVulnerabilityRecord(
       ta3({ identifiers: ["CVE-2024-1234", "GHSA-abcd-efgh-ijkl"] }),
-      { actingUserId: "user-2" },
     );
 
     expect(result).toMatchObject({
@@ -235,7 +228,7 @@ describe("createVulnerabilityRecord", () => {
   it("requests enrichment once for a vulnerability it creates", async () => {
     createsVulnerability("v-1");
 
-    await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
+    await createVulnerabilityRecord(ta3());
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith({
@@ -251,7 +244,7 @@ describe("createVulnerabilityRecord", () => {
       vulnerabilityId: "v-1",
     });
 
-    await createVulnerabilityRecord(ta3(), { actingUserId: "user-2" });
+    await createVulnerabilityRecord(ta3());
 
     expect(send).not.toHaveBeenCalled();
   });
@@ -266,9 +259,7 @@ describe("createVulnerabilityRecord", () => {
       throw Object.assign(new Error("Unique constraint"), { code: "P2002" });
     });
 
-    const result = await createVulnerabilityRecord(ta3(), {
-      actingUserId: "user-1",
-    });
+    const result = await createVulnerabilityRecord(ta3());
 
     expect(result).toMatchObject({
       vulnerabilityId: "v-winner",
@@ -279,23 +270,18 @@ describe("createVulnerabilityRecord", () => {
   it("gives a record with no identifiers a new vulnerability with a VIPER ID", async () => {
     createsVulnerability("v-1");
 
-    await createVulnerabilityRecord(ta3({ identifiers: [] }), {
-      actingUserId: "user-1",
-    });
+    await createVulnerabilityRecord(ta3({ identifiers: [] }));
 
     const [{ data }] = db.vulnerability.create.mock.calls[0];
     expect(data.displayId).toMatch(/^VIPER-[0-9A-F]{12}$/);
     expect(data.identifiers.create).toEqual([
       { value: data.displayId, displayValue: data.displayId },
     ]);
-    expect(data.cveId).toBeNull();
   });
 
   it("rejects a TA3 submission on a record that isn't TA3", async () => {
     await expect(
-      createVulnerabilityRecord(ta3({ source: "OTHER" }), {
-        actingUserId: "user-1",
-      }),
+      createVulnerabilityRecord(ta3({ source: "OTHER" })),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(db.vulnerability.create).not.toHaveBeenCalled();
   });
@@ -304,9 +290,7 @@ describe("createVulnerabilityRecord", () => {
     createsVulnerability("v-1");
     db.vulnerabilityRecord.create.mockRejectedValueOnce(new Error("bad FK"));
 
-    await expect(
-      createVulnerabilityRecord(ta3(), { actingUserId: "user-1" }),
-    ).rejects.toThrow("bad FK");
+    await expect(createVulnerabilityRecord(ta3())).rejects.toThrow("bad FK");
     expect(db.vulnerability.deleteMany).toHaveBeenCalledWith({
       where: { id: "v-1" },
     });
@@ -319,7 +303,7 @@ describe("the TA3 submission webhooks", () => {
   it("fires once a new record's TA3 submission is written", async () => {
     createsVulnerability("v-1");
 
-    await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
+    await createVulnerabilityRecord(ta3());
 
     expect(sendWebhooks).toHaveBeenCalledWith(
       "TA3Submission_Created",
@@ -332,7 +316,6 @@ describe("the TA3 submission webhooks", () => {
 
     await createVulnerabilityRecord(
       ta3({ source: "OTHER", ta3Submission: undefined }),
-      { actingUserId: "user-1" },
     );
 
     expect(sendWebhooks).not.toHaveBeenCalled();
@@ -393,21 +376,19 @@ describe("refreshing the vulnerability", () => {
     createsVulnerability("v-1");
     db.metric.findFirst.mockResolvedValueOnce({ severity: "Medium" } as never);
 
-    await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
+    await createVulnerabilityRecord(ta3());
 
     const [{ data }] = db.vulnerability.update.mock.calls[0];
     expect(data.severity).toBe("Medium");
   });
 
-  it("leaves the severity alone when no metric is rated", async () => {
+  it("clears the severity when no metric is rated", async () => {
     createsVulnerability("v-1");
 
-    await createVulnerabilityRecord(ta3({ metrics: [] }), {
-      actingUserId: "user-1",
-    });
+    await createVulnerabilityRecord(ta3({ metrics: [] }));
 
     const [{ data }] = db.vulnerability.update.mock.calls[0];
-    expect(data).not.toHaveProperty("severity");
+    expect(data.severity).toBeNull();
   });
 });
 

@@ -60,7 +60,7 @@ beforeEach(() => {
 });
 
 describe("processVulnerabilityIntegrationSync", () => {
-  it("creates an unowned record and maps it for a new item", async () => {
+  it("creates a record owned by the integration and maps it for a new item", async () => {
     const response = await processVulnerabilityIntegrationSync(
       { items: [item("v-1")] },
       "shadow-1",
@@ -72,11 +72,10 @@ describe("processVulnerabilityIntegrationSync", () => {
         identifiers: ["CVE-2024-1234"],
         devices: [DEVICE],
       },
-      { source: undefined, userId: null },
+      { source: undefined, userId: "shadow-1" },
     );
     expect(mocks.createVulnerabilityRecord).toHaveBeenCalledWith(
       expect.objectContaining({ data: true }),
-      { actingUserId: "shadow-1" },
     );
     expect(mocks.mapping.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -133,7 +132,7 @@ describe("processVulnerabilityIntegrationSync", () => {
 
     expect(mocks.recordDataFromInput).toHaveBeenCalledWith(expect.anything(), {
       source: "AI",
-      userId: null,
+      userId: "shadow-1",
     });
   });
 

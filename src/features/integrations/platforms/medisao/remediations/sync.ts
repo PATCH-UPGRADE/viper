@@ -90,7 +90,6 @@ async function ingestRemediations(
           names: item.fixedVulnerabilities.filter(
             (name) => !vulnerabilityIdCache.has(cacheKey(name)),
           ),
-          integrationUserId,
           deviceGroupMatchingId: matchingId,
         });
         for (const [name, id] of ids) {

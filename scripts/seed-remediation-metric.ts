@@ -1,9 +1,15 @@
+// Run with the server-only stub, since it creates the vulnerability through the record service:
+//   npx tsx --require ./prisma/seeds/stub-server-only.cjs scripts/seed-remediation-metric.ts
 import { hashPassword } from "better-auth/crypto";
+import { createVulnerabilityRecord } from "@/features/vulnerabilities/server/records";
 import {
   type AssetStatus,
+  MetricType,
+  type Prisma,
   ScopeTargetModel,
   Severity,
   VersionStatus,
+  VulnerabilitySource,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
@@ -16,8 +22,9 @@ const SEED_USER = {
 };
 
 const FIXTURE_CVE = "CVE-2022-29875";
-const ADVISORY_URL =
-  "https://www.siemens-healthineers.com/support-documentation/cybersecurity/ssa-220609";
+const FIXTURE_VULNERABILITY_WHERE = {
+  identifiers: { some: { value: FIXTURE_CVE } },
+} satisfies Prisma.VulnerabilityWhereInput;
 const MANUFACTURER = "Siemens Healthineers";
 const PRODUCT = "MAGNETOM NUMARIS X";
 const VERSION = "VA31A";
@@ -139,7 +146,7 @@ async function teardownFixture() {
   });
 
   const remediations = await prisma.remediation.findMany({
-    where: { vulnerabilities: { some: { cveId: FIXTURE_CVE } } },
+    where: { vulnerabilities: { some: FIXTURE_VULNERABILITY_WHERE } },
     select: { id: true },
   });
   const remediationIds = remediations.map((r) => r.id);
@@ -164,7 +171,7 @@ async function teardownFixture() {
     where: { id: { in: remediationIds } },
   });
   const vulns = await prisma.vulnerability.deleteMany({
-    where: { cveId: FIXTURE_CVE },
+    where: FIXTURE_VULNERABILITY_WHERE,
   });
 
   console.log(
@@ -197,7 +204,6 @@ async function seedFixture(userId: string) {
   for (const spec of ASSET_SPECS) {
     const data = {
       ...spec,
-      upstreamApi: ADVISORY_URL,
       status: "Active" as AssetStatus,
       ...device,
       userId,
@@ -212,41 +218,32 @@ async function seedFixture(userId: string) {
     }
   }
 
-  const vulnerability = await prisma.vulnerability.create({
+  // Through the record service, which also opens the baseline Issues on the matching. It copies
+  // narrative and impact only from a TA3 submission, so the advisory's are written here.
+  const { vulnerabilityId } = await createVulnerabilityRecord({
+    source: VulnerabilitySource.VENDOR_ADVISORY,
+    sourceId: "SSA-220609",
+    identifiers: [FIXTURE_CVE],
+    details:
+      "The syngo platform underlying NUMARIS X deserialises untrusted data without sufficient validation (CWE-502), which could result in an arbitrary deserialization. An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on the scanner console can execute code on the affected system.",
+    metrics: [
+      {
+        type: MetricType.CVSS_V3_1,
+        score: 8.8,
+        vector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        severity: Severity.High,
+      },
+    ],
+    deviceGroupMatchingIds: [matching.id],
+    userId: null,
+  });
+  const vulnerability = await prisma.vulnerability.update({
+    where: { id: vulnerabilityId },
     data: {
-      cveId: FIXTURE_CVE,
-      // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
-      // vulnerability by its CVE and would create a duplicate. Create it through that instead.
-      displayId: FIXTURE_CVE,
-      severity: Severity.High,
-      cvssScore: 8.8,
-      cvssVector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-      description:
-        "The syngo platform underlying NUMARIS X deserialises untrusted data without sufficient validation (CWE-502), which could result in an arbitrary deserialization. An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on the scanner console can execute code on the affected system.",
       narrative:
         "An attacker on a network segment that can reach ports 32912/tcp or 32914/tcp on a MAGNETOM NUMARIS X console sends a crafted serialized payload to the syngo service. Because the payload is deserialized without type restriction, it is instantiated and runs arbitrary code under the syngo platform's privileges — no credentials and no user interaction are required.",
       impact:
         "Code execution on the MRI scanner console. An affected scanner must be taken off the schedule until it is verified and updated, displacing booked MRI exams onto the remaining unit and delaying inpatient imaging; in-progress exam data and patient information held on the console are exposed to the attacker.",
-      userId,
-      sarif: {
-        version: "2.1.0",
-        runs: [
-          {
-            tool: { driver: { name: "Siemens Healthineers PSIRT" } },
-            results: [
-              {
-                ruleId: FIXTURE_CVE,
-                level: "error",
-                message: {
-                  text: "Deserialization of untrusted data in Siemens Healthineers syngo platform (SSA-220609) — MAGNETOM NUMARIS X VA31A",
-                },
-              },
-            ],
-          },
-        ],
-      },
-      // Must be inline: the extension opens baseline Issues only for matchings linked in this create.
-      deviceGroupMatchings: { connect: { id: matching.id } },
     },
   });
 
@@ -262,7 +259,7 @@ async function printSummaryAndAssert() {
   const failures: string[] = [];
 
   const vulnerability = await prisma.vulnerability.findFirst({
-    where: { cveId: FIXTURE_CVE },
+    where: FIXTURE_VULNERABILITY_WHERE,
     include: { deviceGroupMatchings: true, issues: true },
   });
   if (!vulnerability) throw new Error(`${FIXTURE_CVE} missing after seeding.`);
@@ -299,7 +296,7 @@ async function printSummaryAndAssert() {
   if (matchings !== 1) failures.push(`expected 1 matching, found ${matchings}`);
   if (baseline !== matchings) {
     failures.push(
-      `${matchings} matching(s) but ${baseline} baseline issue(s) — matchings must be connected inline in the vulnerability create()`,
+      `${matchings} matching(s) but ${baseline} baseline issue(s) — create the vulnerability through createVulnerabilityRecord, which opens them`,
     );
   }
   if (assetLevel !== 0) {

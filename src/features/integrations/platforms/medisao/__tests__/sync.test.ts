@@ -357,7 +357,6 @@ describe("the ingest mapping", () => {
         identifiers: ["GHSA-abcd-efgh-ijkl"],
         deviceGroupMatchingIds: ["matching-1"],
       }),
-      { actingUserId: "shadow-user" },
     );
     expect(createData.vulnerabilities).toEqual({
       connect: [{ id: "vuln-1" }, { id: "minted-GHSA-ABCD-EFGH-IJKL" }],

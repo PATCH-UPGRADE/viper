@@ -3,8 +3,20 @@ import prisma from "@/lib/db";
 import { matchingForDevice } from "./canonical-identity";
 import { deviceForSampleCpe } from "./device-groups";
 
+interface SampleRemediation {
+  cpe: string;
+  fixUri: string;
+  description: string;
+  narrative: string;
+  manufacturer?: {
+    publishedAt: string;
+    externalId: string;
+    webUrl?: string;
+  };
+}
+
 // Remediations matched to seed vulnerability CPEs
-const SAMPLE_REMEDIATIONS = [
+const SAMPLE_REMEDIATIONS: SampleRemediation[] = [
   // CVE-2020-25175 remediation for GE BrightSpeed Elite Select
   {
     cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
@@ -14,6 +26,12 @@ const SAMPLE_REMEDIATIONS = [
       "Apply GE Healthcare ICS security controls per CISA advisory ICSMA-20-343-01 and GE Security Bulletin GE-2020-004 to mitigate credential exposure on imaging devices (CVE-2020-25175).",
     narrative:
       "Work with GE Healthcare Biomedical/Clinical Engineering to apply mitigations from GE Security Bulletin GE-2020-004. Immediately isolate all affected GE imaging devices (CT scanner, ultrasound units, X-ray node) to a dedicated DICOM VLAN with strict ACLs permitting only DICOM traffic (port 104/TCP) to and from the PACS server. Disable unnecessary network services on each device via GE service mode. Request firmware update availability from your GE account representative. Deploy IDS/IPS monitoring on the DICOM VLAN to detect anomalous credential-bearing traffic. Post-remediation: verify DICOM connectivity to PACS and confirm the imaging workflow is unaffected.",
+    manufacturer: {
+      publishedAt: "2020-12-08T00:00:00.000Z",
+      externalId: "GE-2020-004",
+      webUrl:
+        "https://www.cisa.gov/news/events/ics-medical-advisories/icsma-20-343-01",
+    },
   },
   // CVE-2017-0144 remediation for CT Acquisition Workstation (Windows 7 / EOL host)
   {
@@ -24,6 +42,12 @@ const SAMPLE_REMEDIATIONS = [
       "Windows 7 and Server 2008 R2 are end-of-life and do not receive patches via standard Windows Update. Apply MS17-010 via Microsoft extended support if contracted, then implement network-level compensating controls to mitigate EternalBlue (CVE-2017-0144) across all five imaging network Windows hosts.",
     narrative:
       "Immediate actions: (1) Disable SMBv1 on all five affected hosts via PowerShell (Set-SmbServerConfiguration -EnableSMB1Protocol $false) and registry (HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters, SMB1=0). (2) Block TCP port 445 inbound at the Cisco Catalyst 2960S switch using ACLs on all imaging and PACS VLANs. (3) Deploy host-based firewall rules to block SMB from non-management hosts. (4) Micro-segment each workstation subnet to minimize lateral movement. Long-term: coordinate with GE Healthcare to plan migration of CT acquisition workstation and PACS server to a supported OS — Advantage Workstation 4.6 and Centricity PACS-IW 5.0 compatibility with newer Windows versions must be confirmed with the manufacturer before upgrading.",
+    manufacturer: {
+      publishedAt: "2020-12-08T00:00:00.000Z",
+      externalId: "MS-17-010",
+      webUrl:
+        "https://www.cisa.gov/news/events/ics-medical-advisories/icsma-20-343-01",
+    },
   },
   // CVE-2016-6366 remediation for Cisco ASA 5505 (both VPN gateway and firewall)
   {
@@ -34,6 +58,12 @@ const SAMPLE_REMEDIATIONS = [
       "Upgrade Cisco ASA 5505 software from 8.2.x to a patched release (9.1(7.21) or later) per Cisco Security Advisory cisco-sa-20160817-asa-snmp to remediate the EXTRABACON SNMP buffer overflow (CVE-2016-6366). Applies to both the remote radiology VPN gateway and the perimeter firewall.",
     narrative:
       "Both ASA 5505 appliances must be upgraded. Cisco ASA 5505 supports ASA software up to 9.2(x); upgrade to 9.1(7.21)+ or the latest available 9.2.x release. Before upgrading: back up ASA configuration (copy running-config tftp://...), test rollback procedure in a change window. Schedule separate maintenance windows for each device — perimeter firewall first (~30 min downtime), then VPN gateway (coordinate with remote radiology team to minimize after-hours coverage gap). If an immediate upgrade cannot be scheduled: switch from SNMPv2c to SNMPv3 with authentication and encryption, or restrict SNMP community access via ACL to the management VLAN only. Post-upgrade: verify VPN tunnels for remote radiologist access, confirm firewall policy enforcement, and validate DICOM routing.",
+    manufacturer: {
+      publishedAt: "2020-12-08T00:00:00.000Z",
+      externalId: "CI-02-010",
+      webUrl:
+        "https://www.cisa.gov/news/events/ics-medical-advisories/icsma-20-343-01",
+    },
   },
 ];
 
@@ -67,7 +97,8 @@ export async function seedRemediations(userId: string) {
         console.warn(`⚠️  No vulnerability found for CPE: ${remediation.cpe}`);
         return null;
       }
-
+      const { manufacturer } = remediation;
+      const integration = await prisma.integration.findFirst();
       const createdRemediation = await prisma.remediation.create({
         data: {
           description: remediation.description,
@@ -77,6 +108,21 @@ export async function seedRemediations(userId: string) {
             ? { connect: { id: matchingId } }
             : undefined,
           userId,
+          ...(manufacturer && {
+            isManufacturerRemediation: true,
+            publishedAt: new Date(manufacturer.publishedAt),
+          }),
+          ...(manufacturer?.webUrl && integration
+            ? {
+                externalMappings: {
+                  create: {
+                    integrationId: integration.id,
+                    externalId: manufacturer.externalId,
+                    webUrl: manufacturer.webUrl,
+                  },
+                },
+              }
+            : {}),
         },
       });
 

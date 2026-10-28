@@ -33,16 +33,14 @@ function formatWorkOrderLine(workOrder: {
   id: string;
   summary: string;
   status: string;
-  vulnerabilities: { cveId: string | null }[];
+  vulnerabilities: { displayId: string }[];
   _count: { vulnerabilities: number };
 }): string {
-  const cves = workOrder.vulnerabilities
-    .map((v) => v.cveId)
-    .filter((cve): cve is string => cve !== null);
-  const more = workOrder._count.vulnerabilities - cves.length;
+  const ids = workOrder.vulnerabilities.map((v) => v.displayId);
+  const more = workOrder._count.vulnerabilities - ids.length;
   const fixes =
-    cves.length > 0
-      ? ` — fixes ${cves.join(", ")}${more > 0 ? ` and ${more} more` : ""}`
+    ids.length > 0
+      ? ` — fixes ${ids.join(", ")}${more > 0 ? ` and ${more} more` : ""}`
       : "";
   return `workOrder ${workOrder.id} — ${workOrder.summary} — status ${workOrder.status}${fixes}`;
 }
@@ -162,7 +160,7 @@ export const generateDepartmentDebrief = inngest.createFunction(
               summary: true,
               status: true,
               vulnerabilities: {
-                select: { cveId: true },
+                select: { displayId: true },
                 take: WORK_ORDER_LLM_VULNERABILITY_LIMIT,
               },
               _count: { select: { vulnerabilities: true } },

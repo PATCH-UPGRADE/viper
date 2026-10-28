@@ -511,7 +511,9 @@ async function createWorkOrderTicket(
 
   const linkedVulns = ticket.linkedCveIds?.length
     ? await prisma.vulnerability.findMany({
-        where: { cveId: { in: ticket.linkedCveIds } },
+        where: {
+          identifiers: { some: { value: { in: ticket.linkedCveIds } } },
+        },
         select: { id: true },
       })
     : [];
@@ -526,7 +528,11 @@ async function createWorkOrderTicket(
   const linkedRemediations = ticket.linkedCveIds?.length
     ? await prisma.remediation.findMany({
         where: {
-          vulnerabilities: { some: { cveId: { in: ticket.linkedCveIds } } },
+          vulnerabilities: {
+            some: {
+              identifiers: { some: { value: { in: ticket.linkedCveIds } } },
+            },
+          },
         },
         select: { id: true },
       })
@@ -537,7 +543,9 @@ async function createWorkOrderTicket(
       ? await prisma.issue.findMany({
           where: {
             assetId: { in: ticket.linkedAssetIds },
-            vulnerability: { cveId: { in: ticket.linkedCveIds } },
+            vulnerability: {
+              identifiers: { some: { value: { in: ticket.linkedCveIds } } },
+            },
           },
           select: { id: true },
         })

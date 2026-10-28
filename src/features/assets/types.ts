@@ -247,7 +247,7 @@ export const assetDashboardInclude = {
         select: {
           id: true,
           severity: true,
-          cveId: true,
+          displayId: true,
           description: true,
           remediations: {
             include: remediationCardInclude,

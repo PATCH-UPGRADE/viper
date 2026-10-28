@@ -16,7 +16,30 @@ import {
 import { getAssetTitle } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import type { VulnerabilityWithRelations } from "../types";
+import {
+  recordSources,
+  summarizeMetrics,
+  VULNERABILITY_SOURCE_LABELS,
+} from "../utils";
+import { VulnerabilitySources } from "./vulnerability-sources";
 
+type Records = VulnerabilityWithRelations["records"];
+
+const sourcesText = (records: Records) =>
+  recordSources(records)
+    .sources.map((source) => VULNERABILITY_SOURCE_LABELS[source])
+    .join(", ");
+
+/** "Unknown" when the KEV catalog was never checked for this vulnerability. */
+const kevText = (records: Records) => {
+  const kev = summarizeMetrics(records.flatMap((r) => r.metrics)).kev;
+  if (kev?.inKev == null) return "Unknown";
+  return kev.inKev ? "True" : "False";
+};
+
+// TODO: these sort headers do nothing. Sorting is manual, and getManyByPriorityInternal never
+// reads `sort`: fetchPaginated always orders by createdAt. Sources and KEV are worked out from
+// the records, so even with `sort` wired up, Prisma can't order by them without a stored column.
 export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
   {
     accessorKey: "id",
@@ -31,16 +54,15 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
     ),
   },
   {
-    accessorKey: "cveId",
-    header: ({ column }) => <SortableHeader header="CVE ID" column={column} />,
-    cell: ({ row }) => row.original.cveId || "—",
+    accessorKey: "displayId",
+    header: ({ column }) => <SortableHeader header="ID" column={column} />,
+    cell: ({ row }) => row.original.displayId,
   },
   {
-    accessorKey: "user.name",
-    header: ({ column }) => (
-      <SortableHeader header="Source Tool" column={column} />
-    ),
-    cell: ({ row }) => row.original.user.name,
+    id: "sources",
+    accessorFn: (row) => sourcesText(row.records),
+    header: ({ column }) => <SortableHeader header="Sources" column={column} />,
+    cell: ({ row }) => <VulnerabilitySources records={row.original.records} />,
   },
   {
     accessorKey: "createdAt",
@@ -61,7 +83,8 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
     ),
   },
   {
-    accessorKey: "inKEV",
+    id: "kev",
+    accessorFn: (row) => kevText(row.records),
     header: ({ column }) => (
       <div className="flex items-center gap-2">
         <SortableHeader header="In KEV?" column={column} />
@@ -71,11 +94,14 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
         </QuestionTooltip>
       </div>
     ),
-    cell: ({ row }) => (
-      <Badge variant={row.original.inKEV ? "destructive" : "outline"}>
-        {row.original.inKEV ? "True" : "False"}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const text = kevText(row.original.records);
+      return (
+        <Badge variant={text === "True" ? "destructive" : "outline"}>
+          {text}
+        </Badge>
+      );
+    },
   },
   {
     accessorKey: "remediations",

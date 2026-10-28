@@ -38,6 +38,7 @@ import {
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
+import { sortByFields, sortFieldKey } from "@/lib/sort";
 import {
   baseProcedure,
   createTRPCRouter,
@@ -61,8 +62,6 @@ import {
   affectedIssueSortValue,
   countAffectedIssues,
   isAffectedIssueSortKey,
-  sortByFields,
-  sortFieldKey,
 } from "./effective-issue-sort";
 import { processAssetIntegrationSync } from "./integration-sync";
 import { fetchUtilizationGrids } from "./utilization";

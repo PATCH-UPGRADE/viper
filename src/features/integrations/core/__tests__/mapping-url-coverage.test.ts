@@ -32,12 +32,6 @@ describe("every include that selects mappings still resolves", () => {
         deviceArtifactInclude,
         ResourceType.DeviceArtifact,
       ],
-      [
-        "vulnerabilityInclude",
-        "Vulnerability",
-        vulnerabilityInclude,
-        ResourceType.Vulnerability,
-      ],
     ];
 
   for (const [name, model, include, resource] of cases) {
@@ -58,13 +52,28 @@ describe("every include that selects mappings still resolves", () => {
     ]);
   });
 
+  // A vulnerability's mappings are on its records.
+  it("vulnerabilityInclude", () => {
+    const resource = ResourceType.Vulnerability;
+    expect(
+      mappingPaths("Vulnerability", { include: vulnerabilityInclude }),
+    ).toEqual([
+      { path: ["records", "externalMappings"], resource },
+      // TODO: VW-540 drop the vulnerability-level path with the legacy mappings.
+      { path: ["externalMappings"], resource },
+    ]);
+  });
+
   it("vulnerabilityByPriorityInclude", () => {
     expect(
       mappingPaths("Vulnerability", {
         include: vulnerabilityByPriorityInclude,
       }),
     ).toEqual([
-      { path: ["externalMappings"], resource: ResourceType.Vulnerability },
+      {
+        path: ["records", "externalMappings"],
+        resource: ResourceType.Vulnerability,
+      },
       {
         path: ["remediations", "externalMappings"],
         resource: ResourceType.Remediation,

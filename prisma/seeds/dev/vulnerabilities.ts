@@ -2,8 +2,14 @@ import { upsertFeedRecord } from "@/features/vulnerabilities/server/feed-records
 import {
   createVulnerabilityRecord,
   cvssMetricType,
+  type VulnerabilityRecordData,
 } from "@/features/vulnerabilities/server/records";
-import { Priority, Severity, VulnerabilitySource } from "@/generated/prisma";
+import {
+  MetricType,
+  Priority,
+  Severity,
+  VulnerabilitySource,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { matchingForDevice } from "./canonical-identity";
 import { deviceForSampleCpe } from "./device-groups";
@@ -211,6 +217,80 @@ const SAMPLE_VULNERABILITIES = [
   },
 ];
 
+/**
+ * More records for a vulnerability above, keyed by its CVE, created after its first one. A second
+ * source with its own CVSS is what makes the vulnerability drawer show where the score came from
+ * and list each source. TA3 records are the seed user's; other sources have no owner.
+ */
+const ADDITIONAL_RECORDS: Record<
+  string,
+  Omit<
+    VulnerabilityRecordData,
+    "identifiers" | "deviceGroupMatchingIds" | "userId"
+  >[]
+> = {
+  // A second TA3 submission from another tool: two SARIF logs and exploit links on one
+  // vulnerability. Its CVSS is newer, so it is the score the vulnerability shows.
+  "CVE-2017-0144": [
+    {
+      source: VulnerabilitySource.TA3,
+      summary:
+        "EternalBlue confirmed on the PACS server by an exploit verification run",
+      metrics: [
+        {
+          type: MetricType.CVSS_V3_1,
+          score: 8.1,
+          vector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        },
+      ],
+      ta3Submission: {
+        sarif: {
+          version: "2.1.0",
+          runs: [
+            {
+              tool: { driver: { name: "Exploit Verification Harness" } },
+              results: [
+                {
+                  ruleId: "CVE-2017-0144",
+                  level: "error",
+                  message: {
+                    text: "MS17-010 exploit attempt against the Centricity PACS-IW server returned a SYSTEM shell; SMBv1 is enabled and unpatched",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        exploitUri:
+          "https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/windows/smb/ms17_010_eternalblue.rb",
+        narrative:
+          "A verification run against the Centricity PACS-IW server reproduced the EternalBlue exploit without credentials, confirming the host accepts SMBv1 and lacks MS17-010.",
+        impact:
+          "Confirms the PACS server itself, not only the reading workstations, can be taken over remotely, which puts the image archive and its routing to the ED in scope.",
+      },
+    },
+  ],
+  // A vendor advisory whose CVSS outranks the TA3 score (the newest CVSS wins for now).
+  "CVE-2020-25175": [
+    {
+      source: VulnerabilitySource.VENDOR_ADVISORY,
+      sourceId: "GE-2020-004",
+      summary:
+        "GE Healthcare Security Bulletin GE-2020-004: credential exposure in imaging and ultrasound products",
+      details:
+        "GE Healthcare recommends isolating affected scanners on a dedicated imaging VLAN and applying the firmware update listed in the bulletin. Service credentials should be rotated by GE field service after the update.",
+      publishedAt: new Date("2020-12-08T00:00:00Z"),
+      metrics: [
+        {
+          type: MetricType.CVSS_V3_1,
+          score: 9.6,
+          vector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+        },
+      ],
+    },
+  ],
+};
+
 export async function seedVulnerabilities(userId: string) {
   console.log("\n🌱 Seeding vulnerabilities...");
 
@@ -263,6 +343,17 @@ export async function seedVulnerabilities(userId: string) {
       },
       { actingUserId: userId },
     );
+    for (const record of ADDITIONAL_RECORDS[cveId] ?? []) {
+      await createVulnerabilityRecord(
+        {
+          ...record,
+          identifiers: [cveId],
+          deviceGroupMatchingIds: matchingIds,
+          userId: record.source === VulnerabilitySource.TA3 ? userId : null,
+        },
+        { actingUserId: userId },
+      );
+    }
     // What enrichment would write, without calling FIRST or CISA.
     await upsertFeedRecord({
       vulnerabilityId,

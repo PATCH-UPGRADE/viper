@@ -158,7 +158,7 @@ describe("extractFindings", () => {
 describe("enrichFindings", () => {
   it("drops a finding whose record does not exist, and a missing related record", async () => {
     mockPrisma.vulnerability.findMany.mockResolvedValue([
-      { id: "v_1", cveId: "CVE-2017-0144" },
+      { id: "v_1", displayId: "CVE-2017-0144" },
     ]);
     mockPrisma.asset.findMany.mockResolvedValue([
       { id: "a_1", hostname: "PACS-CENTRICITY-001" },

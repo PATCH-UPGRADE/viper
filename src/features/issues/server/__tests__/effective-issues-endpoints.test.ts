@@ -86,7 +86,7 @@ const RANGE_MATCHING = {
 const vulnerability = {
   id: "vuln-1",
   severity: "Critical",
-  cveId: "CVE-2026-FOO",
+  displayId: "CVE-2026-FOO",
   description: "Credential exposure",
   _count: { remediations: 1 },
   remediations: [],
@@ -180,7 +180,7 @@ describe("assets.getIssueMetricsInternal — effective issue counts", () => {
   const unremediatedVulnerability = {
     ...vulnerability,
     id: "vuln-2",
-    cveId: "CVE-2026-BAR",
+    displayId: "CVE-2026-BAR",
     _count: { remediations: 0 },
   };
 

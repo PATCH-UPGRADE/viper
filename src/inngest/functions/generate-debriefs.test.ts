@@ -104,7 +104,10 @@ function contextResolves(previousBullets: unknown[] = []) {
       id: "wo_1",
       summary: "Replace line sets",
       status: "TO_DO",
-      vulnerabilities: [{ cveId: "CVE-2017-0144" }, { cveId: null }],
+      vulnerabilities: [
+        { displayId: "CVE-2017-0144" },
+        { displayId: "VIPER-0A1B2C3D4E5F" },
+      ],
       _count: { vulnerabilities: 7 },
     },
   ]);
@@ -312,7 +315,7 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     expect(mockWriter).toHaveBeenCalledWith(
       expect.objectContaining({
         workOrders: [
-          "workOrder wo_1 — Replace line sets — status TO_DO — fixes CVE-2017-0144 and 6 more",
+          "workOrder wo_1 — Replace line sets — status TO_DO — fixes CVE-2017-0144, VIPER-0A1B2C3D4E5F and 5 more",
         ],
       }),
     );

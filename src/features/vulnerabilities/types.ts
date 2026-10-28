@@ -201,6 +201,18 @@ export const ta3SubmissionResponseSchema = z.object({
 });
 export type Ta3SubmissionResponse = z.infer<typeof ta3SubmissionResponseSchema>;
 
+/** The ID an integration knows a record by, with links to it there. */
+export const externalMappingResponseSchema = z.object({
+  externalId: z.string(),
+  upstreamApi: z.string().nullable(),
+  webUrl: z.string().nullable(),
+  integration: z.object({
+    id: z.string(),
+    name: z.string(),
+    platform: z.enum(PlatformEnum),
+  }),
+});
+
 // TODO VW-541: devices move to AffectedReport, and show up in this response through it.
 export const vulnerabilityRecordResponseSchema = z.object({
   id: z.string(),
@@ -213,6 +225,7 @@ export const vulnerabilityRecordResponseSchema = z.object({
   userId: z.string().nullable(),
   metrics: z.array(metricResponseSchema),
   ta3Submission: ta3SubmissionResponseSchema.nullable(),
+  externalMappings: z.array(externalMappingResponseSchema),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -230,6 +243,7 @@ export const vulnerabilityRecordDeleteResponseSchema = z.object({
 export const vulnerabilityRecordInclude = {
   metrics: { orderBy: { createdAt: "asc" } },
   ta3Submission: true,
+  externalMappings: externalMappingSelect,
 } satisfies Prisma.VulnerabilityRecordInclude;
 
 export const ta3SubmissionInclude = {
@@ -292,18 +306,7 @@ export const vulnerabilityResponseSchema = z.object({
   userId: z.string(),
   user: userSchema,
   deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
-  externalMappings: z.array(
-    z.object({
-      externalId: z.string(),
-      upstreamApi: z.string().nullable(),
-      webUrl: z.string().nullable(),
-      integration: z.object({
-        id: z.string(),
-        name: z.string(),
-        platform: z.enum(PlatformEnum),
-      }),
-    }),
-  ),
+  externalMappings: z.array(externalMappingResponseSchema),
   // </Getting removed in VW-540>
 });
 export type VulnerabilityResponse = z.infer<typeof vulnerabilityResponseSchema>;
@@ -324,13 +327,18 @@ export const vulnerabilitiesByPriorityInputSchema =
     priority: z.enum(Object.values(Priority)),
   });
 
+const recordWithUserInclude = {
+  ...vulnerabilityRecordInclude,
+  user: userIncludeSelect,
+} satisfies Prisma.VulnerabilityRecordInclude;
+
 export const vulnerabilityInclude = {
   identifiers: {
     select: { value: true, displayValue: true },
     orderBy: { createdAt: "asc" },
   },
   records: {
-    include: { ...vulnerabilityRecordInclude, user: userIncludeSelect },
+    include: recordWithUserInclude,
     orderBy: { createdAt: "asc" },
   },
   // TODO: VW-540 legacy relations, removed with the flat fields above
@@ -338,6 +346,18 @@ export const vulnerabilityInclude = {
   deviceGroupMatchings: deviceGroupMatchingInclude,
   externalMappings: externalMappingSelect,
 } satisfies Prisma.VulnerabilityInclude;
+
+/** A vulnerability's records with their owners, Decimals converted to numbers. */
+function toRecordsWithUser(
+  records: Prisma.VulnerabilityRecordGetPayload<{
+    include: typeof recordWithUserInclude;
+  }>[],
+) {
+  return records.map((record) => ({
+    ...toVulnerabilityRecordResponse(record),
+    user: record.user,
+  }));
+}
 
 /** Converts each record's metric Decimals; the output schema strips the rest. */
 export function toVulnerabilityResponse(
@@ -347,17 +367,35 @@ export function toVulnerabilityResponse(
 ) {
   return {
     ...vulnerability,
-    records: vulnerability.records.map((record) => ({
-      ...toVulnerabilityRecordResponse(record),
-      user: record.user,
-    })),
+    records: toRecordsWithUser(vulnerability.records),
   };
 }
 
+/** Legacy columns the prioritized view must not read. */
+// TODO: VW-540 delete once the columns are dropped.
+export const LEGACY_VULNERABILITY_OMIT = {
+  cveId: true,
+  cvssScore: true,
+  cvssVector: true,
+  epss: true,
+  updatedEpss: true,
+  inKEV: true,
+  updatedInKev: true,
+  sarif: true,
+  exploitUri: true,
+  affectedComponents: true,
+  userId: true,
+  alohaStatus: true,
+  alohaLog: true,
+  deviceArtifactId: true,
+} satisfies Prisma.VulnerabilityOmit;
+
 export const vulnerabilityByPriorityInclude = {
-  user: userIncludeSelect,
+  records: {
+    include: recordWithUserInclude,
+    orderBy: { createdAt: "asc" },
+  },
   deviceGroupMatchings: deviceGroupMatchingInclude,
-  externalMappings: externalMappingSelect,
   issues: {
     include: {
       asset: {
@@ -380,9 +418,25 @@ export const vulnerabilityByPriorityInclude = {
   },
 } satisfies Prisma.VulnerabilityInclude;
 
-export type VulnerabilityWithRelations = Prisma.VulnerabilityGetPayload<{
-  include: typeof vulnerabilityByPriorityInclude;
-}>;
+/**
+ * Converts each record's metric Decimals: getManyByPriorityInternal has no output schema, and
+ * superjson doesn't carry Prisma Decimals.
+ */
+export function toPrioritizedVulnerability(
+  vulnerability: Prisma.VulnerabilityGetPayload<{
+    include: typeof vulnerabilityByPriorityInclude;
+    omit: typeof LEGACY_VULNERABILITY_OMIT;
+  }>,
+) {
+  return {
+    ...vulnerability,
+    records: toRecordsWithUser(vulnerability.records),
+  };
+}
+
+export type VulnerabilityWithRelations = ReturnType<
+  typeof toPrioritizedVulnerability
+>;
 
 export const ta3SubmissionAlohaResponseSchema = z.object({
   ta3Submission: ta3SubmissionResponseSchema,

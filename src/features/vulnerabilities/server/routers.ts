@@ -3,20 +3,33 @@ import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
-import { Priority, type Prisma, ResourceType } from "@/generated/prisma";
+import {
+  MetricType,
+  Priority,
+  type Prisma,
+  ResourceType,
+  Severity,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   type DeviceIdentity,
   deviceIdentitySelect,
 } from "@/lib/device-matching";
-import { type PaginationInput, paginationInputSchema } from "@/lib/pagination";
 import {
+  buildPaginationMeta,
+  createPaginatedResponse,
+  type PaginationInput,
+  paginationInputSchema,
+} from "@/lib/pagination";
+import {
+  buildUpdatedAtFilter,
   fetchPaginated,
   findVersionIdentity,
   findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
+import { sortByFields, sortFieldKey } from "@/lib/sort";
 import {
   baseProcedure,
   createTRPCRouter,
@@ -25,13 +38,16 @@ import {
 import { requireExistence } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
+  LEGACY_VULNERABILITY_OMIT,
   paginatedVulnerabilityResponseSchema,
+  toPrioritizedVulnerability,
   toVulnerabilityResponse,
   vulnerabilitiesByPriorityInputSchema,
   vulnerabilityByPriorityInclude,
   vulnerabilityInclude,
   vulnerabilityResponseSchema,
 } from "../types";
+import { summarizeRecordMetrics } from "../utils";
 import { processVulnerabilityIntegrationSync } from "./integration-sync";
 
 const createSearchFilter = (search: string): Prisma.VulnerabilityWhereInput => {
@@ -53,14 +69,19 @@ export const VULNERABILITY_SORT_FIELDS = new Set([
   "updatedAt",
   "priority",
   "severity",
-  "epss",
-  "cveId",
   "description",
+  "epss",
   "inKEV",
 ] as const);
 
+/**
+ * Sort keys read from each vulnerability's newest EPSS and KEV metrics. They live on its records,
+ * which no Prisma orderBy can reach, so a sort that names one runs in memory.
+ */
+const METRIC_SORT_KEYS = new Set(["epss", "inKEV"]);
+
 /** The `sort` documentation for the vulnerability lists, shared by OpenAPI and the agent catalog. */
-export const VULNERABILITY_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...VULNERABILITY_SORT_FIELDS].join(", ")}. severity sorts in enum order, so ascending puts Critical first. Rows with no EPSS sort last in both directions. Unknown fields are ignored.`;
+export const VULNERABILITY_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...VULNERABILITY_SORT_FIELDS].join(", ")}. severity sorts in enum order, so ascending puts Critical first. epss is the newest EPSS score; "-inKEV" puts vulnerabilities in CISA's KEV catalog first. Rows with no EPSS score, or never checked against KEV, sort last in both directions. Unknown fields are ignored.`;
 
 const vulnerabilityListInputSchema = paginationInputSchema.extend({
   sort: z.string().default("").describe(VULNERABILITY_SORT_DESCRIPTION),
@@ -70,25 +91,148 @@ function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
 }
 
+/** The allowed fields of a comma-separated sort string, in order, each with its "-". */
+function vulnerabilitySortFields(sort: string): string[] {
+  return sort
+    .split(",")
+    .filter((field) =>
+      VULNERABILITY_SORT_FIELDS.has(sortFieldKey(field) as never),
+    );
+}
+
 /**
- * The sort clauses for a comma-separated sort string, with unknown fields
- * dropped. EPSS sorts nulls last in both directions: Postgres puts nulls first
- * on a descending sort, so "-epss" would otherwise start with the unscored rows.
+ * The Prisma sort clauses for a comma-separated sort string, with unknown fields
+ * dropped. EPSS and KEV have no column to sort on; a sort that names them goes
+ * through fetchVulnerabilitiesSortedByMetrics instead.
  */
 export function vulnerabilitySortClauses(
   sort: string,
 ): Prisma.VulnerabilityOrderByWithRelationInput[] {
-  return sort
-    .split(",")
-    .flatMap<Prisma.VulnerabilityOrderByWithRelationInput>((s) => {
-      const field = s.replace("-", "");
-      if (!VULNERABILITY_SORT_FIELDS.has(field as never)) return [];
-      const direction = getSortValue(s);
-      if (field === "epss") {
-        return [{ epss: { sort: direction, nulls: "last" } }];
-      }
-      return [{ [field]: direction }];
-    });
+  return vulnerabilitySortFields(sort).flatMap((field) =>
+    METRIC_SORT_KEYS.has(sortFieldKey(field))
+      ? []
+      : [{ [sortFieldKey(field)]: getSortValue(field) }],
+  );
+}
+
+const sortsByMetric = (sort: string) =>
+  vulnerabilitySortFields(sort).some((field) =>
+    METRIC_SORT_KEYS.has(sortFieldKey(field)),
+  );
+
+/** Position in the enum's declaration order, which is how Postgres sorts an enum column. */
+const enumRank = (values: string[], value: string | null) =>
+  value === null ? null : values.indexOf(value);
+
+const metricSortSelect = {
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  priority: true,
+  severity: true,
+  description: true,
+  records: {
+    select: {
+      metrics: { where: { type: { in: [MetricType.EPSS, MetricType.KEV] } } },
+    },
+  },
+} satisfies Prisma.VulnerabilitySelect;
+
+type MetricSortRow = Prisma.VulnerabilityGetPayload<{
+  select: typeof metricSortSelect;
+}> & { epss: number | null; inKev: number | null };
+
+function metricSortValue(
+  row: MetricSortRow,
+  key: string,
+): number | string | null {
+  switch (key) {
+    case "epss":
+      return row.epss;
+    case "inKEV":
+      return row.inKev;
+    case "priority":
+      return enumRank(Object.values(Priority), row.priority);
+    case "severity":
+      return enumRank(Object.values(Severity), row.severity);
+    case "description":
+      return row.description;
+    case "createdAt":
+      return row.createdAt.getTime();
+    default:
+      return row.updatedAt.getTime();
+  }
+}
+
+/**
+ * One page of vulnerabilities sorted by a field that lives in their metrics (EPSS, KEV). Loads
+ * every matching vulnerability's sort fields, sorts them in memory, then loads the page's rows.
+ *
+ * TODO: if this gets slow, cache the newest EPSS score and KEV flag on Vulnerability (written by
+ * upsertFeedRecord, the way refreshVulnerability writes severity) and sort on those columns.
+ */
+async function fetchVulnerabilitiesSortedByMetrics(
+  where: Prisma.VulnerabilityWhereInput,
+  input: PaginationInput,
+) {
+  const rows = await prisma.vulnerability.findMany({
+    where: { ...where, ...buildUpdatedAtFilter(input) },
+    select: metricSortSelect,
+  });
+  const meta = buildPaginationMeta(input, rows.length);
+  const sorted = sortByFields(
+    rows.map((row): MetricSortRow => {
+      const { epss, kev } = summarizeRecordMetrics(row.records);
+      const inKev = kev?.inKev;
+      return {
+        ...row,
+        epss: epss?.score ?? null,
+        inKev: inKev === null || inKev === undefined ? null : Number(inKev),
+      };
+    }),
+    vulnerabilitySortFields(input.sort),
+    metricSortValue,
+  );
+
+  const pageIds = sorted
+    .slice(meta.skip, meta.skip + meta.take)
+    .map((row) => row.id);
+  const page = await prisma.vulnerability.findMany({
+    where: { id: { in: pageIds } },
+    include: vulnerabilityInclude,
+  });
+  const byId = new Map(
+    page.map((vulnerability) => [vulnerability.id, vulnerability]),
+  );
+  return createPaginatedResponse(
+    pageIds.flatMap((id) => byId.get(id) ?? []),
+    meta,
+  );
+}
+
+/** One page of vulnerabilities, sorted in SQL or, for EPSS and KEV, in memory. */
+async function fetchSortedVulnerabilities(
+  where: Prisma.VulnerabilityWhereInput,
+  input: PaginationInput,
+  defaultOrderBy: Prisma.VulnerabilityOrderByWithRelationInput | undefined,
+) {
+  if (sortsByMetric(input.sort)) {
+    return fetchVulnerabilitiesSortedByMetrics(where, input);
+  }
+  const sortClauses = vulnerabilitySortClauses(input.sort);
+  return fetchPaginated(prisma.vulnerability, input, {
+    where,
+    include: vulnerabilityInclude,
+    ...(sortClauses.length > 0
+      ? {
+          orderBy: [
+            ...sortClauses,
+            { updatedAt: "desc" as const },
+            { id: "asc" as const },
+          ],
+        }
+      : defaultOrderBy && { orderBy: defaultOrderBy }),
+  });
 }
 
 /** One page of the vulnerabilities whose matchings apply to a device. */
@@ -98,20 +242,13 @@ async function paginateVulnerabilitiesForDevice(
 ) {
   const matchedVulns = await findVulnerabilitiesMatchingDevices([device]);
   const idFilter = { id: { in: matchedVulns.map((vuln) => vuln.id) } };
-  const sortClauses = vulnerabilitySortClauses(input.sort);
-  const result = await fetchPaginated(prisma.vulnerability, input, {
-    where: input.search
+  const result = await fetchSortedVulnerabilities(
+    input.search
       ? { AND: [createSearchFilter(input.search), idFilter] }
       : idFilter,
-    include: vulnerabilityInclude,
-    ...(sortClauses.length > 0 && {
-      orderBy: [
-        ...sortClauses,
-        { updatedAt: "desc" as const },
-        { id: "asc" as const },
-      ],
-    }),
-  });
+    input,
+    undefined,
+  );
   return {
     ...result,
     items: await attachNotes(
@@ -137,21 +274,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(paginatedVulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      const { search, sort } = input;
-
-      const searchFilter = createSearchFilter(search);
-
-      // TODO: sorting should eventually be moved to fetchPaginated, right?
-      const sortClauses = vulnerabilitySortClauses(sort);
-
-      const result = await fetchPaginated(prisma.vulnerability, input, {
-        where: searchFilter,
-        include: vulnerabilityInclude,
-        orderBy:
-          sortClauses.length > 0
-            ? [...sortClauses, { updatedAt: "desc" }, { id: "asc" }]
-            : { updatedAt: "desc" },
-      });
+      const result = await fetchSortedVulnerabilities(
+        createSearchFilter(input.search),
+        input,
+        { updatedAt: "desc" },
+      );
 
       return {
         ...result,
@@ -266,14 +393,22 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const where = {
         priority: priority as Priority,
         ...(search && {
-          OR: [{ cveId: insensitive }, { description: insensitive }],
+          OR: [
+            { identifiers: { some: { value: insensitive } } },
+            { description: insensitive },
+          ],
         }),
       };
 
-      return fetchPaginated(prisma.vulnerability, pagination, {
+      const result = await fetchPaginated(prisma.vulnerability, pagination, {
         where,
         include: vulnerabilityByPriorityInclude,
+        omit: LEGACY_VULNERABILITY_OMIT,
       });
+      return {
+        ...result,
+        items: result.items.map(toPrioritizedVulnerability),
+      };
     }),
 
   getPriorityMetricsInternal: protectedProcedure.query(async () => {

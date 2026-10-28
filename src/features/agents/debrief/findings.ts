@@ -101,9 +101,9 @@ const LABEL_LOOKUP: Record<
     (
       await prisma.vulnerability.findMany({
         where: { id: { in: ids } },
-        select: { id: true, cveId: true },
+        select: { id: true, displayId: true },
       })
-    ).map((r) => ({ id: r.id, label: r.cveId })),
+    ).map((r) => ({ id: r.id, label: r.displayId })),
   asset: async (ids) =>
     (
       await prisma.asset.findMany({

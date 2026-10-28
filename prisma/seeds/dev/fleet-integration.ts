@@ -188,7 +188,7 @@ export async function seedFleetAdvisoryNotification() {
   console.log("\n🌱 Seeding the Siemens advisory notification...");
 
   const vulnerability = await prisma.vulnerability.findFirst({
-    where: { cveId: "CVE-2023-00001" },
+    where: { identifiers: { some: { value: "CVE-2023-00001" } } },
     select: { id: true, deviceGroupMatchings: { select: { id: true } } },
   });
   if (!vulnerability) {

@@ -272,7 +272,7 @@ export async function recordCreationActivity(ticketId: string): Promise<void> {
       priority: true,
       sourceLabel: true,
       notification: { select: { title: true } },
-      vulnerabilities: { select: { cveId: true }, take: 10 },
+      vulnerabilities: { select: { displayId: true }, take: 1 },
       externalMappings: {
         select: {
           externalId: true,
@@ -293,7 +293,7 @@ export async function recordCreationActivity(ticketId: string): Promise<void> {
       data: {
         source: t.sourceLabel ?? mapping?.integration?.name ?? null,
         advisoryTitle: t.notification?.title ?? null,
-        cveId: t.vulnerabilities.find((v) => v.cveId)?.cveId ?? null,
+        displayId: t.vulnerabilities[0]?.displayId ?? null,
         externalRecordId: mapping?.externalId ?? null,
         category: t.category,
         priority: t.priority,

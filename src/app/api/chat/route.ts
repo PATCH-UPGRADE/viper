@@ -21,6 +21,7 @@ import {
 import { assetDeviceInclude } from "@/features/assets/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import { deviceGroupMatchingInclude } from "@/features/vulnerabilities/types";
+import { summarizeRecordMetrics } from "@/features/vulnerabilities/utils";
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
@@ -100,12 +101,19 @@ export async function POST(req: Request) {
             include: assetDeviceInclude,
           })
         : null;
-      const openVulnerability = vulnerabilityId
+      const vulnerabilityRow = vulnerabilityId
         ? await prisma.vulnerability.findUnique({
             where: { id: vulnerabilityId },
-            include: { deviceGroupMatchings: deviceGroupMatchingInclude },
+            include: {
+              deviceGroupMatchings: deviceGroupMatchingInclude,
+              records: { select: { metrics: true } },
+            },
           })
         : null;
+      const openVulnerability = vulnerabilityRow && {
+        ...vulnerabilityRow,
+        metrics: summarizeRecordMetrics(vulnerabilityRow.records),
+      };
 
       const graph = buildChatGraph({
         userId,

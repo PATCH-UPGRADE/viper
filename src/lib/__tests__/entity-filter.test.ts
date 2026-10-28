@@ -153,28 +153,35 @@ describe("validateEntityFilter", () => {
   });
 
   describe("VULNERABILITY", () => {
-    it("accepts numeric and boolean operators", () => {
+    it("accepts severity and priority", () => {
       expect(
         validateEntityFilter("VULNERABILITY", {
-          cvssScore: { gte: 7 },
-          inKEV: true,
           severity: "Critical",
+          priority: { in: ["Critical", "High"] },
         }).success,
       ).toBe(true);
     });
 
-    it("accepts a string-list filter on affectedComponents", () => {
+    it("accepts an identifier filter through some / none", () => {
       expect(
         validateEntityFilter("VULNERABILITY", {
-          affectedComponents: { has: "openssl" },
+          identifiers: { some: { value: "CVE-2024-1234" } },
+        }).success,
+      ).toBe(true);
+      expect(
+        validateEntityFilter("VULNERABILITY", {
+          identifiers: {
+            none: { value: { startsWith: "ghsa-", mode: "insensitive" } },
+          },
         }).success,
       ).toBe(true);
     });
 
-    it("rejects a number operator given a string", () => {
+    it("rejects an identifier filter without some / every / none", () => {
       expect(
-        validateEntityFilter("VULNERABILITY", { cvssScore: { gte: "7" } })
-          .success,
+        validateEntityFilter("VULNERABILITY", {
+          identifiers: { value: "CVE-2024-1234" },
+        }).success,
       ).toBe(false);
     });
   });

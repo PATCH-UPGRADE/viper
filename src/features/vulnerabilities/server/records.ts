@@ -1,7 +1,11 @@
 // Helpers to create, update, or remove VulnerabilityRecords, creating Vulnerability as needed
 import "server-only";
 import { TRPCError } from "@trpc/server";
-import { cvssBand } from "@/features/vulnerabilities/utils";
+import {
+  CVSS_METRIC_TYPES,
+  cvssBand,
+  FEED_SOURCES,
+} from "@/features/vulnerabilities/utils";
 import {
   MetricType,
   type Prisma,
@@ -24,21 +28,6 @@ import {
   normalizeIdentifiers,
   upsertIdentifiers,
 } from "./identity";
-
-export const CVSS_METRIC_TYPES: MetricType[] = [
-  MetricType.CVSS_V3_0,
-  MetricType.CVSS_V3_1,
-  MetricType.CVSS_V4_0,
-];
-
-/**
- * Enrichment adds an EPSS and a KEV record to every vulnerability with a CVE. They describe a
- * vulnerability but never keep one alive: deleting its last other record deletes it.
- */
-const FEED_SOURCES: VulnerabilitySource[] = [
-  VulnerabilitySource.FIRST_EPSS,
-  VulnerabilitySource.CISA_KEV,
-];
 
 /** The CVSS version a vector names. A score with no vector is assumed to be CVSS 3.1. */
 export function cvssMetricType(vector?: string | null): MetricType {

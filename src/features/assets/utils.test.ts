@@ -5,6 +5,7 @@ import {
   getAssetIdentifier,
   getAssetNameForAgent,
   getAssetTitle,
+  securityRemediationsOf,
 } from "./utils";
 
 const fleetCt = {
@@ -108,5 +109,32 @@ describe("getAssetDeviceTypeLabel", () => {
     ["no asset", null],
   ])("returns null for %s", (_, asset) => {
     expect(getAssetDeviceTypeLabel(asset)).toBeNull();
+  });
+});
+
+describe("securityRemediationsOf", () => {
+  const rem = (id: string, isSecurityUpdate: boolean | null) => ({
+    id,
+    isSecurityUpdate,
+    _count: { vulnerabilities: 1 },
+  });
+
+  it("lists each remediation once across issues", () => {
+    const a = rem("a", null);
+    expect(
+      securityRemediationsOf([
+        { vulnerability: { remediations: [a] } },
+        { vulnerability: { remediations: [a] } },
+      ]),
+    ).toEqual([a]);
+  });
+  it("leaves out one a source stated is not a security update", () => {
+    const general = rem("g", false);
+    const security = rem("s", true);
+    expect(
+      securityRemediationsOf([
+        { vulnerability: { remediations: [general, security] } },
+      ]),
+    ).toEqual([security]);
   });
 });

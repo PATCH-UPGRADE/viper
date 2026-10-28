@@ -34,11 +34,8 @@ import {
   paginatedVulnerabilityResponseSchema,
   vulnerabilitiesByPriorityInputSchema,
   vulnerabilityAlohaResponseSchema,
-  vulnerabilityArrayInputSchema,
-  vulnerabilityArrayResponseSchema,
   vulnerabilityByPriorityInclude,
   vulnerabilityInclude,
-  vulnerabilityInputSchema,
   vulnerabilityResponseSchema,
   vulnerabilityUpdateInputSchema,
 } from "../types";
@@ -245,71 +242,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       return attachNote("VULNERABILITY", found);
     }),
 
-  // POST /api/vulnerabilities - Create vulnerability
-  create: protectedProcedure
-    .input(vulnerabilityInputSchema)
-    .meta({
-      openapi: {
-        method: "POST",
-        path: "/vulnerabilities",
-        tags: ["Vulnerabilities"],
-        summary: "Create Vulnerability",
-        description:
-          "Create a new vulnerability. The authenticated user will be recorded as the creator.",
-      },
-    })
-    .output(vulnerabilityResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { devices, ...dataInput } = input;
-      const connect = await devicesToMatchingConnect(devices);
-
-      return prisma.vulnerability.create({
-        data: {
-          ...dataInput,
-          deviceGroupMatchings: { connect },
-          userId: ctx.auth.user.id,
-        },
-        include: vulnerabilityInclude,
-      });
-    }),
-
-  // POST /api/vulnerabilities/bulk - Create one or more vulnerabilities
-  createBulk: protectedProcedure
-    .input(vulnerabilityArrayInputSchema)
-    .meta({
-      openapi: {
-        method: "POST",
-        path: "/vulnerabilities/bulk",
-        tags: ["Vulnerabilities"],
-        summary: "Create Bulk Vulnerabilities",
-        description:
-          "Create one or more new vulnerabilities from an array. The authenticated user will be recorded as the creator.",
-      },
-    })
-    .output(vulnerabilityArrayResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      // resolve shared matchings up-front (each runs its own transaction)
-      const connects = await Promise.all(
-        input.vulnerabilities.map((vuln) =>
-          devicesToMatchingConnect(vuln.devices),
-        ),
-      );
-
-      // create all vulns in a transaction
-      return prisma.$transaction(
-        input.vulnerabilities.map((vuln, index) => {
-          const { devices: _devices, ...dataInput } = vuln;
-          return prisma.vulnerability.create({
-            data: {
-              ...dataInput,
-              deviceGroupMatchings: { connect: connects[index] },
-              userId: ctx.auth.user.id,
-            },
-            include: vulnerabilityInclude,
-          });
-        }),
-      );
-    }),
+  // TODO: VW-540 POST /vulnerabilities and /vulnerabilities/bulk were removed with the move to
+  // VulnerabilityRecord; POST /vulnerabilityRecords replaces them.
 
   processIntegrationCreate: baseProcedure
     .input(integrationVulnerabilityInputSchema)

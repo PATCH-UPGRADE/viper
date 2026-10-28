@@ -10,6 +10,8 @@ type IntegrationVulnerabilityItem = z.infer<
   typeof integrationVulnerabilityInputSchema
 >["items"][number];
 
+// TODO: VW-540 broken until it is moved onto VulnerabilityRecord: the create below sets no
+// displayId (now required) or identifiers, so syncing a new vulnerability fails.
 export function processVulnerabilityIntegrationSync(
   input: {
     items: (Omit<IntegrationVulnerabilityItem, "sarif"> & {

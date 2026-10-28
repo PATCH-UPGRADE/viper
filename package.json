@@ -23,7 +23,7 @@
     "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx --require ./prisma/seeds/stub-server-only.cjs prisma/seed.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.44",

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CSV_UPLOAD_DISPLAY_NAME } from "@/features/integrations/platforms/csv-upload/contract";
 import { IssueStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
+import { isSecurityRelated } from "../remediations/release";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
 export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";
@@ -143,4 +144,26 @@ export function countAffectedRemediations(
     for (const r of issue.vulnerability.remediations) seen.add(r.id);
   }
   return seen.size;
+}
+
+interface IssueWithRemediations {
+  vulnerability: {
+    remediations: Array<{
+      id: string;
+      isSecurityUpdate: boolean | null;
+      _count: { vulnerabilities: number };
+    }>;
+  };
+}
+
+export function securityRemediationsOf<I extends IssueWithRemediations>(
+  issues: I[],
+): I["vulnerability"]["remediations"][number][] {
+  const allRemediations = issues.flatMap(
+    (issue) => issue.vulnerability.remediations,
+  );
+  const securityRemediations = allRemediations.filter(isSecurityRelated);
+
+  const uniqueMap = new Map(securityRemediations.map((r) => [r.id, r]));
+  return Array.from(uniqueMap.values());
 }

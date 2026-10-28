@@ -65,3 +65,19 @@ export const securityRelatedWhere = {
     { isSecurityUpdate: null, vulnerabilities: { some: {} } },
   ],
 } satisfies Prisma.RemediationWhereInput;
+
+export function manufacturerLink(
+  mappings: { webUrl: string | null; integration: { name: string } }[],
+): { href: string; label: string } | null {
+  const mapping = mappings.find((m) => m.webUrl);
+  return mapping?.webUrl
+    ? { href: mapping.webUrl, label: mapping.integration.name }
+    : null;
+}
+export const formatReleaseDate = (date: Date): string =>
+  date.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });

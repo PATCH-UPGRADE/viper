@@ -8,7 +8,7 @@ import {
   impactScalarData,
   remediationImpactSchema,
   statedImpactFields,
-} from "./impact";
+} from "../impact";
 
 const state = (over: Partial<ImpactState> = {}, impactRows = 0): ImpactState =>
   ({

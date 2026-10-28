@@ -26,6 +26,7 @@ const item = (
   status: TicketStatus.TO_DO,
   category: TicketCategory.FIRMWARE_UPDATE,
   scheduledAt: null,
+  scheduledEndTime: null,
   body: "",
   ownIncidentNumber,
   raw: { ticketKey: externalId },

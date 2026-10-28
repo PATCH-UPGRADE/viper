@@ -145,6 +145,8 @@ export const remediationInclude = {
 export const remediationCardInclude = {
   user: userIncludeSelect,
   artifacts: artifactWrapperSelect,
+  externalMappings: externalMappingSelect,
+  _count: { select: { vulnerabilities: true } },
 } as const;
 
 export type RemediationCard = Prisma.RemediationGetPayload<{

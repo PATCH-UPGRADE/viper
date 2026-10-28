@@ -147,13 +147,12 @@ const query = (params: Record<string, string>): string =>
 
 async function fetchPage(
   session: Session,
-  since: string | null,
+  since: string,
   offset: number,
 ): Promise<ChangeRequest[]> {
-  const order = "ORDERBYsys_updated_on^ORDERBYsys_id";
   const res = await session.request(
     `${tableApiPath(CHANGE_REQUEST_TABLE)}?${query({
-      sysparm_query: since ? `sys_updated_on>=${since}^${order}` : order,
+      sysparm_query: `sys_updated_on>=${since}^ORDERBYsys_updated_on^ORDERBYsys_id`,
       sysparm_limit: String(PAGE_SIZE),
       sysparm_offset: String(offset),
       sysparm_no_count: "true",
@@ -177,6 +176,14 @@ interface ChangeRequestsCursor {
  * covers a difference between the VIPER clock and the ServiceNow clock.
  */
 const CURSOR_CLOCK_MARGIN_MS = 5 * 60 * 1000;
+
+/**
+ * How far back the first sync reaches. Without it, the first sync imports the
+ * whole `change_request` table. An open change that nobody edited inside the
+ * window arrives when it next changes.
+ */
+const MAX_AGE_MONTH = 12;
+const MAX_AGE_MS = MAX_AGE_MONTH * 30 * 24 * 60 * 60 * 1000;
 
 /** A `Date` in the raw `sys_updated_on` format, in UTC. */
 const toServiceNowDateTime = (date: Date): string =>
@@ -211,15 +218,18 @@ const watermarkOf = (cursor: Cursor | null): string | null => {
  * otherwise moves the cursor past every real edit, and the sync stops seeing
  * changes. That record comes back on every sync instead, and the content hash
  * stops it from writing a new snapshot.
+ *
+ * With no cursor, the pull starts `MAX_AGE_MONTH` back. A saved cursor is used
+ * as it is, even when it is older than that.
  */
 export async function* listChanged(
   session: Session,
   cursor: Cursor | null,
 ): AsyncIterable<Page<ChangeRequest>> {
-  const limit = toServiceNowDateTime(
-    new Date(Date.now() - CURSOR_CLOCK_MARGIN_MS),
-  );
-  let since = watermarkOf(cursor);
+  const now = Date.now();
+  const limit = toServiceNowDateTime(new Date(now - CURSOR_CLOCK_MARGIN_MS));
+  let since =
+    watermarkOf(cursor) ?? toServiceNowDateTime(new Date(now - MAX_AGE_MS));
   let offset = 0;
   const seen = new Set<string>();
 
@@ -240,8 +250,10 @@ export async function* listChanged(
       offset += PAGE_SIZE;
     }
 
-    const saved = since && since > limit ? limit : since;
-    yield { items: fresh, cursor: saved ? { updatedOn: saved } : null };
+    yield {
+      items: fresh,
+      cursor: { updatedOn: since > limit ? limit : since },
+    };
     if (records.length < PAGE_SIZE) return;
   }
 }

@@ -130,9 +130,41 @@ describe("listChanged", () => {
     expect(params.get("sysparm_display_value")).toBe("false");
     expect(params.get("sysparm_exclude_reference_link")).toBe("true");
     expect(params.get("sysparm_fields")).toContain("sys_updated_on");
-    expect(params.get("sysparm_query")).toBe(
-      "ORDERBYsys_updated_on^ORDERBYsys_id",
+    expect(params.get("sysparm_query")).toMatch(
+      /\^ORDERBYsys_updated_on\^ORDERBYsys_id$/,
     );
+  });
+
+  describe("on the first sync", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date("2026-05-02T10:00:00Z") });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("asks only for changes from the last 12 months", async () => {
+      const { session, urls } = fakeSession([[]]);
+
+      const pages = await collect(listChanged(session, null));
+
+      expect(urls[0].searchParams.get("sysparm_query")).toBe(
+        "sys_updated_on>=2025-05-07 10:00:00^ORDERBYsys_updated_on^ORDERBYsys_id",
+      );
+      expect(pages).toEqual([
+        { items: [], cursor: { updatedOn: "2025-05-07 10:00:00" } },
+      ]);
+    });
+
+    it("uses a saved cursor that is older than the window", async () => {
+      const { session, urls } = fakeSession([[]]);
+
+      await collect(listChanged(session, { updatedOn: "2020-01-01 00:00:00" }));
+
+      expect(urls[0].searchParams.get("sysparm_query")).toBe(
+        "sys_updated_on>=2020-01-01 00:00:00^ORDERBYsys_updated_on^ORDERBYsys_id",
+      );
+    });
   });
 
   it("resumes from the cursor and returns the newest timestamp", async () => {

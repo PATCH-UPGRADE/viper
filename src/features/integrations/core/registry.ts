@@ -6,6 +6,7 @@ import { csaf } from "../platforms/csaf";
 import { csvUpload } from "../platforms/csv-upload";
 import { medisao } from "../platforms/medisao";
 import { partner } from "../platforms/partner";
+import { serviceNow } from "../platforms/servicenow";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
 import type { Category } from "../types";
 import { hasResourceModules, moduleForResource } from "./sync/resources";
@@ -21,6 +22,7 @@ export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   MEDISAO: medisao,
   CSAF: csaf,
   CSV_UPLOAD: csvUpload,
+  SERVICENOW: serviceNow,
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {

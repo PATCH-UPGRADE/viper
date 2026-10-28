@@ -21,12 +21,6 @@ describe("every include that selects mappings still resolves", () => {
     [
       ["assetInclude", "Asset", assetInclude, ResourceType.Asset],
       [
-        "assetDashboardInclude",
-        "Asset",
-        assetDashboardInclude,
-        ResourceType.Asset,
-      ],
-      [
         "remediationInclude",
         "Remediation",
         remediationInclude,
@@ -48,6 +42,16 @@ describe("every include that selects mappings still resolves", () => {
     });
   }
 
+  it("assetDashboardInclude", () => {
+    expect(mappingPaths("Asset", { include: assetDashboardInclude })).toEqual([
+      { path: ["externalMappings"], resource: ResourceType.Asset },
+      {
+        path: ["issues", "vulnerability", "remediations", "externalMappings"],
+        resource: ResourceType.Remediation,
+      },
+    ]);
+  });
+
   // A vulnerability's mappings are on its records.
   it("vulnerabilityInclude", () => {
     const resource = ResourceType.Vulnerability;
@@ -61,12 +65,20 @@ describe("every include that selects mappings still resolves", () => {
   });
 
   it("vulnerabilityByPriorityInclude", () => {
-    const resource = ResourceType.Vulnerability;
     expect(
       mappingPaths("Vulnerability", {
         include: vulnerabilityByPriorityInclude,
       }),
-    ).toEqual([{ path: ["records", "externalMappings"], resource }]);
+    ).toEqual([
+      {
+        path: ["records", "externalMappings"],
+        resource: ResourceType.Vulnerability,
+      },
+      {
+        path: ["remediations", "externalMappings"],
+        resource: ResourceType.Remediation,
+      },
+    ]);
   });
 
   // Related tickets select their own external id for the row label, so the

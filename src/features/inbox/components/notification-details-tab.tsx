@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { UtilizationGridList } from "@/features/assets/components/asset-utilization-grid";
+import { CVE_PATTERN } from "@/features/vulnerabilities/utils";
 import type { MatchFeedbackTargetType } from "@/generated/prisma";
 import { deviceGroupMatchingLabel, matchingVersionLabel } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
@@ -59,8 +60,6 @@ import { nvdUrl, sourceLabel } from "./shared";
 
 type DeviceGroupMapping =
   NotificationDetailWithRelations["deviceGroupsMatchings"][number];
-type VulnerabilityMapping =
-  NotificationDetailWithRelations["vulnerabilities"][number];
 
 type RejectTarget = {
   targetType: MatchFeedbackTargetType;
@@ -68,13 +67,6 @@ type RejectTarget = {
   label: string;
   noun: "product" | "vulnerability";
 };
-
-// A vulnerability minted from a non-CVE identifier stores that identifier as
-// the first sentence of its description.
-function vulnerabilityLabel(mapping: VulnerabilityMapping): string {
-  const { cveId, description } = mapping.vulnerability;
-  return cveId ?? description?.split(". ")[0] ?? mapping.vulnerabilityId;
-}
 
 function UnlinkButton({
   label,
@@ -358,19 +350,19 @@ export function NotificationDetailsTab({
                 {notification.vulnerabilities.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="font-medium">
-                      {m.vulnerability.cveId ? (
+                      {CVE_PATTERN.test(m.vulnerability.displayId) ? (
                         <a
-                          href={nvdUrl(m.vulnerability.cveId)}
+                          href={nvdUrl(m.vulnerability.displayId)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-primary hover:underline"
                         >
-                          {m.vulnerability.cveId}
+                          {m.vulnerability.displayId}
                           <ExternalLinkIcon className="size-3 shrink-0" />
                         </a>
                       ) : (
                         <span className="block max-w-md truncate">
-                          {vulnerabilityLabel(m)}
+                          {m.vulnerability.displayId}
                         </span>
                       )}
                     </TableCell>
@@ -384,7 +376,7 @@ export function NotificationDetailsTab({
                           setRejecting({
                             targetType: "NotificationVulnerabilityMapping",
                             id: m.id,
-                            label: vulnerabilityLabel(m),
+                            label: m.vulnerability.displayId,
                             noun: "vulnerability",
                           })
                         }

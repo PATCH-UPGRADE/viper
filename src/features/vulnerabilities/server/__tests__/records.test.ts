@@ -67,12 +67,14 @@ const { db, identifiers, sendWebhooks, send, SUBMITTED_AT } = vi.hoisted(() => {
         ta3Submission: data.ta3Submission ? { createdAt: SUBMITTED_AT } : null,
       })),
       update: vi.fn(async ({ data }) => ({ id: "rec-1", ...data })),
+      upsert: vi.fn(async () => ({ id: "rec-inbox" })),
       findUnique: vi.fn(),
       deleteMany: vi.fn(async () => ({ count: 1 })),
     },
     metric: {
       findFirst: vi.fn(async () => null),
       deleteMany: vi.fn(async () => ({ count: 0 })),
+      createMany: vi.fn(async () => ({ count: 1 })),
     },
     tA3Submission: {
       findFirst: vi.fn(async () => null),
@@ -103,6 +105,7 @@ import {
   createVulnerabilityRecord,
   deleteVulnerabilityRecord,
   updateVulnerabilityRecord,
+  upsertSourceRecord,
 } from "../records";
 
 const SARIF = { version: "2.1.0", runs: [] };
@@ -514,5 +517,50 @@ describe("deleteVulnerabilityRecord", () => {
     await expect(deleteVulnerabilityRecord("missing")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+});
+
+describe("upsertSourceRecord", () => {
+  const inbox = {
+    source: "INBOX" as const,
+    sourceId: "notif-1",
+    metrics: [{ type: "CVSS_V3_1" as const, score: 7.5 }],
+  };
+
+  it("upserts the record on (source, sourceId, vulnerability), replaces its metrics and refreshes the vulnerability", async () => {
+    db.metric.findFirst.mockResolvedValueOnce({ severity: "High" } as never);
+
+    await upsertSourceRecord("vuln-1", inbox);
+
+    expect(db.vulnerabilityRecord.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          source_sourceId_vulnerabilityId: {
+            source: "INBOX",
+            sourceId: "notif-1",
+            vulnerabilityId: "vuln-1",
+          },
+        },
+      }),
+    );
+    expect(db.metric.deleteMany).toHaveBeenCalledWith({
+      where: { recordId: "rec-inbox" },
+    });
+    expect(db.metric.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recordId: "rec-inbox",
+          type: "CVSS_V3_1",
+          score: 7.5,
+          severity: "High",
+        }),
+      ],
+    });
+    expect(db.vulnerability.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "vuln-1" },
+        data: expect.objectContaining({ severity: "High" }),
+      }),
+    );
   });
 });

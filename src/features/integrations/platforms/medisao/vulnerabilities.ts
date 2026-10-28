@@ -1,10 +1,10 @@
 import "server-only";
 import {
-  CVE_PATTERN,
   isGlobalVulnerabilityIdentifier,
   normalizeIdentifier as normalizeVulnerabilityIdentifier,
 } from "@/features/vulnerabilities/server/identity";
 import { createVulnerabilityRecord } from "@/features/vulnerabilities/server/records";
+import { CVE_PATTERN } from "@/features/vulnerabilities/utils";
 import { VulnerabilitySource } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { isUniqueViolation } from "@/lib/router-utils";

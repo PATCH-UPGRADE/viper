@@ -1,4 +1,10 @@
 import "server-only";
+import {
+  cvssMetricType,
+  upsertSourceRecord,
+} from "@/features/vulnerabilities/server/records";
+import { CVSS_METRIC_TYPES } from "@/features/vulnerabilities/utils";
+import { VulnerabilitySource } from "@/generated/prisma";
 import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { fillVersionUdi, normalizeName } from "@/lib/router-utils";
@@ -197,32 +203,50 @@ export async function enrichVersionUdi(
   await fillVersionUdi({ id: versionId, assets: { some: {} } }, udi);
 }
 
-export async function enrichVulnerabilityCvss(
-  vulnerabilityId: string,
-  updates: {
-    cvssScore?: number | null;
-    cvssVector?: string | null;
-  },
-): Promise<void> {
-  const vulnerability = await prisma.vulnerability.findUnique({
-    where: { id: vulnerabilityId },
-    select: { cvssScore: true, cvssVector: true },
-  });
+/**
+ * Keep a CVSS score the match step read out of a notification, as an INBOX record on the
+ * vulnerability (one per notification). Skipped when a CVSS metric from any source, this
+ * notification's own record included, already has the same score and vector (each compared only
+ * when the notification gives it), so repeating a known value adds nothing and a re-run is a
+ * no-op. A different score or vector is written, and as the newest CVSS it becomes the one the
+ * vulnerability shows.
+ *
+ * Call it after the match transaction commits: the record service writes the vulnerability row,
+ * which the transaction may hold locked.
+ */
+export async function recordInboxCvss({
+  vulnerabilityId,
+  notificationId,
+  cvssScore,
+  cvssVector,
+}: {
+  vulnerabilityId: string;
+  notificationId: string;
+  cvssScore?: number | null;
+  cvssVector?: string | null;
+}): Promise<void> {
+  if (cvssScore == null && !cvssVector) return;
 
-  if (!vulnerability) return;
-
-  const needsScore =
-    updates.cvssScore !== null && vulnerability.cvssScore === null;
-  const needsVector = !!updates.cvssVector && !vulnerability.cvssVector;
-
-  if (!needsScore && !needsVector) return;
-
-  await prisma.vulnerability.update({
-    where: { id: vulnerabilityId },
-    data: {
-      ...(needsScore ? { cvssScore: updates.cvssScore } : {}),
-      ...(needsVector ? { cvssVector: updates.cvssVector } : {}),
+  const same = await prisma.metric.count({
+    where: {
+      record: { vulnerabilityId },
+      type: { in: CVSS_METRIC_TYPES },
+      ...(cvssScore != null ? { score: cvssScore } : {}),
+      ...(cvssVector ? { vector: cvssVector } : {}),
     },
+  });
+  if (same > 0) return;
+
+  await upsertSourceRecord(vulnerabilityId, {
+    source: VulnerabilitySource.INBOX,
+    sourceId: notificationId,
+    metrics: [
+      {
+        type: cvssMetricType(cvssVector),
+        score: cvssScore ?? null,
+        vector: cvssVector ?? null,
+      },
+    ],
   });
 }
 

@@ -6,6 +6,8 @@ import {
 } from "@/generated/prisma";
 import { type MetricResponse, toMetricResponse } from "./types";
 
+export const CVE_PATTERN = /^CVE-\d{4}-\d{4,}$/i;
+
 // computeVulnerabilityPriority checking against 7
 // The band is from https://www.first.org/cvss/v3.1/specification-document section 5
 export function cvssBand(score: number | null | undefined): Severity | null {
@@ -37,6 +39,7 @@ export const VULNERABILITY_SOURCE_LABELS: Record<VulnerabilitySource, string> =
     VENDOR_ADVISORY: "Vendor advisory",
     AI: "AI crawler",
     OTHER: "Other",
+    INBOX: "Inbox",
     FIRST_EPSS: "FIRST EPSS",
     CISA_KEV: "CISA KEV",
   };

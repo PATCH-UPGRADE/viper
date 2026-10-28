@@ -5,6 +5,11 @@ import {
   impactStateSelect,
   statedImpactFields,
 } from "@/features/remediations/impact";
+import { normalizeIdentifier } from "@/features/vulnerabilities/server/identity";
+import {
+  CVE_PATTERN,
+  summarizeRecordMetrics,
+} from "@/features/vulnerabilities/utils";
 import { type Prisma, VersionStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { matchingVersionLabel } from "@/lib/markdown";
@@ -29,7 +34,7 @@ export type DeviceGroupMatchingCandidate = {
 
 export type VulnerabilityCandidate = {
   id: string;
-  cveId: string | null;
+  displayId: string;
   description: string | null;
   cvssScore: number | null;
   cvssVector: string | null;
@@ -185,44 +190,43 @@ async function searchDeviceGroupMatching(
 async function searchVulnerability(
   extracted: ExtractedVulnerability,
 ): Promise<VulnerabilityCandidate[]> {
-  const or: Prisma.VulnerabilityWhereInput[] = [];
-  if (extracted.cveId) {
-    or.push({ cveId: { contains: extracted.cveId, mode: "insensitive" } });
-  }
-
-  if (or.length === 0) return [];
+  const cve = extracted.cveId ? normalizeIdentifier(extracted.cveId) : null;
+  if (!cve) return [];
 
   const rows = await prisma.vulnerability.findMany({
-    where: { OR: or },
+    where: { identifiers: { some: { value: cve.value } } },
     select: {
       id: true,
-      cveId: true,
+      displayId: true,
       description: true,
-      cvssScore: true,
-      cvssVector: true,
+      records: { select: { metrics: true } },
     },
     take: TOP_K,
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    cveId: row.cveId ?? null,
-    description: row.description ?? null,
-    cvssScore: row.cvssScore ?? null,
-    cvssVector: row.cvssVector ?? null,
-  }));
+  return rows.map((row) => {
+    const { cvss } = summarizeRecordMetrics(row.records);
+    return {
+      id: row.id,
+      displayId: row.displayId,
+      description: row.description ?? null,
+      cvssScore: cvss?.score ?? null,
+      cvssVector: cvss?.vector ?? null,
+    };
+  });
 }
 
 async function searchRemediation(
   extracted: ExtractedRemediation,
 ): Promise<RemediationCandidate[]> {
   const or: Prisma.RemediationWhereInput[] = [];
-  if (extracted.linkedCveIds?.length) {
+  const linkedCves = (extracted.linkedCveIds ?? []).flatMap(
+    (id) => normalizeIdentifier(id)?.value ?? [],
+  );
+  if (linkedCves.length > 0) {
     or.push({
       vulnerabilities: {
-        some: {
-          cveId: { in: extracted.linkedCveIds, mode: "insensitive" },
-        },
+        some: { identifiers: { some: { value: { in: linkedCves } } } },
       },
     });
   }
@@ -240,7 +244,7 @@ async function searchRemediation(
       id: true,
       description: true,
       ...impactStateSelect,
-      vulnerabilities: { select: { cveId: true } },
+      vulnerabilities: { select: { displayId: true } },
       deviceGroupMatchings: {
         select: {
           manufacturer: { select: { canonicalDisplayName: true } },
@@ -255,7 +259,7 @@ async function searchRemediation(
   return rows.map((row) => ({
     id: row.id,
     linkedCveIds: row.vulnerabilities.flatMap((v) =>
-      v.cveId ? [v.cveId] : [],
+      CVE_PATTERN.test(v.displayId) ? [v.displayId] : [],
     ),
     description: row.description ?? null,
     statedImpactFields: statedImpactFields(row),

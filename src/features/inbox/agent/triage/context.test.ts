@@ -35,7 +35,7 @@ const render = (affectedAssets: Affected[]) =>
       assetLabel: new Map(),
       groupLabel: new Map(),
       matchingLabel: new Map(),
-      cveById: new Map(),
+      displayIdById: new Map(),
     },
     workflowsMarkdown: null,
   });

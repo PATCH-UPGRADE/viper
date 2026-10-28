@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { type Prisma, RemediationCategory } from "@/generated/prisma";
+import { publishedAtSchema } from "@/lib/schemas";
 
 export const remediationReleaseFieldsSchema = z.object({
   category: z
     .enum(RemediationCategory)
     .nullish()
     .describe("What kind of fix it is"),
-  publishedAt: z.iso
-    .datetime({ offset: true })
+  publishedAt: publishedAtSchema
     .nullish()
     .describe("When the manufacturer released it"),
   isSecurityUpdate: z

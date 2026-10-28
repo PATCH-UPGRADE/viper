@@ -1,9 +1,4 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import {
   useVulnerabilitiesByPriorityParams,
@@ -33,64 +28,6 @@ export const useSuspenseVulnerabilityPriorityMetrics = () => {
   const trpc = useTRPC();
   return useSuspenseQuery(
     trpc.vulnerabilities.getPriorityMetricsInternal.queryOptions(),
-  );
-};
-
-/**
- * Hook to update a vulnerability
- */
-export const useUpdateVulnerability = () => {
-  const queryClient = useQueryClient();
-  const trpc = useTRPC();
-
-  return useMutation(
-    trpc.vulnerabilities.update.mutationOptions({
-      onSuccess: (_data) => {
-        toast.success("Vulnerability updated");
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const getManyKey = trpc.vulnerabilities.getMany.queryKey();
-            const getOneKey = trpc.vulnerabilities.getOne.queryKey();
-            return (
-              query.queryKey[0] === getManyKey[0] ||
-              query.queryKey[0] === getOneKey[0]
-            );
-          },
-        });
-      },
-      onError: (error) => {
-        toast.error(`Failed to update vulnerability: ${error.message}`);
-      },
-    }),
-  );
-};
-
-/**
- * Hook to remove a vulnerability
- */
-export const useRemoveVulnerability = () => {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  return useMutation(
-    trpc.vulnerabilities.remove.mutationOptions({
-      onSuccess: (_data) => {
-        toast.success("Vulnerability removed");
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const getManyKey = trpc.vulnerabilities.getMany.queryKey();
-            const getOneKey = trpc.vulnerabilities.getOne.queryKey();
-            return (
-              query.queryKey[0] === getManyKey[0] ||
-              query.queryKey[0] === getOneKey[0]
-            );
-          },
-        });
-      },
-      onError: (error) => {
-        toast.error(`Failed to remove vulnerability: ${error.message}`);
-      },
-    }),
   );
 };
 

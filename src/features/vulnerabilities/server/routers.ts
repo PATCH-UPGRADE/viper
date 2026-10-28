@@ -3,12 +3,7 @@ import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
-import {
-  type AlohaStatus,
-  Priority,
-  type Prisma,
-  ResourceType,
-} from "@/generated/prisma";
+import { Priority, type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   type DeviceIdentity,
@@ -16,28 +11,25 @@ import {
 } from "@/lib/device-matching";
 import { type PaginationInput, paginationInputSchema } from "@/lib/pagination";
 import {
-  devicesToMatchingConnect,
   fetchPaginated,
   findVersionIdentity,
   findVulnerabilitiesMatchingDevices,
   processIntegrationToken,
 } from "@/lib/router-utils";
-import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
+import { integrationResponseSchema } from "@/lib/schemas";
 import {
   baseProcedure,
   createTRPCRouter,
   protectedProcedure,
 } from "@/trpc/init";
-import { requireExistence, requireOwnership } from "@/trpc/middleware";
+import { requireExistence } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
   paginatedVulnerabilityResponseSchema,
   vulnerabilitiesByPriorityInputSchema,
-  vulnerabilityAlohaResponseSchema,
   vulnerabilityByPriorityInclude,
   vulnerabilityInclude,
   vulnerabilityResponseSchema,
-  vulnerabilityUpdateInputSchema,
 } from "../types";
 import { processVulnerabilityIntegrationSync } from "./integration-sync";
 
@@ -242,9 +234,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       return attachNote("VULNERABILITY", found);
     }),
 
-  // TODO: VW-540 POST /vulnerabilities and /vulnerabilities/bulk were removed with the move to
-  // VulnerabilityRecord; POST /vulnerabilityRecords replaces them.
-
   processIntegrationCreate: baseProcedure
     .input(integrationVulnerabilityInputSchema)
     .meta({
@@ -266,131 +255,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       );
 
       return processVulnerabilityIntegrationSync(input, userId, integrationId);
-    }),
-
-  // DELETE /api/vulnerabilities/{id} - Delete vulnerability (only creator can delete)
-  remove: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .meta({
-      openapi: {
-        method: "DELETE",
-        path: "/vulnerabilities/{id}",
-        tags: ["Vulnerabilities"],
-        summary: "Delete Vulnerability",
-        description:
-          "Delete a vulnerability. Only the user who created the vulnerability can delete it.",
-      },
-    })
-    .output(vulnerabilityResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
-
-      return prisma.vulnerability.delete({
-        where: { id: input.id },
-        include: vulnerabilityInclude,
-      });
-    }),
-
-  // PUT /api/vulnerabilities/{id} - Update vulnerability (only creator can update)
-  update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        data: vulnerabilityUpdateInputSchema,
-      }),
-    )
-    .meta({
-      openapi: {
-        method: "PUT",
-        path: "/vulnerabilities/{id}",
-        tags: ["Vulnerabilities"],
-        summary: "Update Vulnerability",
-        description:
-          "Update a vulnerability. Only the user who created the vulnerability can update it.",
-      },
-    })
-    .output(vulnerabilityResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
-      const { devices, ...dataInput } = input.data;
-
-      return prisma.vulnerability.update({
-        where: { id: input.id },
-        data: {
-          ...dataInput,
-          ...(devices
-            ? {
-                deviceGroupMatchings: {
-                  set: await devicesToMatchingConnect(devices),
-                },
-              }
-            : {}),
-        },
-        include: vulnerabilityInclude,
-      });
-    }),
-
-  // GET /api/vulnerabilities/{id}/aloha - Get aloha data for a vulnerability
-  getAloha: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/vulnerabilities/{id}/aloha",
-        tags: ["Vulnerabilities"],
-        summary: "Get Vulnerability Aloha",
-        description:
-          "Get aloha status and log for a vulnerability. Any authenticated user can access.",
-      },
-    })
-    .output(vulnerabilityAlohaResponseSchema)
-    .query(async ({ input }) => {
-      const vuln = await prisma.vulnerability.findUnique({
-        where: { id: input.id },
-        include: vulnerabilityInclude,
-      });
-      const found = requireExistence(vuln, "Vulnerability");
-      return {
-        vulnerability: found,
-        aloha: { status: found.alohaStatus, log: found.alohaLog },
-      };
-    }),
-
-  // PUT /api/vulnerabilities/{id}/aloha - Update aloha data for a vulnerability
-  updateAloha: protectedProcedure
-    .input(z.object({ id: z.string(), data: alohaInputSchema }))
-    .meta({
-      openapi: {
-        method: "PUT",
-        path: "/vulnerabilities/{id}/aloha",
-        tags: ["Vulnerabilities"],
-        summary: "Update Vulnerability Aloha",
-        description:
-          "Update aloha status and log for a vulnerability. Any authenticated user can update.",
-      },
-    })
-    .output(vulnerabilityAlohaResponseSchema)
-    .mutation(async ({ input }) => {
-      const existing = await prisma.vulnerability.findUnique({
-        where: { id: input.id },
-        select: { id: true },
-      });
-      requireExistence(existing, "Vulnerability");
-
-      const vuln = await prisma.vulnerability.update({
-        where: { id: input.id },
-        data: {
-          alohaStatus: input.data.status as AlohaStatus,
-          alohaLog: input.data.log ?? {},
-        },
-        include: vulnerabilityInclude,
-      });
-      return {
-        vulnerability: vuln,
-        aloha: { status: vuln.alohaStatus, log: vuln.alohaLog },
-      };
     }),
 
   getManyByPriorityInternal: protectedProcedure

@@ -1,4 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { useDeferredValue } from "react";
 import { useTRPC } from "@/trpc/client";
 import {
   useVulnerabilitiesByPriorityParams,
@@ -15,13 +16,19 @@ export const useSuspenseVulnerabilities = () => {
   return useSuspenseQuery(trpc.vulnerabilities.getMany.queryOptions(params));
 };
 
+/**
+ * Queries with deferred params, so a page, search or tab change keeps the list
+ * mounted (and the table shows "Loading...") instead of suspending the page.
+ */
 export const useSuspenseVulnerabilitiesByPriority = () => {
   const trpc = useTRPC();
   const [params] = useVulnerabilitiesByPriorityParams();
+  const deferredParams = useDeferredValue(params);
 
-  return useSuspenseQuery(
-    trpc.vulnerabilities.getManyByPriorityInternal.queryOptions(params),
+  const { data, isFetching } = useSuspenseQuery(
+    trpc.vulnerabilities.getManyByPriorityInternal.queryOptions(deferredParams),
   );
+  return { data, isFetching: isFetching || params !== deferredParams };
 };
 
 export const useSuspenseVulnerabilityPriorityMetrics = () => {

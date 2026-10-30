@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ClampedCell } from "@/components/ui/clamped-cell";
 import { SortableHeader } from "@/components/ui/data-table";
 import type { AssetResponse } from "../types";
-import { getAssetDeviceTypeLabel, getSourceToolLabel } from "../utils";
+import { getAssetDeviceTypeLabel, getAssetSources } from "../utils";
 
 export const columns: ColumnDef<AssetResponse>[] = [
   {
@@ -23,10 +23,11 @@ export const columns: ColumnDef<AssetResponse>[] = [
     header: "IP Address",
   },
   {
-    accessorKey: "userId",
-    meta: { title: "Source Tool" },
-    header: "Source Tool",
-    accessorFn: getSourceToolLabel,
+    id: "sources",
+    meta: { title: "Sources" },
+    header: "Sources",
+    accessorFn: (row) => getAssetSources(row).join(", "),
+    cell: ({ getValue }) => <ClampedCell text={getValue<string>()} />,
   },
   {
     accessorKey: "updatedAt",

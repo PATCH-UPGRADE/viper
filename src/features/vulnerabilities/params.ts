@@ -1,6 +1,4 @@
-"use client";
-
-import { parseAsStringEnum } from "nuqs";
+import { parseAsStringEnum } from "nuqs/server";
 import { Priority } from "@/generated/prisma";
 import { createPaginationParams } from "@/lib/url-state";
 

@@ -38,13 +38,6 @@ export const assetUtilizationSchema = z.array(
   z.record(utilizationHourKeySchema, z.number().int()),
 );
 
-// Zod drops unknown keys, so without this a client that still sends the old
-// field gets a 200 and an asset whose status is silently UNKNOWN.
-const removedVersionStatusSchema = z
-  .never({ error: "versionStatus moved to device.version.status." })
-  .optional()
-  .describe("Removed. Use device.version.status.");
-
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
@@ -53,7 +46,6 @@ export const assetInputSchema = z.object({
     .describe(
       "The asset's manufacturer, product, and version. Without it, the asset has no device.",
     ),
-  versionStatus: removedVersionStatusSchema,
   role: z
     .string()
     .min(1)

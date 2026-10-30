@@ -1005,16 +1005,6 @@ describe("Assets Endpoint version status input", () => {
     expect(res.status).toBe(400);
   });
 
-  it("POST /assets - the old top-level versionStatus is a 400", async () => {
-    const res = await createAsset({
-      ip: "10.0.7.2",
-      device: namedDevice("vitest", product, VERSION_UNKNOWN),
-      versionStatus: "UNSURE",
-    });
-
-    expect(res.status).toBe(400);
-  });
-
   it("POST /assets - takes a version status in place of a version", async () => {
     const unsure = {
       ...namedDevice("vitest", product),

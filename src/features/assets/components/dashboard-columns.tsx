@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { SeverityBadge, severityConfig } from "@/components/severity-badge";
 import { Badge } from "@/components/ui/badge";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { SortableHeader } from "@/components/ui/data-table";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
@@ -16,7 +17,7 @@ import {
 import {
   countAffectedRemediations,
   getAssetDeviceTypeLabel,
-  getSourceToolLabel,
+  getAssetSources,
 } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
@@ -125,10 +126,11 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     header: "IP Address",
   },
   {
-    id: "sourceTool",
-    meta: { title: "Source Tool" },
-    header: "Source Tool",
-    accessorFn: getSourceToolLabel,
+    id: "sources",
+    meta: { title: "Sources" },
+    header: "Sources",
+    accessorFn: (row) => getAssetSources(row).join(", "),
+    cell: ({ getValue }) => <ClampedCell text={getValue<string>()} />,
   },
   {
     id: "remediations",

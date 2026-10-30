@@ -43,7 +43,9 @@ const kevText = (records: Records) => {
 export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
   {
     accessorKey: "id",
-    header: ({ column }) => <SortableHeader header="ID" column={column} />,
+    header: ({ column }) => (
+      <SortableHeader header="VIPER ID" column={column} />
+    ),
     cell: ({ row }) => (
       <Link
         href={`/vulnerabilities/${row.original.id}`}

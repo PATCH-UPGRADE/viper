@@ -109,25 +109,26 @@ export function getAssetNameForAgent(asset: AgentNameSource): string {
   );
 }
 
-export type SourceToolSource = {
+export type AssetSourcesSource = {
   user: { name: string };
-  externalMappings: ReadonlyArray<{ integration: { platform: PlatformEnum } }>;
+  externalMappings: ReadonlyArray<{
+    integration: { name: string; platform: PlatformEnum };
+  }>;
 };
 
-export function getSourceToolLabel(asset: SourceToolSource): string {
-  const reportingPlatforms = asset.externalMappings.map(
-    (mapping) => mapping.integration.platform,
+/**
+ * Where an asset came from: the user who created it, then each integration that
+ * reports it. Every CSV import is its own integration, so each shows as "CSV
+ * Upload". An integration's shadow user shares its name, so an asset an
+ * integration created lists that integration once.
+ */
+export function getAssetSources(asset: AssetSourcesSource): string[] {
+  const integrations = asset.externalMappings.map(({ integration }) =>
+    integration.platform === PlatformEnum.CSV_UPLOAD
+      ? CSV_UPLOAD_DISPLAY_NAME
+      : integration.name,
   );
-  const isReportedByCsvUpload = reportingPlatforms.includes(
-    PlatformEnum.CSV_UPLOAD,
-  );
-  const isReportedByAnotherPlatform = reportingPlatforms.some(
-    (platform) => platform !== PlatformEnum.CSV_UPLOAD,
-  );
-  if (isReportedByCsvUpload && !isReportedByAnotherPlatform) {
-    return CSV_UPLOAD_DISPLAY_NAME;
-  }
-  return asset.user.name;
+  return [...new Set([asset.user.name, ...integrations])];
 }
 
 // One remediation can fix several of the asset's vulnerabilities, so count

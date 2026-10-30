@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { PlatformEnum } from "@/generated/prisma";
 import {
   getAssetDeviceTypeLabel,
   getAssetDisplayName,
   getAssetIdentifier,
   getAssetNameForAgent,
+  getAssetSources,
   getAssetTitle,
   securityRemediationsOf,
 } from "./utils";
@@ -109,6 +111,51 @@ describe("getAssetDeviceTypeLabel", () => {
     ["no asset", null],
   ])("returns null for %s", (_, asset) => {
     expect(getAssetDeviceTypeLabel(asset)).toBeNull();
+  });
+});
+
+describe("getAssetSources", () => {
+  const mapping = (name: string, platform: PlatformEnum) => ({
+    integration: { name, platform },
+  });
+
+  it("lists the creator, then each integration that reports the asset", () => {
+    expect(
+      getAssetSources({
+        user: { name: "Seed User" },
+        externalMappings: [
+          mapping("Blueflow", PlatformEnum.PARTNER),
+          mapping("Hospital ServiceNow", PlatformEnum.SERVICENOW),
+        ],
+      }),
+    ).toEqual(["Seed User", "Blueflow", "Hospital ServiceNow"]);
+  });
+
+  it("lists an integration once when its shadow user created the asset", () => {
+    expect(
+      getAssetSources({
+        user: { name: "Blueflow" },
+        externalMappings: [mapping("Blueflow", PlatformEnum.PARTNER)],
+      }),
+    ).toEqual(["Blueflow"]);
+  });
+
+  it('shows every CSV import as one "CSV Upload"', () => {
+    expect(
+      getAssetSources({
+        user: { name: "Seed User" },
+        externalMappings: [
+          mapping("CSV Assets Upload - Oct 1", PlatformEnum.CSV_UPLOAD),
+          mapping("CSV Assets Upload - Oct 2", PlatformEnum.CSV_UPLOAD),
+        ],
+      }),
+    ).toEqual(["Seed User", "CSV Upload"]);
+  });
+
+  it("lists only the creator when no integration reports the asset", () => {
+    expect(
+      getAssetSources({ user: { name: "Seed User" }, externalMappings: [] }),
+    ).toEqual(["Seed User"]);
   });
 });
 

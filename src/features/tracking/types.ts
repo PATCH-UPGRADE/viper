@@ -716,6 +716,7 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   product: z
     .object({
       canonicalDisplayName: z.string(),
+      deviceTypeId: z.string().nullable(),
       deviceType: deviceTypeLabelSchema,
     })
     .nullable(),

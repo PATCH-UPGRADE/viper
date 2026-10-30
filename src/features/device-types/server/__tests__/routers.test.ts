@@ -7,10 +7,11 @@ const db = vi.hoisted(() => ({
   deviceType: { findMany: vi.fn() },
   product: { findMany: vi.fn() },
   asset: { count: vi.fn() },
+  deviceGuide: { findMany: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ default: db }));
 
-const { countAssetsByDeviceType } = await import("../routers");
+const { countAssetsByDeviceType, getDeviceGuides } = await import("../routers");
 
 const product = (deviceTypeId: string | null, assets: number) => ({
   deviceTypeId,
@@ -25,6 +26,7 @@ beforeEach(() => {
   ]);
   db.product.findMany.mockReset().mockResolvedValue([]);
   db.asset.count.mockReset().mockResolvedValue(0);
+  db.deviceGuide.findMany.mockResolvedValue([]);
 });
 
 describe("countAssetsByDeviceType", () => {
@@ -67,5 +69,69 @@ describe("countAssetsByDeviceType", () => {
     expect(db.asset.count).toHaveBeenCalledWith({
       where: { ...counted, productId: null },
     });
+  });
+});
+
+describe("getDeviceGuides", () => {
+  beforeEach(() => {
+    db.deviceType.findMany.mockResolvedValue([]);
+  });
+  it("returns each device type with its general text, or null without one", async () => {
+    db.deviceType.findMany.mockResolvedValue([
+      {
+        id: "dt-ct",
+        displayName: "CT",
+        guides: [{ body: "Takes quick pictures" }],
+      },
+      { id: "dt-fw", displayName: "Firewall", guides: [] },
+    ]);
+    const { deviceTypes } = await getDeviceGuides({
+      deviceTypeIds: ["dt-ct", "dtfw"],
+      productIds: [],
+    });
+
+    expect(deviceTypes).toEqual([
+      {
+        id: "dt-ct",
+        displayName: "CT",
+        generalText: "Takes quick pictures",
+      },
+      { id: "dt-fw", displayName: "Firewall", generalText: null },
+    ]);
+  });
+
+  it("reads the given device types and only their typical-usage guides", async () => {
+    await getDeviceGuides({ deviceTypeIds: ["dt-ct"], productIds: [] });
+    const [{ where, select }] = db.deviceType.findMany.mock.calls[0];
+    expect(where).toEqual({ id: { in: ["dt-ct"] } });
+    expect(select.guides.where).toEqual({ topic: "TYPICAL_USAGE" });
+  });
+
+  it("skips the product query when there are no product ids", async () => {
+    const { productGuides } = await getDeviceGuides({
+      deviceTypeIds: ["dt-ct"],
+      productIds: [],
+    });
+    expect(db.deviceGuide.findMany).not.toHaveBeenCalled();
+    expect(productGuides).toEqual([]);
+  });
+
+  it("returns the product-specific guides of the given products", async () => {
+    const guide = { productId: "p-gotop", body: "Main CT for the ED" };
+    db.deviceGuide.findMany.mockResolvedValue([guide]);
+
+    const { productGuides } = await getDeviceGuides({
+      deviceTypeIds: [],
+      productIds: ["p-gotop", "p-sola"],
+    });
+
+    expect(db.deviceGuide.findMany).toHaveBeenCalledWith({
+      where: {
+        topic: "TYPICAL_USAGE",
+        productId: { in: ["p-gotop", "p-sola"] },
+      },
+      select: { productId: true, body: true },
+    });
+    expect(productGuides).toEqual([guide]);
   });
 });

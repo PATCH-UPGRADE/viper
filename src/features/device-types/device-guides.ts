@@ -10,7 +10,7 @@ export type PageProduct = {
 export function describeProducts(products: PageProduct[]) {
   return {
     deviceCount: products.reduce((n, p) => n + p.assetCount, 0),
-    subtitle: products.map((p) => p.product).join(" \u00b7"),
+    subtitle: products.map((p) => p.product).join(" \u00b7 "),
   };
 }
 

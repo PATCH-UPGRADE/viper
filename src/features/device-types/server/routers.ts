@@ -96,7 +96,7 @@ export async function getDeviceGuides({
     deviceTypes: deviceTypes.map((deviceType) => ({
       id: deviceType.id,
       displayName: deviceType.displayName,
-      generalText: deviceType.guides[0]?.body ?? null,
+      generalText: deviceType.guides.at(0)?.body ?? null,
     })),
     productGuides,
   };

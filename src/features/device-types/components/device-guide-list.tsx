@@ -42,12 +42,12 @@ export function DeviceGuideList({ products }: { products: PageProduct[] }) {
           >
             <h4 className="text-sm font-semibold">
               {guide.deviceType
-                ? `${guide.product} ${guide.deviceType}`
+                ? `${guide.product} \u2022 ${guide.deviceType}`
                 : guide.product}
             </h4>
             {guide.generalText || guide.productText ? (
               <>
-                <p className="flex items-cener gap-2 text-xs font-medium text-primary">
+                <p className="flex items-center gap-2 text-xs font-medium text-primary">
                   In most hospitals
                   <Badge variant="outline" className="uppercase tracking-wide">
                     General information

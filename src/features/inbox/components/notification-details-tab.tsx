@@ -221,19 +221,23 @@ export function NotificationDetailsTab({
     (m) => m.assetCount > 0,
   );
 
-  const affectedProducts: PageProduct[] = withAssets.flatMap((m) => {
+  const productsById = new Map<string, PageProduct>();
+  for (const m of withAssets) {
     const product = m.deviceGroupMatching.product;
-    return product
-      ? [
-          {
-            productId: product.id,
-            product: product.canonicalDisplayName,
-            deviceTypeId: product.deviceTypeId,
-            assetCount: m.assetCount,
-          },
-        ]
-      : [];
-  });
+    if (!product) continue;
+    const existing = productsById.get(product.id);
+    if (existing) {
+      existing.assetCount += m.assetCount;
+    } else {
+      productsById.set(product.id, {
+        productId: product.id,
+        product: product.canonicalDisplayName,
+        deviceTypeId: product.deviceTypeId,
+        assetCount: m.assetCount,
+      });
+    }
+  }
+  const affectedProducts: PageProduct[] = [...productsById.values()];
 
   // Group matchings by manufacturer (first-seen order) so the manufacturer cell can span
   // all of that manufacturer's product rows in the table below.

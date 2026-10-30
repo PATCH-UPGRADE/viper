@@ -235,6 +235,7 @@ export const ticketDetailInclude = {
           product: {
             select: {
               canonicalDisplayName: true,
+              deviceTypeId: true,
               ...deviceTypeLabelSelect,
             },
           },

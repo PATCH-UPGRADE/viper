@@ -359,7 +359,7 @@ export function NotificationDetailsTab({
                   value="utilization"
                   className="overflow-hidden rounded-xl border last:border-b"
                 >
-                  <AccordionTrigger className="items center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
+                  <AccordionTrigger className="items-center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
                     <span className="flex font-bold items-center gap-2.5 text-left">
                       <HeartIcon className="size-4 shrink-0" />
                       When are these devices being used in my hospital?

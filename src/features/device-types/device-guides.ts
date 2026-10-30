@@ -15,14 +15,14 @@ export function describeProducts(products: PageProduct[]) {
 }
 
 export function toProductGuides(products: PageProduct[], guides: DeviceGuides) {
-  const deviceTypeId = new Map(guides.deviceTypes.map((d) => [d.id, d]));
+  const deviceTypeById = new Map(guides.deviceTypes.map((d) => [d.id, d]));
   const productTextById = new Map(
     guides.productGuides.map((g) => [g.productId, g.body]),
   );
 
   return products.map((p) => {
     const deviceType = p.deviceTypeId
-      ? deviceTypeId.get(p.deviceTypeId)
+      ? deviceTypeById.get(p.deviceTypeId)
       : undefined;
     return {
       productId: p.productId,

@@ -29,7 +29,7 @@ export function DeviceQuestionAccordionItem({
       value={value}
       className="mb-3 overflow-hidden rounded-xl border last:border-b"
     >
-      <AccordionTrigger className="items center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
+      <AccordionTrigger className="items-center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
         <span className="flex items-start gap-2.5 text-left">
           <Icon className="mt-0.5 size-4 shrink-0" />
           <span className="space-y-0.5">

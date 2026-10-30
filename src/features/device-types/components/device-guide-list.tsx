@@ -38,7 +38,7 @@ export function DeviceGuideList({ products }: { products: PageProduct[] }) {
         return (
           <section
             key={guide.productId}
-            className="space-y-2 py-4 pt-5 first:pt-0"
+            className="space-y-2 pt-5 pb-4 first:pt-0"
           >
             <h4 className="text-sm font-semibold">
               {guide.deviceType
@@ -62,7 +62,7 @@ export function DeviceGuideList({ products }: { products: PageProduct[] }) {
                   )}
                   {guide.productText && (
                     <MarkdownWithTablesWrapper plainLinks>
-                      {guide.productText ?? ""}
+                      {guide.productText}
                     </MarkdownWithTablesWrapper>
                   )}
                 </div>

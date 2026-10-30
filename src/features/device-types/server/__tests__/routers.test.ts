@@ -26,7 +26,7 @@ beforeEach(() => {
   ]);
   db.product.findMany.mockReset().mockResolvedValue([]);
   db.asset.count.mockReset().mockResolvedValue(0);
-  db.deviceGuide.findMany.mockResolvedValue([]);
+  db.deviceGuide.findMany.mockReset().mockResolvedValue([]);
 });
 
 describe("countAssetsByDeviceType", () => {
@@ -86,7 +86,7 @@ describe("getDeviceGuides", () => {
       { id: "dt-fw", displayName: "Firewall", guides: [] },
     ]);
     const { deviceTypes } = await getDeviceGuides({
-      deviceTypeIds: ["dt-ct", "dtfw"],
+      deviceTypeIds: ["dt-ct", "dt-fw"],
       productIds: [],
     });
 

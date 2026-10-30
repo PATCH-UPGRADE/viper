@@ -70,7 +70,7 @@ describe("toProductGuides", () => {
     expect(entry.generalText).toBeNull();
   });
 
-  it("keeps the type name but no txt for a type without a guide", () => {
+  it("keeps the type name but no text for a type without a guide", () => {
     const [entry] = toProductGuides([product("asa", "dt-fw")], guides);
     expect(entry.deviceType).toBe("Firewall");
     expect(entry.generalText).toBeNull();

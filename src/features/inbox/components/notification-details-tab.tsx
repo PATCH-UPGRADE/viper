@@ -2,9 +2,16 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
+import {
+  ActivityIcon,
+  ExternalLinkIcon,
+  HeartIcon,
+  MailIcon,
+  Unlink,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { DeviceQuestionAccordionItem } from "@/components/device-question-accordion-item";
 import { SeverityBadge } from "@/components/severity-badge";
 import { TlpBadge } from "@/components/tlp-badge";
 import {
@@ -37,6 +44,11 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { UtilizationGridList } from "@/features/assets/components/asset-utilization-grid";
+import { DeviceGuideList } from "@/features/device-types/components/device-guide-list";
+import {
+  describeProducts,
+  type PageProduct,
+} from "@/features/device-types/device-guides";
 import { CVE_PATTERN } from "@/features/vulnerabilities/utils";
 import type { MatchFeedbackTargetType } from "@/generated/prisma";
 import { deviceGroupMatchingLabel, matchingVersionLabel } from "@/lib/markdown";
@@ -209,6 +221,24 @@ export function NotificationDetailsTab({
     (m) => m.assetCount > 0,
   );
 
+  const productsById = new Map<string, PageProduct>();
+  for (const m of withAssets) {
+    const product = m.deviceGroupMatching.product;
+    if (!product) continue;
+    const existing = productsById.get(product.id);
+    if (existing) {
+      existing.assetCount += m.assetCount;
+    } else {
+      productsById.set(product.id, {
+        productId: product.id,
+        product: product.canonicalDisplayName,
+        deviceTypeId: product.deviceTypeId,
+        assetCount: m.assetCount,
+      });
+    }
+  }
+  const affectedProducts: PageProduct[] = [...productsById.values()];
+
   // Group matchings by manufacturer (first-seen order) so the manufacturer cell can span
   // all of that manufacturer's product rows in the table below.
   const manufacturerGroups = withAssets.reduce<
@@ -315,14 +345,27 @@ export function NotificationDetailsTab({
                 questions about these devices
               </p>
               <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="utilization" className="border-b-0">
-                  <AccordionTrigger className="px-3 text-sm rounded-lg bg-secondary hover:no-underline hover:bg-secondary/80">
+                {affectedProducts.length > 0 && (
+                  <DeviceQuestionAccordionItem
+                    value="typical-usage"
+                    icon={ActivityIcon}
+                    title="How are these devices typically used in hospitals?"
+                    {...describeProducts(affectedProducts)}
+                  >
+                    <DeviceGuideList products={affectedProducts} />
+                  </DeviceQuestionAccordionItem>
+                )}
+                <AccordionItem
+                  value="utilization"
+                  className="overflow-hidden rounded-xl border last:border-b"
+                >
+                  <AccordionTrigger className="items-center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
                     <span className="flex font-bold items-center gap-2.5 text-left">
                       <HeartIcon className="size-4 shrink-0" />
                       When are these devices being used in my hospital?
                     </span>
                   </AccordionTrigger>
-                  <AccordionContent className="pl-[26px] pt-4">
+                  <AccordionContent className="bg-card px-6 pt-5 pb-5 dark:bg-accent/40">
                     <NotificationUtilizationAnswer
                       notificationId={notification.id}
                     />

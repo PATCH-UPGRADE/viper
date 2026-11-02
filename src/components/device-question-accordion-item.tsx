@@ -7,21 +7,20 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 
 export function DeviceQuestionAccordionItem({
   value,
   icon: Icon,
   title,
-  deviceCount,
   subtitle,
+  showSubtitle = false,
   children,
 }: {
   value: string;
   icon: LucideIcon;
   title: string;
-  deviceCount?: number;
   subtitle?: string;
+  showSubtitle?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -33,18 +32,8 @@ export function DeviceQuestionAccordionItem({
         <span className="flex items-start gap-2.5 text-left">
           <Icon className="mt-0.5 size-4 shrink-0" />
           <span className="space-y-0.5">
-            <span className="flex items-center gap-2 font-bold">
-              {title}
-              {deviceCount !== undefined && (
-                <Badge
-                  className="rounded-full border-primary/50 bg-primary/10 text-primary"
-                  variant="outline"
-                >
-                  {deviceCount} {deviceCount === 1 ? "device" : "devices"}
-                </Badge>
-              )}
-            </span>
-            {subtitle && (
+            <span className="block font-bold">{title}</span>
+            {showSubtitle && subtitle && (
               <span className="block text-xs font-normal text-muted-foreground">
                 {subtitle}
               </span>

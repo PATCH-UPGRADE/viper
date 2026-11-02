@@ -84,15 +84,13 @@ const buildQuestions = (assetIds: string[]): StubQuestion[] => [
 function toPageProducts(assets: CardAsset[]): PageProduct[] {
   const byId = new Map<string, PageProduct>();
   for (const asset of assets) {
-    if (!asset.productId || !asset.product) continue;
-    const entry = byId.get(asset.productId) ?? {
+    if (!asset.productId || !asset.product || byId.has(asset.productId))
+      continue;
+    byId.set(asset.productId, {
       productId: asset.productId,
       product: asset.product.canonicalDisplayName,
       deviceTypeId: asset.product.deviceTypeId,
-      assetCount: 0,
-    };
-    entry.assetCount += 1;
-    byId.set(asset.productId, entry);
+    });
   }
   return [...byId.values()];
 }
@@ -109,6 +107,7 @@ export const AdditionalDetailsCard = ({ assets }: { assets: CardAsset[] }) => {
             icon={ActivityIcon}
             title="How are these devices typically used in hospitals?"
             {...describeProducts(products)}
+            showSubtitle
           >
             <DeviceGuideList products={products} />
           </DeviceQuestionAccordionItem>

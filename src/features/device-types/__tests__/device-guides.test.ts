@@ -9,12 +9,10 @@ import type { DeviceGuides } from "../server/routers";
 const product = (
   productId: string,
   deviceTypeId: string | null,
-  assetCount = 1,
 ): PageProduct => ({
   productId,
   product: `Product ${productId}`,
   deviceTypeId,
-  assetCount,
 });
 
 const guides: DeviceGuides = {
@@ -78,14 +76,10 @@ describe("toProductGuides", () => {
 });
 
 describe("describeProducts", () => {
-  it("adds up the asset counts and joins the product names", () => {
+  it("joins the product names", () => {
     expect(
-      describeProducts([
-        product("sola", "dt-mri", 2),
-        product("gotop", "dt-ct", 3),
-      ]),
+      describeProducts([product("sola", "dt-mri"), product("gotop", "dt-ct")]),
     ).toEqual({
-      deviceCount: 5,
       subtitle: "Product sola \u00b7 Product gotop",
     });
   });

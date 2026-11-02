@@ -224,18 +224,12 @@ export function NotificationDetailsTab({
   const productsById = new Map<string, PageProduct>();
   for (const m of withAssets) {
     const product = m.deviceGroupMatching.product;
-    if (!product) continue;
-    const existing = productsById.get(product.id);
-    if (existing) {
-      existing.assetCount += m.assetCount;
-    } else {
-      productsById.set(product.id, {
-        productId: product.id,
-        product: product.canonicalDisplayName,
-        deviceTypeId: product.deviceTypeId,
-        assetCount: m.assetCount,
-      });
-    }
+    if (!product || productsById.has(product.id)) continue;
+    productsById.set(product.id, {
+      productId: product.id,
+      product: product.canonicalDisplayName,
+      deviceTypeId: product.deviceTypeId,
+    });
   }
   const affectedProducts: PageProduct[] = [...productsById.values()];
 

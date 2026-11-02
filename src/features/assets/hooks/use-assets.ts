@@ -4,7 +4,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
 import {
   NEW_VULNERABLE_ASSETS_POLL_INTERVAL_MS,
@@ -25,13 +25,19 @@ export const useSuspenseAssets = () => {
   return useSuspenseQuery(trpc.assets.getManyInternal.queryOptions(params));
 };
 
+/**
+ * Queries with deferred params, so a page or search change keeps the list
+ * mounted (and the table shows "Loading...") instead of suspending the page.
+ */
 export const useSuspenseAssetsDashboard = () => {
   const trpc = useTRPC();
   const [params] = useAssetsParams();
+  const deferredParams = useDeferredValue(params);
 
-  return useSuspenseQuery(
-    trpc.assets.getManyDashboardInternal.queryOptions(params),
+  const { data, isFetching } = useSuspenseQuery(
+    trpc.assets.getManyDashboardInternal.queryOptions(deferredParams),
   );
+  return { data, isFetching: isFetching || params !== deferredParams };
 };
 
 export const useNewVulnerableAssets = (

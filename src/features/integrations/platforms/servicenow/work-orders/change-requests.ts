@@ -3,7 +3,12 @@
 import "server-only";
 import { z } from "zod";
 import { TicketCategory, TicketStatus } from "@/generated/prisma";
-import type { Cursor, Page, Session } from "../../../core/types";
+import type {
+  Cursor,
+  Page,
+  Session,
+  WorkOrderPatch,
+} from "../../../core/types";
 import { tableApiPath } from "../urls";
 
 export const CHANGE_REQUEST_TABLE = "change_request";
@@ -90,31 +95,16 @@ export function toIso(value: string): string | null {
   return match ? `${match[1]}T${match[2]}Z` : null;
 }
 
-function buildBody(cr: ChangeRequest): string {
-  const start = toIso(cr.start_date);
-  const end = toIso(cr.end_date);
-  return [
-    `**${cr.number}**: ${cr.short_description}`,
-    "",
-    cr.type ? `- Type: ${cr.type}` : null,
-    start ? `- Planned: ${start} → ${end ?? "?"}` : null,
-    cr.description ? `\n${cr.description}` : null,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
-}
-
 export function toCanonical(raw: ChangeRequest): ServiceNowWorkOrderItem {
   return {
     externalId: raw.sys_id,
-    summary: raw.short_description
-      ? `${raw.number}: ${raw.short_description}`
-      : raw.number,
+    // VIPER requires a summary, and a change request can have none.
+    summary: raw.short_description || raw.number,
     status: mapStatus(raw.state),
     category: TicketCategory.OTHER,
     scheduledAt: toIso(raw.start_date),
     scheduledEndTime: toIso(raw.end_date),
-    body: buildBody(raw),
+    body: raw.description,
     raw,
   };
 }
@@ -124,7 +114,9 @@ async function readResult(res: Response): Promise<unknown> {
     throw new Error(
       res.status === 401
         ? "ServiceNow rejected the credentials (401)"
-        : `ServiceNow Table API returned ${res.status}`,
+        : res.status === 403
+          ? "ServiceNow refused the request (403). Confirm the integration user's permissions."
+          : `ServiceNow Table API returned ${res.status}`,
     );
   }
   // A hibernating developer instance answers 200 with an HTML wake-up page.
@@ -266,4 +258,39 @@ export async function get(
     `${tableApiPath(CHANGE_REQUEST_TABLE)}/${encodeURIComponent(externalId)}?${query({})}`,
   );
   return changeRequestSchema.parse(await readResult(res));
+}
+
+const toServiceNowValue = (iso: string | null): string =>
+  iso ? toServiceNowDateTime(new Date(iso)) : "";
+
+/**
+ * Writes a VIPER edit onto the change request. The Table API reads raw datetime
+ * input as UTC, the same as it returns it, and an empty string clears a field.
+ * The state is never sent: the platform declares the status locked.
+ */
+export async function update(
+  session: Session,
+  externalId: string,
+  patch: WorkOrderPatch,
+): Promise<{ externalId: string; raw: ChangeRequest }> {
+  const body: Record<string, string> = {};
+  if (patch.summary !== undefined) body.short_description = patch.summary;
+  if (patch.description !== undefined) body.description = patch.description;
+  if (patch.scheduledAt !== undefined) {
+    body.start_date = toServiceNowValue(patch.scheduledAt);
+  }
+  if (patch.scheduledEndTime !== undefined) {
+    body.end_date = toServiceNowValue(patch.scheduledEndTime);
+  }
+
+  const res = await session.request(
+    `${tableApiPath(CHANGE_REQUEST_TABLE)}/${encodeURIComponent(externalId)}?${query({})}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  const raw = changeRequestSchema.parse(await readResult(res));
+  return { externalId: raw.sys_id, raw };
 }

@@ -59,6 +59,22 @@ describe("registry", () => {
     },
   );
 
+  // Core sends `update` only the fields in `pushedFields`, so an `update`
+  // without them never runs. A field that is both pushed and locked can never
+  // be edited.
+  it.each(Object.keys(registry) as PlatformEnum[])(
+    "%s declares which work order fields its update pushes",
+    (platform) => {
+      const workOrders = requirePlatform(platform).workOrders;
+      if (!workOrders) return;
+      const pushed = workOrders.pushedFields ?? [];
+      expect(pushed.length > 0).toBe(workOrders.update !== undefined);
+      expect(
+        pushed.filter((field) => workOrders.lockedFields?.includes(field)),
+      ).toEqual([]);
+    },
+  );
+
   it("has no adapter for a platform that records no snapshots", () => {
     expect(sourceAdapterFor(PlatformEnum.PARTNER)).toBeUndefined();
   });

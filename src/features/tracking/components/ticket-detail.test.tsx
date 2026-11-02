@@ -354,6 +354,7 @@ const makeTicket = (
     isWatching: false,
     activities: [],
     externalMappings: [],
+    lockedFields: [],
     sourceLinks: [],
     notification: null,
     ...overrides,
@@ -361,6 +362,62 @@ const makeTicket = (
   }) as any;
 
 describe("TicketEditForm", () => {
+  it("lets the user change the status of a VIPER ticket", () => {
+    render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
+
+    expect(screen.getByLabelText("Status")).toBeEnabled();
+  });
+
+  it("disables the status that a platform owns, and says why", async () => {
+    const user = userEvent.setup();
+    render(
+      <TicketEditForm
+        data={makeTicket({
+          lockedFields: [{ field: "status", managedBy: "ServiceNow" }],
+        })}
+        onCancel={() => {}}
+      />,
+    );
+
+    const status = screen.getByLabelText("Status");
+    expect(status).toBeDisabled();
+
+    await user.hover(status.closest("span") as HTMLElement);
+    expect(
+      (
+        await screen.findAllByText(
+          /status of this work order is managed in ServiceNow/i,
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("disables any field that a platform owns, and leaves the others enabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <TicketEditForm
+        data={makeTicket({
+          lockedFields: [{ field: "priority", managedBy: "ServiceNow" }],
+        })}
+        onCancel={() => {}}
+      />,
+    );
+
+    const priority = screen.getByLabelText("Priority");
+    expect(priority).toBeDisabled();
+    expect(screen.getByLabelText("Status")).toBeEnabled();
+    expect(screen.getByLabelText(/summary/i)).toBeEnabled();
+
+    await user.hover(priority.closest("span") as HTMLElement);
+    expect(
+      (
+        await screen.findAllByText(
+          /priority of this work order is managed in ServiceNow/i,
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("prefills inputs from the ticket", () => {
     render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
 
@@ -530,6 +587,28 @@ describe("TicketEditForm", () => {
         .click(screen.getByRole("button", { name: /^save$/i }));
       expect(mockMutate.mock.calls[0][0].scheduledEndTime).toEqual(
         new Date(2026, 5, 2, 14, 30),
+      );
+    });
+
+    it("keeps a locked end in place when the start moves", () => {
+      render(
+        <TicketEditForm
+          data={{
+            ...scheduled,
+            lockedFields: [
+              { field: "scheduledEndTime", managedBy: "ServiceNow" },
+            ],
+          }}
+          onCancel={() => {}}
+        />,
+      );
+
+      fireEvent.change(screen.getByLabelText(/scheduled for/i), {
+        target: { value: "2026-06-01T08:00" },
+      });
+
+      expect(screen.getByLabelText(/scheduled end/i)).toHaveValue(
+        "2026-06-01T10:30",
       );
     });
   });
@@ -1130,6 +1209,7 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   isWatching: false,
   activities: [],
   externalMappings: [],
+  lockedFields: [],
   sourceLinks: [],
   notification: null,
   ...overrides,

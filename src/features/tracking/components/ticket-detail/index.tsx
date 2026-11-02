@@ -210,9 +210,7 @@ const TicketDetailBody = ({
               parentId={data.id}
               childTickets={data.children}
             />
-            <AdditionalDetailsCard
-              assetIds={data.assets.map((a) => a.asset.id)}
-            />
+            <AdditionalDetailsCard assets={data.assets.map((a) => a.asset)} />
             <RelatedTicketsSection
               ticketId={data.id}
               relatedTickets={data.relatedTickets}

@@ -4,6 +4,7 @@ import { seedCategoryColors } from "./category-colors";
 import { seedDepartments } from "./departments";
 import { seedDeviceArtifacts } from "./device-artifacts";
 import { seedSampleDevices } from "./device-groups";
+import { seedSampleDeviceGuides } from "./device-guides";
 import {
   isFleetAdvisoryNotificationSeeded,
   seedFleetAdvisoryNotification,
@@ -29,6 +30,7 @@ export async function seedDemoData() {
   await seedDepartments(seedUser.id);
   await seedCategoryColors();
   await seedSampleDevices();
+  await seedSampleDeviceGuides();
   await seedAssets(seedUser.id);
   await seedVendors();
   await seedFleetIntegration(seedUser.id);

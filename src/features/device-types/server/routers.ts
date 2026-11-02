@@ -68,6 +68,41 @@ export async function countAssetsByDeviceType(): Promise<
   };
 }
 
+export async function getDeviceGuides({
+  deviceTypeIds,
+  productIds,
+}: {
+  deviceTypeIds: string[];
+  productIds: string[];
+}) {
+  const topic = "TYPICAL_USAGE";
+  const [deviceTypes, productGuides] = await Promise.all([
+    prisma.deviceType.findMany({
+      where: { id: { in: deviceTypeIds } },
+      select: {
+        id: true,
+        displayName: true,
+        guides: { where: { topic }, select: { body: true } },
+      },
+    }),
+    productIds.length === 0
+      ? []
+      : prisma.deviceGuide.findMany({
+          where: { topic, productId: { in: productIds } },
+          select: { productId: true, body: true },
+        }),
+  ]);
+  return {
+    deviceTypes: deviceTypes.map((deviceType) => ({
+      id: deviceType.id,
+      displayName: deviceType.displayName,
+      generalText: deviceType.guides.at(0)?.body ?? null,
+    })),
+    productGuides,
+  };
+}
+export type DeviceGuides = Awaited<ReturnType<typeof getDeviceGuides>>;
+
 export const deviceTypesRouter = createTRPCRouter({
   getMany: protectedProcedure
     .meta({
@@ -83,4 +118,13 @@ export const deviceTypesRouter = createTRPCRouter({
     .input(z.object({}))
     .output(deviceTypeCountsSchema)
     .query(() => countAssetsByDeviceType()),
+
+  getGuides: protectedProcedure
+    .input(
+      z.object({
+        deviceTypeIds: z.array(z.string()),
+        productIds: z.array(z.string()),
+      }),
+    )
+    .query(({ input }) => getDeviceGuides(input)),
 });

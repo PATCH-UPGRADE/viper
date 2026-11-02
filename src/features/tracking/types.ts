@@ -235,6 +235,7 @@ export const ticketDetailInclude = {
           product: {
             select: {
               canonicalDisplayName: true,
+              deviceTypeId: true,
               ...deviceTypeLabelSelect,
             },
           },
@@ -715,6 +716,7 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   product: z
     .object({
       canonicalDisplayName: z.string(),
+      deviceTypeId: z.string().nullable(),
       deviceType: deviceTypeLabelSchema,
     })
     .nullable(),

@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  ActivityIcon,
   ActivitySquareIcon,
   ClockIcon,
   MonitorIcon,
@@ -10,19 +11,26 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { DeviceQuestionAccordionItem } from "@/components/device-question-accordion-item";
+import { Accordion } from "@/components/ui/accordion";
 import { AssetUtilizationAnswer } from "@/features/assets/components/asset-utilization-grid";
+import { DeviceGuideList } from "@/features/device-types/components/device-guide-list";
+import {
+  describeProducts,
+  type PageProduct,
+} from "@/features/device-types/device-guides";
 
 type StubQuestion = {
   id: string;
   icon: LucideIcon;
   question: string;
   answer: ReactNode;
+};
+
+type CardAsset = {
+  id: string;
+  productId: string | null;
+  product: { canonicalDisplayName: string; deviceTypeId: string | null } | null;
 };
 
 // TODO: Replace these stub questions with real data
@@ -68,22 +76,48 @@ const buildQuestions = (assetIds: string[]): StubQuestion[] => [
   },
 ];
 
-export const AdditionalDetailsCard = ({ assetIds }: { assetIds: string[] }) => (
-  <CollapsibleSectionCard title="Additional Details">
-    <Accordion type="single" collapsible className="w-full">
-      {buildQuestions(assetIds).map(({ id, icon: Icon, question, answer }) => (
-        <AccordionItem key={id} value={id}>
-          <AccordionTrigger className="text-sm hover:no-underline">
-            <span className="flex items-center gap-2.5 text-left">
-              <Icon className="size-4 shrink-0 text-muted-foreground" />
-              {question}
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="pl-[26px] text-sm text-muted-foreground">
+function toPageProducts(assets: CardAsset[]): PageProduct[] {
+  const byId = new Map<string, PageProduct>();
+  for (const asset of assets) {
+    if (!asset.productId || !asset.product || byId.has(asset.productId))
+      continue;
+    byId.set(asset.productId, {
+      productId: asset.productId,
+      product: asset.product.canonicalDisplayName,
+      deviceTypeId: asset.product.deviceTypeId,
+    });
+  }
+  return [...byId.values()];
+}
+
+export const AdditionalDetailsCard = ({ assets }: { assets: CardAsset[] }) => {
+  const assetIds = assets.map((a) => a.id);
+  const products = toPageProducts(assets);
+  return (
+    <CollapsibleSectionCard title="Additional Details">
+      <Accordion type="single" collapsible className="w-full">
+        {products.length > 0 && (
+          <DeviceQuestionAccordionItem
+            value="typical-usage"
+            icon={ActivityIcon}
+            title="How are these devices typically used in hospitals?"
+            {...describeProducts(products)}
+            showSubtitle
+          >
+            <DeviceGuideList products={products} />
+          </DeviceQuestionAccordionItem>
+        )}
+        {buildQuestions(assetIds).map(({ id, icon, question, answer }) => (
+          <DeviceQuestionAccordionItem
+            key={id}
+            value={id}
+            icon={icon}
+            title={question}
+          >
             {answer}
-          </AccordionContent>
-        </AccordionItem>
-      ))}
-    </Accordion>
-  </CollapsibleSectionCard>
-);
+          </DeviceQuestionAccordionItem>
+        ))}
+      </Accordion>
+    </CollapsibleSectionCard>
+  );
+};

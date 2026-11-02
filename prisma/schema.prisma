@@ -350,6 +350,7 @@ model Product {
   versions             Version[]
   assets               Asset[]
   matchings            DeviceGroupMatching[]
+  guides               DeviceGuide[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
@@ -373,11 +374,33 @@ model DeviceType {
   nameMappings String[] @default([])
 
   products Product[]
+  guides   DeviceGuide[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("device_type")
+}
+
+enum DeviceGuideTopic {
+  TYPICAL_USAGE
+}
+
+model DeviceGuide {
+  id           String           @id @default(cuid())
+  deviceTypeId String?
+  deviceType   DeviceType?      @relation(fields: [deviceTypeId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product?         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  topic        DeviceGuideTopic
+  body         String           @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([deviceTypeId, topic])
+  @@unique([productId, topic])
+  @@map("device_guide")
 }
 
 model Version {
@@ -409,7 +432,7 @@ model DeviceGroupMatching {
   versionId      String? // exact version when set
   version        Version?     @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
-  versionRange String?
+  versionRange  String?
   // UNKNOWN when the source gives no version, NOT_APPLICABLE when the product
   // has no versions. Either way the matching has no versionId and no
   // versionRange, and matches like a product-level rule.
@@ -709,13 +732,13 @@ enum AlohaStatus {
 }
 
 model Vulnerability {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   /// Best human-facing ID: CVE > GHSA > other public ID > VIPER. Written alongside
   /// identifiers
   displayId   String
-  description String?  @db.Text // description of vulnerability
-  narrative   String?  @db.Text // how a vulnerability could be exploited
-  impact      String?  @db.Text // clinical impact
+  description String?   @db.Text // description of vulnerability
+  narrative   String?   @db.Text // how a vulnerability could be exploited
+  impact      String?   @db.Text // clinical impact
   /// The newest rated metric's severity (CVSS or qualitative), recomputed whenever a record
   /// changes. Null when no record rates it.
   severity    Severity?

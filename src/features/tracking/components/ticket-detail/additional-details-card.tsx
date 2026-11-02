@@ -12,12 +12,7 @@ import {
 import type { ReactNode } from "react";
 import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import { DeviceQuestionAccordionItem } from "@/components/device-question-accordion-item";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion } from "@/components/ui/accordion";
 import { AssetUtilizationAnswer } from "@/features/assets/components/asset-utilization-grid";
 import { DeviceGuideList } from "@/features/device-types/components/device-guide-list";
 import {
@@ -112,21 +107,16 @@ export const AdditionalDetailsCard = ({ assets }: { assets: CardAsset[] }) => {
             <DeviceGuideList products={products} />
           </DeviceQuestionAccordionItem>
         )}
-        {buildQuestions(assetIds).map(
-          ({ id, icon: Icon, question, answer }) => (
-            <AccordionItem key={id} value={id}>
-              <AccordionTrigger className="text-sm hover:no-underline">
-                <span className="flex items-center gap-2.5 text-left">
-                  <Icon className="size-4 shrink-0 text-muted-foreground" />
-                  {question}
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="pl-[26px] text-sm text-muted-foreground">
-                {answer}
-              </AccordionContent>
-            </AccordionItem>
-          ),
-        )}
+        {buildQuestions(assetIds).map(({ id, icon, question, answer }) => (
+          <DeviceQuestionAccordionItem
+            key={id}
+            value={id}
+            icon={icon}
+            title={question}
+          >
+            {answer}
+          </DeviceQuestionAccordionItem>
+        ))}
       </Accordion>
     </CollapsibleSectionCard>
   );

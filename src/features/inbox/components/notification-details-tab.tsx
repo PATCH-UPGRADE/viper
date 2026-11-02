@@ -4,8 +4,8 @@
 import { format } from "date-fns";
 import {
   ActivityIcon,
+  ClockIcon,
   ExternalLinkIcon,
-  HeartIcon,
   MailIcon,
   Unlink,
 } from "lucide-react";
@@ -14,12 +14,7 @@ import { toast } from "sonner";
 import { DeviceQuestionAccordionItem } from "@/components/device-question-accordion-item";
 import { SeverityBadge } from "@/components/severity-badge";
 import { TlpBadge } from "@/components/tlp-badge";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -349,22 +344,15 @@ export function NotificationDetailsTab({
                     <DeviceGuideList products={affectedProducts} />
                   </DeviceQuestionAccordionItem>
                 )}
-                <AccordionItem
+                <DeviceQuestionAccordionItem
                   value="utilization"
-                  className="overflow-hidden rounded-xl border last:border-b"
+                  icon={ClockIcon}
+                  title="When are these devices being used in my hospital?"
                 >
-                  <AccordionTrigger className="items-center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
-                    <span className="flex font-bold items-center gap-2.5 text-left">
-                      <HeartIcon className="size-4 shrink-0" />
-                      When are these devices being used in my hospital?
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent className="bg-card px-6 pt-5 pb-5 dark:bg-accent/40">
-                    <NotificationUtilizationAnswer
-                      notificationId={notification.id}
-                    />
-                  </AccordionContent>
-                </AccordionItem>
+                  <NotificationUtilizationAnswer
+                    notificationId={notification.id}
+                  />
+                </DeviceQuestionAccordionItem>
               </Accordion>
             </div>
           </CollapsibleCardContent>

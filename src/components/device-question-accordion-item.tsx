@@ -24,25 +24,20 @@ export function DeviceQuestionAccordionItem({
   children: ReactNode;
 }) {
   return (
-    <AccordionItem
-      value={value}
-      className="mb-3 overflow-hidden rounded-xl border last:border-b"
-    >
-      <AccordionTrigger className="items-center rounded-none bg-secondary hover:bg-secondary/80 px-4 py-3 hover:no-underline dark:bg-background/20">
+    <AccordionItem value={value}>
+      <AccordionTrigger className="text-sm hover:no-underline">
         <span className="flex items-start gap-2.5 text-left">
-          <Icon className="mt-0.5 size-4 shrink-0" />
+          <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <span className="space-y-0.5">
-            <span className="block font-bold">{title}</span>
+            <span className="block">{title}</span>
             {showSubtitle && subtitle && (
-              <span className="block text-xs font-normal text-muted-foreground">
-                {subtitle}
-              </span>
+              <span className="block text-xs font-normal">{subtitle}</span>
             )}
           </span>
         </span>
       </AccordionTrigger>
-      <AccordionContent className="bg-card px-6 pt-5 pb-5 dark:bg-accent/40">
-        <div className="max-w-prose">{children}</div>
+      <AccordionContent className="pl-[26px] text-sm">
+        {children}
       </AccordionContent>
     </AccordionItem>
   );

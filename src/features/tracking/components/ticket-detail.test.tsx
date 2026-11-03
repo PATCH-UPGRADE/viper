@@ -510,7 +510,7 @@ describe("TicketEditForm", () => {
     removeSpy.mockRestore();
   });
 
-  it("submits the full edited payload, including multi-dept set and per-dept descriptions", async () => {
+  it("submits the edited payload, including multi-dept set and per-dept descriptions", async () => {
     const user = userEvent.setup();
     render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
 
@@ -531,12 +531,20 @@ describe("TicketEditForm", () => {
     expect(payload).toMatchObject({
       id: "ticket-1",
       summary: "Updated summary",
-      status: "TO_DO",
-      category: "PATCH",
       departmentIds: ["d-radio", "d-biomed"],
       assigneeId: "u1",
-      scheduledAt: null,
     });
+    // Unchanged work order fields are left out, so they never reach a platform.
+    for (const field of [
+      "body",
+      "status",
+      "category",
+      "priority",
+      "scheduledAt",
+      "scheduledEndTime",
+    ]) {
+      expect(payload).not.toHaveProperty(field);
+    }
     // Only departments with non-empty bodies are sent. The newly-added Biomed
     // tab has no body yet, so it should not appear in `descriptions`.
     expect(payload.descriptions).toEqual([

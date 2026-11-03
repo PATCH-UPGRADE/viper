@@ -16,13 +16,11 @@ import type {
 import prisma from "@/lib/db";
 import { lockedFieldMessage } from "../locked-fields";
 
-/**
- * Edits to a work order that a platform also holds.
- *
- * Nothing here knows a platform. The ticket's mappings name the integrations,
- * and each work order module says what it accepts (`update`, `pushedFields`)
- * and what it owns (`lockedFields`).
- */
+// Edits to a work order that a platform also holds.
+//
+// Nothing here knows a platform. The ticket's mappings name the integrations,
+// and each work order module says what it accepts (`update`, `pushedFields`)
+// and what it owns (`lockedFields`).
 
 export interface LockedField {
   field: EditableWorkOrderField;
@@ -119,6 +117,9 @@ export async function pushEditToPlatforms(
   current: TicketFields,
   edit: Partial<TicketFields>,
 ): Promise<void> {
+  const patch = patchFor(current, edit);
+  if (Object.keys(patch).length === 0) return;
+
   const mappings = await prisma.externalWorkOrderMapping.findMany({
     where: { itemId: ticketId },
     select: {
@@ -136,9 +137,6 @@ export async function pushEditToPlatforms(
     },
   });
   if (mappings.length === 0) return;
-
-  const patch = patchFor(current, edit);
-  if (Object.keys(patch).length === 0) return;
 
   const lock = lockedFieldsFor(mappings).find((l) => l.field in patch);
   if (lock) {

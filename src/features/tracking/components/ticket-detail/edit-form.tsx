@@ -219,21 +219,30 @@ export const TicketEditForm = ({
         body: (form.descriptionsByDept[id] ?? "").trim(),
       }))
       .filter((d) => d.body.length > 0);
+    // Send a platform-mapped field only when the user changed it. The form
+    // rounds times to the minute and trims text, so an untouched value can
+    // differ from the stored one and would be pushed to the platform, or
+    // refused as locked.
+    const changed = (field: keyof EditState) => form[field] !== initial[field];
     update.mutate(
       {
         id: data.id,
-        summary: trimmedSummary,
-        body: form.body.trim() || null,
-        status: form.status,
-        category: form.category,
-        priority: form.priority,
+        ...(changed("summary") && { summary: trimmedSummary }),
+        ...(changed("body") && { body: form.body.trim() || null }),
+        ...(changed("status") && { status: form.status }),
+        ...(changed("category") && { category: form.category }),
+        ...(changed("priority") && { priority: form.priority }),
         departmentIds: form.departmentIds,
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
-        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
-        scheduledEndTime: form.scheduledEndTime
-          ? new Date(form.scheduledEndTime)
-          : null,
+        ...(changed("scheduledAt") && {
+          scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
+        }),
+        ...(changed("scheduledEndTime") && {
+          scheduledEndTime: form.scheduledEndTime
+            ? new Date(form.scheduledEndTime)
+            : null,
+        }),
       },
       { onSuccess: () => onCancel() },
     );

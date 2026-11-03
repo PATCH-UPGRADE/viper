@@ -222,17 +222,52 @@ describe("pushEditToPlatforms", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("skips a disabled integration but keeps its lock", async () => {
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
-      mapping("SERVICENOW", { enabled: false }),
-    ]);
+  describe("on a disabled integration", () => {
+    beforeEach(() => {
+      mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+        mapping("SERVICENOW", { enabled: false }),
+      ]);
+    });
 
-    await pushEditToPlatforms("t1", current, { summary: "New title" });
-    expect(mockUpdate).not.toHaveBeenCalled();
+    it("refuses a change to a field that the integration pushes", async () => {
+      await expect(
+        pushEditToPlatforms("t1", current, { summary: "New title" }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringContaining("ServiceNow is disabled"),
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
 
-    await expect(
-      pushEditToPlatforms("t1", current, { status: "DONE" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    it("accepts a change to a field that stays in VIPER", async () => {
+      await pushEditToPlatforms("t1", current, { priority: "Critical" });
+
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("keeps its locks", async () => {
+      await expect(
+        pushEditToPlatforms("t1", current, { status: "DONE" }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringContaining("managed in ServiceNow"),
+      });
+    });
+
+    it("refuses before any other platform gets the edit", async () => {
+      mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+        mapping("SERVICENOW"),
+        {
+          ...mapping("SERVICENOW", { enabled: false }),
+          externalId: "sys-2",
+        },
+      ]);
+
+      await expect(
+        pushEditToPlatforms("t1", current, { summary: "New title" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
   });
 
   it("names the platform and the reason when the platform refuses", async () => {

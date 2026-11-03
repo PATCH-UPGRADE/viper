@@ -103,9 +103,9 @@ const pick = (
  * the push, the next pull brings the platform's value back. The call is outside
  * the database transaction, so the HTTP request never holds the row lock.
  *
- * A disabled integration keeps its locks but gets no push. The edit is saved
- * in VIPER only, and the platform keeps its old value. A pull reads only
- * records that changed on the platform, so it does not correct the difference.
+ * A disabled integration keeps its locks, and VIPER refuses an edit to a field
+ * that it pushes. A pull reads only records that changed on the platform, so a
+ * value saved in VIPER only stays different from the platform.
  */
 export async function pushEditToPlatforms(
   ticketId: string,
@@ -134,12 +134,25 @@ export async function pushEditToPlatforms(
     });
   }
 
-  for (const { externalId, integration } of mappings) {
+  const pushes = mappings.flatMap(({ externalId, integration }) => {
     const module = registry[integration.platform]?.workOrders;
-    if (!module?.update || !integration.enabled) continue;
+    if (!module?.update) return [];
     const pushed = pick(patch, module.pushedFields ?? []);
-    if (Object.keys(pushed).length === 0) continue;
+    if (Object.keys(pushed).length === 0) return [];
+    return [{ externalId, integration, update: module.update, pushed }];
+  });
 
+  // Checked before any push, so a disabled integration never leaves another
+  // platform with half of the edit.
+  const disabled = pushes.find((p) => !p.integration.enabled)?.integration;
+  if (disabled) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `${disabled.name} is disabled, so VIPER cannot send this change. Enable the integration, or make the change in ${disabled.name}.`,
+    });
+  }
+
+  for (const { externalId, integration, update, pushed } of pushes) {
     try {
       const {
         module: connector,
@@ -151,7 +164,7 @@ export async function pushEditToPlatforms(
         config,
         creds,
       });
-      await module.update(session, externalId, pushed, config);
+      await update(session, externalId, pushed, config);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       throw new TRPCError({

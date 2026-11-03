@@ -4,7 +4,7 @@ import {
   type Prisma,
   ResourceType,
   SourceChannel,
-  type TicketCategory,
+  TicketCategory,
   type TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -23,7 +23,11 @@ export interface WorkOrderSourceItem {
 export interface PulledWorkOrder extends WorkOrderSourceItem {
   summary: string;
   status: TicketStatus;
-  category: TicketCategory;
+  /**
+   * Leave it out if VIPER owns the category. A new ticket then gets `OTHER`,
+   * and a re-sync keeps the category that a user chose.
+   */
+  category?: TicketCategory;
   scheduledAt: string | null;
   scheduledEndTime: string | null;
 }
@@ -61,7 +65,7 @@ export async function ingestPulledWorkOrders(
           summary: item.summary,
           body: item.body,
           status: item.status,
-          category: item.category,
+          ...(item.category && { category: item.category }),
           scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
           scheduledEndTime: item.scheduledEndTime
             ? new Date(item.scheduledEndTime)
@@ -69,7 +73,11 @@ export async function ingestPulledWorkOrders(
           sourceLabel,
         };
         return {
-          createData: { ...fields, creatorId: userId },
+          createData: {
+            category: TicketCategory.OTHER,
+            ...fields,
+            creatorId: userId,
+          },
           // Never reassign the creator on re-sync. Only refresh mutable fields.
           updateData: fields,
           // A work order has no natural business key, so with no external

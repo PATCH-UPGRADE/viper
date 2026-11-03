@@ -2,7 +2,7 @@
 
 import "server-only";
 import { z } from "zod";
-import { TicketCategory, TicketStatus } from "@/generated/prisma";
+import { TicketStatus } from "@/generated/prisma";
 import type {
   Cursor,
   Page,
@@ -62,7 +62,6 @@ export interface ServiceNowWorkOrderItem {
   externalId: string;
   summary: string;
   status: TicketStatus;
-  category: TicketCategory;
   scheduledAt: string | null;
   scheduledEndTime: string | null;
   body: string;
@@ -101,7 +100,6 @@ export function toCanonical(raw: ChangeRequest): ServiceNowWorkOrderItem {
     // VIPER requires a summary, and a change request can have none.
     summary: raw.short_description || raw.number,
     status: mapStatus(raw.state),
-    category: TicketCategory.OTHER,
     scheduledAt: toIso(raw.start_date),
     scheduledEndTime: toIso(raw.end_date),
     body: raw.description,

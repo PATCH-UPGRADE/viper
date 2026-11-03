@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { TicketCategory, TicketStatus } from "@/generated/prisma";
+import { TicketStatus } from "@/generated/prisma";
 import type { Page, Session } from "../../../../core/types";
 import {
   type ChangeRequest,
@@ -101,10 +101,13 @@ describe("toCanonical", () => {
     expect(item).toMatchObject({
       externalId: "a1b2c3",
       status: TicketStatus.TO_DO,
-      category: TicketCategory.OTHER,
       scheduledAt: "2026-04-16T23:00:00Z",
       scheduledEndTime: "2026-04-17T01:00:00Z",
     });
+  });
+
+  it("leaves the category to VIPER", () => {
+    expect(toCanonical(record())).not.toHaveProperty("category");
   });
 
   it("keeps the text as it is, so an edit maps straight back", () => {

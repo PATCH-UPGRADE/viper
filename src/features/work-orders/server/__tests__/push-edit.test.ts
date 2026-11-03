@@ -32,8 +32,9 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/features/integrations/core/registry", () => ({
   registry: fakeRegistry,
 }));
-vi.mock("@/features/integrations/core/credentials", () => ({
-  decryptCredentials: () => ({ username: "u", password: "p" }),
+const mockLoadContext = vi.hoisted(() => vi.fn());
+vi.mock("@/features/integrations/core/context", () => ({
+  loadIntegrationContext: mockLoadContext,
 }));
 
 import { lockedFieldsFor, patchFor, pushEditToPlatforms } from "../push-edit";
@@ -55,8 +56,6 @@ const mapping = (platform: string, overrides = {}) => ({
     name: platform === "SERVICENOW" ? "ServiceNow" : "Fleet",
     platform,
     enabled: true,
-    config: { instanceUrl: "https://dev.service-now.com" },
-    credentials: "encrypted",
     ...overrides,
   },
 });
@@ -66,6 +65,11 @@ beforeEach(() => {
   mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
     mapping("SERVICENOW"),
   ]);
+  mockLoadContext.mockImplementation(async (integrationId: string) => ({
+    module: fakeRegistry[integrationId.replace("int-", "")],
+    config: { instanceUrl: "https://dev.service-now.com" },
+    creds: { username: "u", password: "p" },
+  }));
   mockUpdate.mockResolvedValue({ externalId: "sys-1", raw: {} });
 });
 
@@ -199,7 +203,7 @@ describe("pushEditToPlatforms", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("accepts the unchanged status that the edit form always sends", async () => {
+  it("accepts a locked field that the edit leaves unchanged", async () => {
     await pushEditToPlatforms("t1", current, {
       status: "IN_PROGRESS",
       summary: "New title",
@@ -246,16 +250,17 @@ describe("pushEditToPlatforms", () => {
     });
   });
 
-  it("reports an integration with no stored credentials", async () => {
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
-      mapping("SERVICENOW", { credentials: null }),
-    ]);
+  it("reports an integration whose settings cannot be loaded", async () => {
+    mockLoadContext.mockRejectedValue(new Error("Invalid credentials"));
 
     await expect(
       pushEditToPlatforms("t1", current, { summary: "New title" }),
     ).rejects.toMatchObject({
       code: "BAD_GATEWAY",
-      message: expect.stringContaining("no stored credentials"),
+      message: expect.stringMatching(
+        /ServiceNow did not accept.*Invalid credentials/,
+      ),
     });
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

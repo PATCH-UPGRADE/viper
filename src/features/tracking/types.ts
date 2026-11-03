@@ -3,14 +3,12 @@ import {
   deviceTypeLabelSchema,
   deviceTypeLabelSelect,
 } from "@/features/assets/utils";
-import {
-  EDITABLE_WORK_ORDER_FIELDS,
-  type EditableWorkOrderField,
-} from "@/features/integrations/core/types";
+import { EDITABLE_WORK_ORDER_FIELDS } from "@/features/integrations/core/types";
 import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
 } from "@/features/integrations/core/urls";
+import type { LockedField } from "@/features/work-orders/locked-fields";
 import {
   AssetStatus,
   IssueStatus,
@@ -366,7 +364,7 @@ export type TicketDetail = Omit<
   isWatching: boolean;
   relatedTickets: RelatedTicketLink[];
   mitigationPlan: { title: string } | null;
-  lockedFields: { field: EditableWorkOrderField; managedBy: string }[];
+  lockedFields: LockedField[];
 };
 
 // Include shape for the public list endpoint — base ticket fields plus the linked

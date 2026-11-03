@@ -106,7 +106,10 @@ vi.mock("@/features/work-orders/server/submit", () => ({
   dispatchSubmission: mockDispatch,
 }));
 
-vi.mock("@/features/work-orders/server/push-edit", () => ({
+vi.mock("@/features/work-orders/server/push-edit", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/work-orders/server/push-edit")
+  >()),
   pushEditToPlatforms: mockPushEdit,
   lockedFieldsFor: mockLockedFields,
 }));

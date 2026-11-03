@@ -1,6 +1,7 @@
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { validatePlatformPayload } from "@/features/work-orders/server/payload";
 import {
+  editableTicketSelect,
   lockedFieldsFor,
   pushEditToPlatforms,
 } from "@/features/work-orders/server/push-edit";
@@ -759,15 +760,7 @@ export const trackingRouter = createTRPCRouter({
 
       const current = await prisma.workOrderTicket.findUnique({
         where: { id },
-        select: {
-          summary: true,
-          body: true,
-          status: true,
-          category: true,
-          priority: true,
-          scheduledAt: true,
-          scheduledEndTime: true,
-        },
+        select: editableTicketSelect,
       });
       if (!current) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });

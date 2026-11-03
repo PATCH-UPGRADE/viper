@@ -199,6 +199,28 @@ Core opens one session per submission and calls `create` once per asset, because
 covers N assets. **Do not sign in inside `create`.** A Fleet login drives a headless browser, so
 a login per call costs one browser launch per asset.
 
+### Edits to a synced work order
+
+A work order module can also take user edits and own fields:
+
+```ts
+update?(session: Session, externalId: string, patch: WorkOrderPatch, config: TConfig): Promise<...>;
+pushedFields?: readonly EditableWorkOrderField[];
+lockedFields?: readonly EditableWorkOrderField[];
+```
+
+`WorkOrderPatch` uses VIPER field names (`summary`, `description`, `scheduledAt` and so on). The
+module maps them onto its own fields. `src/features/work-orders/server/push-edit.ts` runs before
+the edit is saved:
+
+- If the edit changes a field in `lockedFields`, VIPER refuses it, and the edit form disables that
+  field.
+- Each module gets only the changed fields in its `pushedFields`. If the platform refuses, VIPER
+  saves nothing.
+
+Declare `pushedFields` together with `update`. `registry.test.ts` fails on one without the other,
+and on a field that is both pushed and locked.
+
 
 ## Registering a new platform
 

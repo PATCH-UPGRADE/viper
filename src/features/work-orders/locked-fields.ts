@@ -3,6 +3,12 @@ import {
   type EditableWorkOrderField,
 } from "@/features/integrations/core/types";
 
+export interface LockedField {
+  field: EditableWorkOrderField;
+  /** The integration that owns the field, for the message the user sees. */
+  managedBy: string;
+}
+
 /** Why VIPER refuses an edit to a field that a platform owns. */
 export const lockedFieldMessage = (
   field: EditableWorkOrderField,

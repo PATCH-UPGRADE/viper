@@ -1,32 +1,21 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
-import { decryptCredentials } from "@/features/integrations/core/credentials";
+import { loadIntegrationContext } from "@/features/integrations/core/context";
 import { registry } from "@/features/integrations/core/registry";
 import { openSession } from "@/features/integrations/core/session";
 import type {
   EditableWorkOrderField,
   WorkOrderPatch,
 } from "@/features/integrations/core/types";
-import type {
-  PlatformEnum,
-  Priority,
-  TicketCategory,
-  TicketStatus,
-} from "@/generated/prisma";
+import type { PlatformEnum, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { lockedFieldMessage } from "../locked-fields";
+import { type LockedField, lockedFieldMessage } from "../locked-fields";
 
 // Edits to a work order that a platform also holds.
 //
 // Nothing here knows a platform. The ticket's mappings name the integrations,
 // and each work order module says what it accepts (`update`, `pushedFields`)
 // and what it owns (`lockedFields`).
-
-export interface LockedField {
-  field: EditableWorkOrderField;
-  /** The integration that owns the field, for the message the user sees. */
-  managedBy: string;
-}
 
 /** The fields that a ticket's platforms own, so a VIPER user cannot edit them. */
 export const lockedFieldsFor = (
@@ -38,22 +27,27 @@ export const lockedFieldsFor = (
     ),
   );
 
-interface TicketFields {
-  summary: string;
-  body: string | null;
-  status: TicketStatus;
-  category: TicketCategory;
-  priority: Priority;
-  scheduledAt: Date | null;
-  scheduledEndTime: Date | null;
-}
+/** The ticket columns that `patchFor` compares. */
+export const editableTicketSelect = {
+  summary: true,
+  body: true,
+  status: true,
+  category: true,
+  priority: true,
+  scheduledAt: true,
+  scheduledEndTime: true,
+} as const satisfies Prisma.WorkOrderTicketSelect;
+
+type TicketFields = Prisma.WorkOrderTicketGetPayload<{
+  select: typeof editableTicketSelect;
+}>;
 
 const sameTime = (a: Date | null, b: Date | null) =>
   (a?.getTime() ?? null) === (b?.getTime() ?? null);
 
 /**
- * The editable fields that this edit changes. The edit form sends every field
- * on each save, so an unchanged field must not reach a platform.
+ * The editable fields that this edit changes. A caller can send a field with
+ * its current value, and an unchanged field must not reach a platform.
  */
 export function patchFor(
   current: TicketFields,
@@ -125,14 +119,7 @@ export async function pushEditToPlatforms(
     select: {
       externalId: true,
       integration: {
-        select: {
-          id: true,
-          name: true,
-          platform: true,
-          enabled: true,
-          config: true,
-          credentials: true,
-        },
+        select: { id: true, name: true, platform: true, enabled: true },
       },
     },
   });
@@ -147,22 +134,17 @@ export async function pushEditToPlatforms(
   }
 
   for (const { externalId, integration } of mappings) {
-    const connector = registry[integration.platform];
-    const module = connector?.workOrders;
-    if (!connector || !module?.update || !integration.enabled) continue;
+    const module = registry[integration.platform]?.workOrders;
+    if (!module?.update || !integration.enabled) continue;
     const pushed = pick(patch, module.pushedFields ?? []);
     if (Object.keys(pushed).length === 0) continue;
 
     try {
-      const config = connector.definition.configSchema.parse(
-        integration.config,
-      );
-      if (!integration.credentials) {
-        throw new Error("the integration has no stored credentials");
-      }
-      const creds = connector.definition.credentialSchema.parse(
-        decryptCredentials(integration.credentials),
-      );
+      const {
+        module: connector,
+        config,
+        creds,
+      } = await loadIntegrationContext(integration.id);
       const session = openSession(connector, {
         integrationId: integration.id,
         config,

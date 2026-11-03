@@ -95,7 +95,10 @@ const endTimeError = ({ scheduledAt, scheduledEndTime }: EditState) => {
   return null;
 };
 
-/** Explains a field that a platform owns. Renders the field as it is when no lock applies. */
+/**
+ * Explains a field that a platform owns. Renders the field as it is when no
+ * lock applies.
+ */
 const LockedFieldTooltip = ({
   lock,
   children,

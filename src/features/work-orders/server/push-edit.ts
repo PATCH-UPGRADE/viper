@@ -103,8 +103,9 @@ const pick = (
  * the push, the next pull brings the platform's value back. The call is outside
  * the database transaction, so the HTTP request never holds the row lock.
  *
- * A disabled integration keeps its locks but gets no push: it is not syncing,
- * and the next pull after it is enabled again brings its values back.
+ * A disabled integration keeps its locks but gets no push. The edit is saved
+ * in VIPER only, and the platform keeps its old value. A pull reads only
+ * records that changed on the platform, so it does not correct the difference.
  */
 export async function pushEditToPlatforms(
   ticketId: string,

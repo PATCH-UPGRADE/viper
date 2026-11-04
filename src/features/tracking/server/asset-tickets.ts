@@ -5,6 +5,7 @@ import {
   getAssetDisplayName,
 } from "@/features/assets/utils";
 import { assetsForMatchings } from "@/features/work-orders/server/drafts";
+import { lockedFieldsFor } from "@/features/work-orders/server/push-edit";
 import type { Priority, TicketCategory } from "@/generated/prisma";
 import { TicketStatus } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
@@ -209,12 +210,21 @@ export async function cascadeDoneStatus(
         select: {
           status: true,
           children: { select: { status: true } },
+          externalMappings: {
+            select: { integration: { select: { name: true, platform: true } } },
+          },
         },
       },
     },
   });
   if (!ticket?.parentId || !ticket.parent) return;
   if (ticket.parent.status === TicketStatus.DONE) return;
+  // VIPER cannot send this status to a platform that owns it, so the two would
+  // disagree.
+  const statusIsLocked = lockedFieldsFor(ticket.parent.externalMappings).some(
+    (lock) => lock.field === "status",
+  );
+  if (statusIsLocked) return;
 
   const allDone = ticket.parent.children.every(
     (c) => c.status === TicketStatus.DONE,

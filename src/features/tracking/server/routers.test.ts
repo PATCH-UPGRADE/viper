@@ -720,6 +720,56 @@ describe("trackingRouter.update — Done cascade", () => {
     });
   });
 
+  it("leaves a parent whose status a platform locks", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }],
+        },
+      },
+    });
+    mockLockedFields.mockReturnValue([
+      { field: "status", managedBy: "ServiceNow" },
+    ]);
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "parent-1", status: { not: "DONE" } },
+      }),
+    );
+    expect(mockPrisma.ticketActivity.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ticketId: "parent-1" }),
+      }),
+    );
+  });
+
+  it("cascades to a parent whose platform locks a different field", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }],
+        },
+      },
+    });
+    mockLockedFields.mockReturnValue([
+      { field: "priority", managedBy: "ServiceNow" },
+    ]);
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
+      where: { id: "parent-1", status: { not: "DONE" } },
+      data: { status: "DONE" },
+    });
+  });
+
   it("does not update or re-log a parent that's already Done", async () => {
     mockCascadeParents({
       "child-1": {

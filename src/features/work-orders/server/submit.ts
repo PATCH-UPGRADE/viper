@@ -177,6 +177,7 @@ export async function fileClaimedTicket(
       body: true,
       category: true,
       scheduledAt: true,
+      scheduledEndTime: true,
       platformPayload: true,
       targetIntegrationId: true,
       assets: {
@@ -249,6 +250,7 @@ export async function fileClaimedTicket(
         description: ticket.body ?? "",
         category: ticket.category,
         scheduledAt: ticket.scheduledAt?.toISOString() ?? null,
+        scheduledEndTime: ticket.scheduledEndTime?.toISOString() ?? null,
         asset: {
           id: asset.id,
           hostname: asset.hostname,

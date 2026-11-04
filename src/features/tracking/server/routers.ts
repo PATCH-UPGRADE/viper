@@ -1,5 +1,10 @@
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { validatePlatformPayload } from "@/features/work-orders/server/payload";
+import {
+  editableTicketSelect,
+  lockedFieldsFor,
+  pushEditToPlatforms,
+} from "@/features/work-orders/server/push-edit";
 import { dispatchSubmission } from "@/features/work-orders/server/submit";
 import "server-only";
 import { TRPCError } from "@trpc/server";
@@ -248,12 +253,39 @@ const withRelatedTickets = <
 };
 
 const toTicketDetail = <
-  T extends { watchers: { userId: string }[] } & Parameters<
-    typeof withRelatedTickets
-  >[0],
+  T extends {
+    watchers: { userId: string }[];
+    externalMappings: Parameters<typeof lockedFieldsFor>[0];
+  } & Parameters<typeof withRelatedTickets>[0],
 >(
   row: T,
-) => withRelatedTickets(withIsWatching(row));
+) => ({
+  ...withRelatedTickets(withIsWatching(row)),
+  lockedFields: lockedFieldsFor(row.externalMappings),
+});
+
+type ScheduleWindow = {
+  scheduledAt: Date | null;
+  scheduledEndTime: Date | null;
+};
+
+const assertTimeRange = (
+  before: ScheduleWindow,
+  edit: Partial<ScheduleWindow>,
+) => {
+  const {
+    scheduledAt: start = before.scheduledAt,
+    scheduledEndTime: end = before.scheduledEndTime,
+  } = edit;
+  const timesChanged =
+    edit.scheduledAt !== undefined || edit.scheduledEndTime !== undefined;
+  if (timesChanged && end && (!start || end <= start)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "The end time must be after the start time",
+    });
+  }
+};
 
 // Canonical (A < B) ordering so the link table's unique index is
 // direction-agnostic.
@@ -698,7 +730,10 @@ export const trackingRouter = createTRPCRouter({
         status: z.enum(TicketStatus).optional(),
         category: z.enum(TicketCategory).optional(),
         priority: z.enum(Priority).optional(),
-        departmentIds: z.array(z.string()).optional(),
+        departmentIds: z
+          .array(z.string())
+          .optional()
+          .describe("Replaces the departments. An empty array clears them."),
         descriptions: z
           .array(
             z.object({
@@ -706,10 +741,18 @@ export const trackingRouter = createTRPCRouter({
               body: z.string().max(10_000),
             }),
           )
-          .optional(),
+          .optional()
+          .describe(
+            "Replaces the per-department descriptions. An entry with an empty body is dropped, and a removed department loses its description.",
+          ),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
-        scheduledEndTime: z.coerce.date().nullish(),
+        scheduledEndTime: z.coerce
+          .date()
+          .nullish()
+          .describe(
+            "Must be after scheduledAt. To clear scheduledAt, clear this too.",
+          ),
       }),
     )
     .meta({
@@ -719,12 +762,24 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. The end time must be after the start time, so to clear scheduledAt, also clear scheduledEndTime. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Omitted fields are unchanged, and null clears a nullable field. For a ticket that syncs with an external platform, a change to a field in `lockedFields`, or to a synced field while the integration is disabled, returns 400. If the platform refuses the edit, the request returns 500 and nothing is saved.",
       },
     })
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, departmentIds, descriptions, ...rest } = input;
+
+      const current = await prisma.workOrderTicket.findUnique({
+        where: { id },
+        select: editableTicketSelect,
+      });
+      if (!current) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
+      }
+      // Checked here too, so an invalid window never reaches a platform.
+      assertTimeRange(current, rest);
+      await pushEditToPlatforms(id, current, rest);
+
       return prisma.$transaction(async (tx) => {
         // Two partial updates can each set one end of the range. Without the
         // lock, both validate against the same stale snapshot.
@@ -737,18 +792,7 @@ export const trackingRouter = createTRPCRouter({
           });
         }
 
-        const {
-          scheduledAt: start = before.scheduledAt,
-          scheduledEndTime: end = before.scheduledEndTime,
-        } = rest;
-        const timesChanged =
-          rest.scheduledAt !== undefined || rest.scheduledEndTime !== undefined;
-        if (timesChanged && end && (!start || end <= start)) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "The end time must be after the start time",
-          });
-        }
+        assertTimeRange(before, rest);
 
         // Compute the post-update department set so we can scope description
         // writes (and orphan cleanups) to currently-linked departments only.

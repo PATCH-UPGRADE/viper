@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { priorityConfig } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,17 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { EditableWorkOrderField } from "@/features/integrations/core/types";
 import { getChipClass } from "@/features/tag-colors/palette";
+import {
+  type LockedField,
+  lockedFieldMessage,
+} from "@/features/work-orders/locked-fields";
 import type {
   Priority,
   TicketCategory,
@@ -85,6 +95,42 @@ const endTimeError = ({ scheduledAt, scheduledEndTime }: EditState) => {
   return null;
 };
 
+/**
+ * Explains a field that a platform owns. Renders the field as it is when no
+ * lock applies.
+ */
+const LockedFieldTooltip = ({
+  lock,
+  fit = false,
+  children,
+}: {
+  lock: LockedField | undefined;
+  /**
+   * Size the wrapper to a control that is narrower than its column, so that
+   * the tooltip points at the control.
+   */
+  fit?: boolean;
+  children: ReactNode;
+}) => {
+  if (!lock) return <>{children}</>;
+  const wrapperClass = fit ? "block w-fit rounded-md" : "block rounded-md";
+  return (
+    <Tooltip>
+      {/* A disabled control gets no pointer events, so the wrapper takes the
+          hover and the focus for the tooltip. */}
+      <TooltipTrigger asChild>
+        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users must be able to reach the tooltip that explains the disabled field. */}
+        <span tabIndex={0} className={wrapperClass}>
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start">
+        {lockedFieldMessage(lock.field, lock.managedBy)}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
 const editStateFingerprint = (state: EditState) =>
   JSON.stringify({
     ...state,
@@ -113,6 +159,8 @@ export const TicketEditForm = ({
   const [initial] = useState(() => buildEditState(data));
   const [form, setForm] = useState<EditState>(initial);
   const update = useUpdateTicket(data.id);
+  const locks: Partial<Record<EditableWorkOrderField, LockedField>> =
+    Object.fromEntries(data.lockedFields.map((l) => [l.field, l]));
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
 
@@ -175,21 +223,30 @@ export const TicketEditForm = ({
         body: (form.descriptionsByDept[id] ?? "").trim(),
       }))
       .filter((d) => d.body.length > 0);
+    // Send a platform-mapped field only when the user changed it. The form
+    // rounds times to the minute and trims text, so an untouched value can
+    // differ from the stored one and would be pushed to the platform, or
+    // refused as locked.
+    const changed = (field: keyof EditState) => form[field] !== initial[field];
     update.mutate(
       {
         id: data.id,
-        summary: trimmedSummary,
-        body: form.body.trim() || null,
-        status: form.status,
-        category: form.category,
-        priority: form.priority,
+        ...(changed("summary") && { summary: trimmedSummary }),
+        ...(changed("body") && { body: form.body.trim() || null }),
+        ...(changed("status") && { status: form.status }),
+        ...(changed("category") && { category: form.category }),
+        ...(changed("priority") && { priority: form.priority }),
         departmentIds: form.departmentIds,
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
-        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
-        scheduledEndTime: form.scheduledEndTime
-          ? new Date(form.scheduledEndTime)
-          : null,
+        ...(changed("scheduledAt") && {
+          scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
+        }),
+        ...(changed("scheduledEndTime") && {
+          scheduledEndTime: form.scheduledEndTime
+            ? new Date(form.scheduledEndTime)
+            : null,
+        }),
       },
       { onSuccess: () => onCancel() },
     );
@@ -206,37 +263,43 @@ export const TicketEditForm = ({
       <div className="rounded-lg border bg-background p-4 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="ticket-summary">Summary</Label>
-          <Input
-            id="ticket-summary"
-            value={form.summary}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, summary: e.target.value }))
-            }
-            required
-            maxLength={255}
-          />
+          <LockedFieldTooltip lock={locks.summary}>
+            <Input
+              id="ticket-summary"
+              value={form.summary}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, summary: e.target.value }))
+              }
+              disabled={!!locks.summary}
+              required
+              maxLength={255}
+            />
+          </LockedFieldTooltip>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-priority">Priority</Label>
-            <Select
-              value={form.priority}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, priority: v as Priority }))
-              }
-            >
-              <SelectTrigger id="ticket-priority">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(priorityConfig) as Priority[]).map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {priorityConfig[p].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <LockedFieldTooltip lock={locks.priority} fit>
+              <Select
+                value={form.priority}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, priority: v as Priority }))
+                }
+                disabled={!!locks.priority}
+              >
+                <SelectTrigger id="ticket-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(priorityConfig) as Priority[]).map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {priorityConfig[p].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </LockedFieldTooltip>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -270,34 +333,43 @@ export const TicketEditForm = ({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-scheduled">Scheduled for</Label>
-            <Input
-              id="ticket-scheduled"
-              type="datetime-local"
-              value={form.scheduledAt}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  scheduledAt: e.target.value,
-                  scheduledEndTime: shiftEnd(f, e.target.value),
-                }))
-              }
-            />
+            <LockedFieldTooltip lock={locks.scheduledAt}>
+              <Input
+                id="ticket-scheduled"
+                type="datetime-local"
+                value={form.scheduledAt}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    scheduledAt: e.target.value,
+                    // A locked end must not move, or the save is refused.
+                    scheduledEndTime: locks.scheduledEndTime
+                      ? f.scheduledEndTime
+                      : shiftEnd(f, e.target.value),
+                  }))
+                }
+                disabled={!!locks.scheduledAt}
+              />
+            </LockedFieldTooltip>
           </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-scheduled-end">Scheduled end</Label>
-            <Input
-              id="ticket-scheduled-end"
-              type="datetime-local"
-              value={form.scheduledEndTime}
-              aria-invalid={!!endError}
-              aria-describedby={
-                endError ? "ticket-scheduled-end-error" : undefined
-              }
-              onChange={(e) =>
-                setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
-              }
-            />
+            <LockedFieldTooltip lock={locks.scheduledEndTime}>
+              <Input
+                id="ticket-scheduled-end"
+                type="datetime-local"
+                value={form.scheduledEndTime}
+                aria-invalid={!!endError}
+                aria-describedby={
+                  endError ? "ticket-scheduled-end-error" : undefined
+                }
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
+                }
+                disabled={!!locks.scheduledEndTime}
+              />
+            </LockedFieldTooltip>
             {endError && (
               <p
                 id="ticket-scheduled-end-error"
@@ -310,39 +382,47 @@ export const TicketEditForm = ({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-category">Category</Label>
-            <Select
-              value={form.category}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, category: v as TicketCategory }))
-              }
-            >
-              <SelectTrigger id="ticket-category">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(categoryLabels) as TicketCategory[]).map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {categoryLabels[c]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <LockedFieldTooltip lock={locks.category} fit>
+              <Select
+                value={form.category}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, category: v as TicketCategory }))
+                }
+                disabled={!!locks.category}
+              >
+                <SelectTrigger id="ticket-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(categoryLabels) as TicketCategory[]).map(
+                    (c) => (
+                      <SelectItem key={c} value={c}>
+                        {categoryLabels[c]}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </LockedFieldTooltip>
           </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-status">Status</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, status: v as TicketStatus }))
-              }
-            >
-              <TicketStatusSelectTrigger
-                status={form.status}
-                id="ticket-status"
-                colored
-              />
-            </Select>
+            <LockedFieldTooltip lock={locks.status} fit>
+              <Select
+                value={form.status}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, status: v as TicketStatus }))
+                }
+                disabled={!!locks.status}
+              >
+                <TicketStatusSelectTrigger
+                  status={form.status}
+                  id="ticket-status"
+                  colored
+                />
+              </Select>
+            </LockedFieldTooltip>
           </div>
         </div>
       </div>
@@ -350,14 +430,17 @@ export const TicketEditForm = ({
       <div className="rounded-lg border bg-background p-4 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="ticket-body">Description</Label>
-          <Textarea
-            id="ticket-body"
-            value={form.body}
-            onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
-            rows={6}
-            maxLength={50_000}
-            placeholder="General description of this work order"
-          />
+          <LockedFieldTooltip lock={locks.description}>
+            <Textarea
+              id="ticket-body"
+              value={form.body}
+              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              disabled={!!locks.description}
+              rows={6}
+              maxLength={50_000}
+              placeholder="General description of this work order"
+            />
+          </LockedFieldTooltip>
         </div>
 
         <div className="flex flex-col gap-2">

@@ -3,10 +3,12 @@ import {
   deviceTypeLabelSchema,
   deviceTypeLabelSelect,
 } from "@/features/assets/utils";
+import { EDITABLE_WORK_ORDER_FIELDS } from "@/features/integrations/core/types";
 import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
 } from "@/features/integrations/core/urls";
+import type { LockedField } from "@/features/work-orders/locked-fields";
 import {
   AssetStatus,
   IssueStatus,
@@ -353,7 +355,8 @@ export type RelatedTicketLink = {
 
 // What clients receive from the detail endpoints: the per-user `watchers`
 // include is collapsed server-side into an `isWatching` boolean, and the plan
-// siblings and the two link sides into one `relatedTickets` list.
+// siblings and the two link sides into one `relatedTickets` list. The server
+// also adds the fields that a platform owns, from the ticket's mappings.
 export type TicketDetail = Omit<
   TicketDetailPayload,
   "watchers" | "linksAsA" | "linksAsB" | "mitigationPlan"
@@ -361,6 +364,7 @@ export type TicketDetail = Omit<
   isWatching: boolean;
   relatedTickets: RelatedTicketLink[];
   mitigationPlan: { title: string } | null;
+  lockedFields: LockedField[];
 };
 
 // Include shape for the public list endpoint — base ticket fields plus the linked
@@ -826,6 +830,14 @@ export const workOrderDetailResponseSchema = z.object({
   activities: z.array(ticketActivitySchema),
   sourceLinks: z.array(ticketSourceSchema),
   externalMappings: z.array(ticketExternalMappingSchema),
+  // Fields a platform owns. The edit form disables them, and an update that
+  // changes one is refused.
+  lockedFields: z.array(
+    z.object({
+      field: z.enum(EDITABLE_WORK_ORDER_FIELDS),
+      managedBy: z.string(),
+    }),
+  ),
   notification: ticketNotificationRefSchema.nullable(),
   mitigationPlan: ticketMitigationPlanSchema.nullable(),
 });

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { TicketCategory, TicketStatus } from "@/generated/prisma";
+import { TicketStatus } from "@/generated/prisma";
 import type { Page, Session } from "../../../../core/types";
 import {
   type ChangeRequest,
@@ -13,6 +13,7 @@ import {
   PAGE_SIZE,
   toCanonical,
   toIso,
+  update,
 } from "../change-requests";
 
 const record = (overrides: Partial<ChangeRequest> = {}): ChangeRequest => ({
@@ -99,23 +100,34 @@ describe("toCanonical", () => {
 
     expect(item).toMatchObject({
       externalId: "a1b2c3",
-      summary: "CHG0000001: Rollback Oracle Version",
       status: TicketStatus.TO_DO,
-      category: TicketCategory.OTHER,
       scheduledAt: "2026-04-16T23:00:00Z",
       scheduledEndTime: "2026-04-17T01:00:00Z",
     });
-    expect(item.body).toContain("Roll back to the previous version.");
+  });
+
+  it("leaves the category to VIPER", () => {
+    expect(toCanonical(record())).not.toHaveProperty("category");
+  });
+
+  it("keeps the text as it is, so an edit maps straight back", () => {
+    const item = toCanonical(record());
+
+    expect(item.summary).toBe("Rollback Oracle Version");
+    expect(item.body).toBe("Roll back to the previous version.");
   });
 
   it("leaves the window empty when the change has no planned times", () => {
-    const item = toCanonical(
-      record({ start_date: "", end_date: "", short_description: "" }),
-    );
+    const item = toCanonical(record({ start_date: "", end_date: "" }));
 
     expect(item.scheduledAt).toBeNull();
     expect(item.scheduledEndTime).toBeNull();
-    expect(item.summary).toBe("CHG0000001");
+  });
+
+  it("uses the number when the change has no short description", () => {
+    expect(toCanonical(record({ short_description: "" })).summary).toBe(
+      "CHG0000001",
+    );
   });
 });
 
@@ -310,6 +322,79 @@ describe("listChanged", () => {
     };
 
     await expect(collect(listChanged(session, null))).rejects.toThrow(/401/);
+  });
+});
+
+describe("update", () => {
+  /** A session that answers with `result` and records each request. */
+  const recordingSession = (result: unknown, status = 200) => {
+    const calls: { url: URL; init?: RequestInit }[] = [];
+    const session: Session = {
+      request: vi.fn(async (path: string, init?: RequestInit) => {
+        calls.push({ url: new URL(path, "https://dev.service-now.com"), init });
+        return status === 200 ? json(result) : new Response("", { status });
+      }),
+    };
+    return { session, calls };
+  };
+  const sentBody = (init?: RequestInit) => JSON.parse(String(init?.body));
+
+  it("patches the change request by sys_id and returns the saved record", async () => {
+    const { session, calls } = recordingSession(record());
+
+    const result = await update(session, "a1b2c3", { summary: "New title" });
+
+    expect(calls[0].init?.method).toBe("PATCH");
+    expect(calls[0].url.pathname).toBe("/api/now/table/change_request/a1b2c3");
+    expect(calls[0].url.searchParams.get("sysparm_display_value")).toBe(
+      "false",
+    );
+    expect(result).toEqual({ externalId: "a1b2c3", raw: record() });
+  });
+
+  it("maps the VIPER fields onto the change request fields", async () => {
+    const { session, calls } = recordingSession(record());
+
+    await update(session, "a1b2c3", {
+      summary: "New title",
+      description: "New body",
+      scheduledAt: "2026-11-02T14:00:00.000Z",
+      scheduledEndTime: "2026-11-02T16:00:00.000Z",
+    });
+
+    expect(sentBody(calls[0].init)).toEqual({
+      short_description: "New title",
+      description: "New body",
+      start_date: "2026-11-02 14:00:00",
+      end_date: "2026-11-02 16:00:00",
+    });
+  });
+
+  it("sends only the fields in the patch", async () => {
+    const { session, calls } = recordingSession(record());
+
+    await update(session, "a1b2c3", { description: "New body" });
+
+    expect(sentBody(calls[0].init)).toEqual({ description: "New body" });
+  });
+
+  it("clears a time with an empty string", async () => {
+    const { session, calls } = recordingSession(record());
+
+    await update(session, "a1b2c3", {
+      scheduledAt: null,
+      scheduledEndTime: null,
+    });
+
+    expect(sentBody(calls[0].init)).toEqual({ start_date: "", end_date: "" });
+  });
+
+  it("points at the integration user's permissions on a 403", async () => {
+    const { session } = recordingSession(null, 403);
+
+    await expect(
+      update(session, "a1b2c3", { summary: "New title" }),
+    ).rejects.toThrow(/403.*integration user's permissions/);
   });
 });
 

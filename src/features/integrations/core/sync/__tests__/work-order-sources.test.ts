@@ -197,6 +197,19 @@ describe("ingestPulledWorkOrders", () => {
     });
   });
 
+  it("keeps the ticket's category when the platform sends none", async () => {
+    const { category: _, ...withoutCategory } = pulled;
+    await ingestPulledWorkOrders([withoutCategory], options);
+
+    const [, config] = mockProcessIntegrationSync.mock.calls[0];
+    const { createData, updateData } = await config.transformInputItem(
+      withoutCategory,
+      "user-1",
+    );
+    expect(createData.category).toBe(TicketCategory.OTHER);
+    expect(updateData).not.toHaveProperty("category");
+  });
+
   it("ingests only the last item of a repeated externalId", async () => {
     const newer = { ...pulled, status: TicketStatus.DONE };
 

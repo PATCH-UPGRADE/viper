@@ -8,8 +8,10 @@ import type { z } from "zod";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import type {
   PlatformEnum,
+  Priority,
   ResourceType,
   TicketCategory,
+  TicketStatus,
 } from "@/generated/prisma";
 import type { Category } from "../types";
 
@@ -171,6 +173,8 @@ export interface WorkOrderDraftInput {
   category: TicketCategory;
   /** ISO-8601 with offset, or null when no window was proposed. */
   scheduledAt: string | null;
+  /** ISO-8601 with offset, or null when the window has no end. */
+  scheduledEndTime: string | null;
   asset: {
     id: string;
     hostname: string | null;
@@ -187,17 +191,74 @@ export interface WorkOrderDraftInput {
 }
 
 /**
+ * The VIPER work order fields that a user edit can change, with their values in
+ * terms every platform understands. Each work order module declares which of
+ * them it pushes and which it owns.
+ */
+export interface WorkOrderFieldValues {
+  summary: string;
+  description: string;
+  status: TicketStatus;
+  category: TicketCategory;
+  priority: Priority;
+  /** ISO-8601 with offset, or null to clear the time. */
+  scheduledAt: string | null;
+  /** ISO-8601 with offset, or null to clear the time. */
+  scheduledEndTime: string | null;
+}
+
+export type EditableWorkOrderField = keyof WorkOrderFieldValues;
+
+/** The words VIPER uses for each field in messages to the user. */
+export const EDITABLE_WORK_ORDER_FIELD_LABELS = {
+  summary: "summary",
+  description: "description",
+  status: "status",
+  category: "category",
+  priority: "priority",
+  scheduledAt: "start time",
+  scheduledEndTime: "end time",
+} as const satisfies Record<EditableWorkOrderField, string>;
+
+export const EDITABLE_WORK_ORDER_FIELDS = Object.keys(
+  EDITABLE_WORK_ORDER_FIELD_LABELS,
+) as EditableWorkOrderField[];
+
+/** The fields of one edit that changed. */
+export type WorkOrderPatch = Partial<WorkOrderFieldValues>;
+
+/**
  * A resource module that can also be filed *into* from VIPER.
  *
  * `payloadSchema` is the only part a model fills in, so it holds the platform's
  * own choices and nothing VIPER already knows. `toDraft` joins the two halves.
+ *
+ * `update` takes a `WorkOrderPatch`, not a partial draft: an edit has no asset,
+ * actor or payload, so core cannot call `toDraft` for it.
  */
 export interface WorkOrderModule<
   TRaw = unknown,
   TConfig = unknown,
   TCreds = unknown,
   TDraft = unknown,
-> extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
+> extends Omit<
+    ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft>,
+    "update"
+  > {
+  /**
+   * Called after a user edits a work order that maps to this platform. The
+   * patch holds only the changed fields that `pushedFields` names.
+   */
+  update?(
+    session: Session,
+    externalId: string,
+    patch: WorkOrderPatch,
+    config: TConfig,
+  ): Promise<{ externalId: string; raw: unknown }>;
+  /** The fields that `update` writes. Required with `update`. */
+  pushedFields?: readonly EditableWorkOrderField[];
+  /** The fields that the platform owns. VIPER refuses an edit that changes one. */
+  lockedFields?: readonly EditableWorkOrderField[];
   /** Called once per asset, all with one session. */
   create(
     session: Session,

@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assetNameSelect } from "@/features/assets/utils";
 
@@ -83,13 +84,19 @@ vi.mock("@/lib/auth-utils", () => ({
 
 // The submitter and the payload check are exercised in their own tests; here we
 // stub them so the router's own decisions are what runs.
-const { mockValidatePayload, mockDispatch, mockInngestSend } = vi.hoisted(
-  () => ({
-    mockValidatePayload: vi.fn(),
-    mockDispatch: vi.fn(),
-    mockInngestSend: vi.fn(),
-  }),
-);
+const {
+  mockValidatePayload,
+  mockDispatch,
+  mockInngestSend,
+  mockPushEdit,
+  mockLockedFields,
+} = vi.hoisted(() => ({
+  mockValidatePayload: vi.fn(),
+  mockDispatch: vi.fn(),
+  mockInngestSend: vi.fn(),
+  mockPushEdit: vi.fn(),
+  mockLockedFields: vi.fn(),
+}));
 
 vi.mock("@/features/work-orders/server/payload", () => ({
   validatePlatformPayload: mockValidatePayload,
@@ -97,6 +104,14 @@ vi.mock("@/features/work-orders/server/payload", () => ({
 
 vi.mock("@/features/work-orders/server/submit", () => ({
   dispatchSubmission: mockDispatch,
+}));
+
+vi.mock("@/features/work-orders/server/push-edit", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/work-orders/server/push-edit")
+  >()),
+  pushEditToPlatforms: mockPushEdit,
+  lockedFieldsFor: mockLockedFields,
 }));
 
 vi.mock("@/inngest/client", () => ({
@@ -250,6 +265,8 @@ beforeEach(() => {
   mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
   mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
   mockPrisma.workOrderTicket.updateMany.mockResolvedValue({ count: 1 });
+  mockPushEdit.mockResolvedValue(undefined);
+  mockLockedFields.mockReturnValue([]);
 });
 
 describe("trackingRouter.update", () => {
@@ -389,6 +406,63 @@ describe("trackingRouter.update", () => {
       stored({ scheduledEndTime: before });
       await setup().update({ id: "t1", summary: "New summary" });
       expect(updateData()).toMatchObject({ summary: "New summary" });
+    });
+
+    it("rejects an invalid window before it reaches a platform", async () => {
+      stored();
+      await expect(
+        setup().update({ id: "t1", scheduledEndTime: before }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mockPushEdit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a ticket that a platform holds", () => {
+    beforeEach(() => {
+      mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
+    });
+
+    it("pushes the edit before it saves", async () => {
+      const order: string[] = [];
+      mockPushEdit.mockImplementation(async () => {
+        order.push("push");
+      });
+      mockPrisma.workOrderTicket.update.mockImplementation(async () => {
+        order.push("save");
+        return makeTicketDetail();
+      });
+
+      await setup().update({ id: "t1", summary: "New summary" });
+
+      expect(mockPushEdit).toHaveBeenCalledWith(
+        "t1",
+        expect.objectContaining({ summary: "Test ticket" }),
+        expect.objectContaining({ summary: "New summary" }),
+      );
+      expect(order).toEqual(["push", "save"]);
+    });
+
+    it("saves nothing when the platform refuses the edit", async () => {
+      mockPushEdit.mockRejectedValue(
+        new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "refused" }),
+      );
+
+      await expect(
+        setup().update({ id: "t1", summary: "New summary" }),
+      ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+      expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+    });
+
+    it("returns the fields the platform owns", async () => {
+      mockLockedFields.mockReturnValue([
+        { field: "status", managedBy: "ServiceNow" },
+      ]);
+
+      const result = await setup().update({ id: "t1", summary: "New" });
+
+      expect(result.lockedFields).toEqual([
+        { field: "status", managedBy: "ServiceNow" },
+      ]);
     });
   });
 
@@ -642,6 +716,56 @@ describe("trackingRouter.update — Done cascade", () => {
     });
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
       where: { id: "grandparent-1", status: { not: "DONE" } },
+      data: { status: "DONE" },
+    });
+  });
+
+  it("leaves a parent whose status a platform locks", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }],
+        },
+      },
+    });
+    mockLockedFields.mockReturnValue([
+      { field: "status", managedBy: "ServiceNow" },
+    ]);
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "parent-1", status: { not: "DONE" } },
+      }),
+    );
+    expect(mockPrisma.ticketActivity.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ticketId: "parent-1" }),
+      }),
+    );
+  });
+
+  it("cascades to a parent whose platform locks a different field", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }],
+        },
+      },
+    });
+    mockLockedFields.mockReturnValue([
+      { field: "priority", managedBy: "ServiceNow" },
+    ]);
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
+      where: { id: "parent-1", status: { not: "DONE" } },
       data: { status: "DONE" },
     });
   });

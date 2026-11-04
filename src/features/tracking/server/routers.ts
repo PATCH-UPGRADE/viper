@@ -730,7 +730,10 @@ export const trackingRouter = createTRPCRouter({
         status: z.enum(TicketStatus).optional(),
         category: z.enum(TicketCategory).optional(),
         priority: z.enum(Priority).optional(),
-        departmentIds: z.array(z.string()).optional(),
+        departmentIds: z
+          .array(z.string())
+          .optional()
+          .describe("Replaces the departments. An empty array clears them."),
         descriptions: z
           .array(
             z.object({
@@ -738,10 +741,18 @@ export const trackingRouter = createTRPCRouter({
               body: z.string().max(10_000),
             }),
           )
-          .optional(),
+          .optional()
+          .describe(
+            "Replaces the per-department descriptions. An entry with an empty body is dropped, and a removed department loses its description.",
+          ),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
-        scheduledEndTime: z.coerce.date().nullish(),
+        scheduledEndTime: z.coerce
+          .date()
+          .nullish()
+          .describe(
+            "Must be after scheduledAt. To clear scheduledAt, clear this too.",
+          ),
       }),
     )
     .meta({
@@ -751,7 +762,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. The end time must be after the start time, so to clear scheduledAt, also clear scheduledEndTime. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Omitted fields are unchanged, and null clears a nullable field. For a ticket that syncs with an external platform, a change to a field in `lockedFields`, or to a synced field while the integration is disabled, returns 400. If the platform refuses the edit, the request returns 500 and nothing is saved.",
       },
     })
     .output(workOrderDetailResponseSchema)

@@ -444,12 +444,12 @@ describe("trackingRouter.update", () => {
 
     it("saves nothing when the platform refuses the edit", async () => {
       mockPushEdit.mockRejectedValue(
-        new TRPCError({ code: "BAD_GATEWAY", message: "refused" }),
+        new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "refused" }),
       );
 
       await expect(
         setup().update({ id: "t1", summary: "New summary" }),
-      ).rejects.toMatchObject({ code: "BAD_GATEWAY" });
+      ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
       expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
     });
 

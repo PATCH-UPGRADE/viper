@@ -278,7 +278,7 @@ describe("pushEditToPlatforms", () => {
     await expect(
       pushEditToPlatforms("t1", current, { summary: "New title" }),
     ).rejects.toMatchObject({
-      code: "BAD_GATEWAY",
+      code: "INTERNAL_SERVER_ERROR",
       message: expect.stringMatching(
         /ServiceNow did not accept.*saved nothing.*403/,
       ),
@@ -291,7 +291,7 @@ describe("pushEditToPlatforms", () => {
     await expect(
       pushEditToPlatforms("t1", current, { summary: "New title" }),
     ).rejects.toMatchObject({
-      code: "BAD_GATEWAY",
+      code: "INTERNAL_SERVER_ERROR",
       message: expect.stringMatching(
         /ServiceNow did not accept.*Invalid credentials/,
       ),

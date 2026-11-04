@@ -168,7 +168,7 @@ export async function pushEditToPlatforms(
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       throw new TRPCError({
-        code: "BAD_GATEWAY",
+        code: "INTERNAL_SERVER_ERROR",
         message: `${integration.name} did not accept the change, so VIPER saved nothing: ${reason}`,
         cause: error,
       });

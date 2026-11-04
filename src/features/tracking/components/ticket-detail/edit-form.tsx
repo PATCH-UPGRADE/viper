@@ -101,23 +101,30 @@ const endTimeError = ({ scheduledAt, scheduledEndTime }: EditState) => {
  */
 const LockedFieldTooltip = ({
   lock,
+  fit = false,
   children,
 }: {
   lock: LockedField | undefined;
+  /**
+   * Size the wrapper to a control that is narrower than its column, so that
+   * the tooltip points at the control.
+   */
+  fit?: boolean;
   children: ReactNode;
 }) => {
   if (!lock) return <>{children}</>;
+  const wrapperClass = fit ? "block w-fit rounded-md" : "block rounded-md";
   return (
     <Tooltip>
       {/* A disabled control gets no pointer events, so the wrapper takes the
           hover and the focus for the tooltip. */}
       <TooltipTrigger asChild>
         {/* biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users must be able to reach the tooltip that explains the disabled field. */}
-        <span tabIndex={0} className="block rounded-md">
+        <span tabIndex={0} className={wrapperClass}>
           {children}
         </span>
       </TooltipTrigger>
-      <TooltipContent>
+      <TooltipContent side="bottom" align="start">
         {lockedFieldMessage(lock.field, lock.managedBy)}
       </TooltipContent>
     </Tooltip>
@@ -273,7 +280,7 @@ export const TicketEditForm = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-priority">Priority</Label>
-            <LockedFieldTooltip lock={locks.priority}>
+            <LockedFieldTooltip lock={locks.priority} fit>
               <Select
                 value={form.priority}
                 onValueChange={(v) =>
@@ -375,7 +382,7 @@ export const TicketEditForm = ({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-category">Category</Label>
-            <LockedFieldTooltip lock={locks.category}>
+            <LockedFieldTooltip lock={locks.category} fit>
               <Select
                 value={form.category}
                 onValueChange={(v) =>
@@ -401,7 +408,7 @@ export const TicketEditForm = ({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-status">Status</Label>
-            <LockedFieldTooltip lock={locks.status}>
+            <LockedFieldTooltip lock={locks.status} fit>
               <Select
                 value={form.status}
                 onValueChange={(v) =>

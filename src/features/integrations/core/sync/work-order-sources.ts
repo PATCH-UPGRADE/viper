@@ -96,6 +96,60 @@ export async function ingestPulledWorkOrders(
   return response;
 }
 
+/** The subset of `externalIds` that this integration has a ticket for. */
+export async function listMappedWorkOrders(
+  integrationId: string,
+  externalIds: string[],
+): Promise<string[]> {
+  if (externalIds.length === 0) return [];
+  const mappings = await prisma.externalWorkOrderMapping.findMany({
+    where: { integrationId, externalId: { in: externalIds } },
+    select: { externalId: true },
+  });
+  return mappings.map((mapping) => mapping.externalId);
+}
+
+/**
+ * Delete the tickets of records that the platform deleted.
+ *
+ * An asset sub-ticket has no meaning without its parent, so it is deleted too.
+ * An attached sub-ticket is independent and can have a live record of its own,
+ * so it stays with no parent, whether its parent is the deleted ticket or one of
+ * that ticket's asset sub-tickets. Without the `updateMany`, the `parentId`
+ * cascade deletes it.
+ */
+export async function deletePulledWorkOrders(
+  integrationId: string,
+  externalIds: string[],
+): Promise<void> {
+  if (externalIds.length === 0) return;
+  await prisma.$transaction(async (tx) => {
+    const mappings = await tx.externalWorkOrderMapping.findMany({
+      where: { integrationId, externalId: { in: externalIds } },
+      select: { itemId: true },
+    });
+    const ticketIds = mappings.map((mapping) => mapping.itemId);
+    await tx.workOrderTicket.updateMany({
+      where: {
+        ticket: null,
+        OR: [
+          { parentId: { in: ticketIds } },
+          { parent: { ticket: { parentTicketId: { in: ticketIds } } } },
+        ],
+      },
+      data: { parentId: null },
+    });
+    await tx.workOrderTicket.deleteMany({
+      where: {
+        OR: [
+          { id: { in: ticketIds } },
+          { ticket: { parentTicketId: { in: ticketIds } } },
+        ],
+      },
+    });
+  });
+}
+
 /**
  * Record what each pulled work order looked like on this poll, and link the
  * snapshot to its ticket.
@@ -104,6 +158,10 @@ export async function ingestPulledWorkOrders(
  * record costs no write. The mapping owns the snapshots, which keeps the
  * record off the global `(channel, externalId)` unique key that only channels
  * without a mapping use.
+ *
+ * The one exception is an unchanged record whose ticket has no link to the
+ * newest snapshot. The snapshots outlive a deleted ticket, so the ticket that a
+ * restored record creates needs this link.
  *
  * For a repeated `externalId`, only the last item is recorded. The hash
  * comparison reads the newest stored record and cannot see a sibling created in
@@ -183,47 +241,63 @@ export async function recordWorkOrderSources(
     where: { mappingId: { in: [...mappingIdByExternalId.values()] } },
     orderBy: [{ mappingId: "asc" }, { observedAt: "desc" }],
     distinct: ["mappingId"],
-    select: { mappingId: true, contentHash: true },
+    select: {
+      id: true,
+      mappingId: true,
+      contentHash: true,
+      links: { select: { workOrderTicketId: true } },
+    },
   });
-  const newestHashByMappingId = new Map(
-    newest.map((record) => [record.mappingId, record.contentHash]),
+  const newestByMappingId = new Map(
+    newest.map((record) => [record.mappingId, record]),
   );
 
+  const links: { sourceRecordId: string; workOrderTicketId: string }[] = [];
   const changed: {
     item: WorkOrderSourceItem;
     mappingId: string;
     contentHash: string;
+    workOrderTicketId: string;
   }[] = [];
   for (const item of landed) {
     const mappingId = mappingIdByExternalId.get(item.externalId);
-    if (!mappingId) continue;
+    const workOrderTicketId = ticketByExternalId.get(item.externalId);
+    if (!mappingId || !workOrderTicketId) continue;
     const contentHash = sourceContentHash(item.raw, item.body);
-    if (newestHashByMappingId.get(mappingId) === contentHash) continue;
-    changed.push({ item, mappingId, contentHash });
+    const newestRecord = newestByMappingId.get(mappingId);
+    if (newestRecord?.contentHash !== contentHash) {
+      changed.push({ item, mappingId, contentHash, workOrderTicketId });
+    } else if (
+      !newestRecord.links.some(
+        (link) => link.workOrderTicketId === workOrderTicketId,
+      )
+    ) {
+      links.push({ sourceRecordId: newestRecord.id, workOrderTicketId });
+    }
   }
-  if (changed.length === 0) return;
 
-  const records = await prisma.sourceRecord.createManyAndReturn({
-    data: changed.map(({ item, mappingId, contentHash }) => ({
-      channel: SourceChannel.Integration,
-      mappingId,
-      contentHash,
-      raw: item.raw,
-      markdown: item.body,
-    })),
-    select: { id: true, mappingId: true },
-  });
+  const records =
+    changed.length === 0
+      ? []
+      : await prisma.sourceRecord.createManyAndReturn({
+          data: changed.map(({ item, mappingId, contentHash }) => ({
+            channel: SourceChannel.Integration,
+            mappingId,
+            contentHash,
+            raw: item.raw,
+            markdown: item.body,
+          })),
+          select: { id: true, mappingId: true },
+        });
   const recordIdByMappingId = new Map(
     records.map((record) => [record.mappingId, record.id]),
   );
 
-  await prisma.sourceLink.createMany({
-    data: changed.flatMap(({ item, mappingId }) => {
-      const sourceRecordId = recordIdByMappingId.get(mappingId);
-      const workOrderTicketId = ticketByExternalId.get(item.externalId);
-      if (!sourceRecordId || !workOrderTicketId) return [];
-      return [{ sourceRecordId, workOrderTicketId }];
-    }),
-    skipDuplicates: true,
-  });
+  for (const { mappingId, workOrderTicketId } of changed) {
+    const sourceRecordId = recordIdByMappingId.get(mappingId);
+    if (sourceRecordId) links.push({ sourceRecordId, workOrderTicketId });
+  }
+  if (links.length === 0) return;
+
+  await prisma.sourceLink.createMany({ data: links, skipDuplicates: true });
 }

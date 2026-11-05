@@ -13,6 +13,8 @@ import { tableApiPath } from "../urls";
 
 export const CHANGE_REQUEST_TABLE = "change_request";
 
+const DELETE_LOG_TABLE = "sys_audit_delete";
+
 export const PAGE_SIZE = 1000;
 
 const FIELDS = [
@@ -53,6 +55,16 @@ const changeRequestSchema = z.object({
 });
 
 export type ChangeRequest = z.infer<typeof changeRequestSchema>;
+
+// `documentkey` is the `sys_id` of the deleted record, and `sys_created_on` is
+// the time of the delete.
+const deletedChangeRequestSchema = z.object({
+  sys_id: z.string().min(1),
+  documentkey: z.string().min(1),
+  sys_created_on: z.string(),
+});
+
+type DeletedChangeRequest = z.infer<typeof deletedChangeRequestSchema>;
 
 /**
  * A change request as VIPER models it. `externalId` is the `sys_id` that
@@ -155,10 +167,12 @@ async function fetchPage(
 interface ChangeRequestsCursor {
   /**
    * The highest raw `sys_updated_on` this integration has seen, in UTC, but
-   * never later than the limit that `listChanged` sets.
+   * never later than the limit in `syncWindow`.
    * `sysparm_query` compares it as UTC too, whatever the API user's time zone.
    */
   updatedOn: string;
+  /** The same rule as `updatedOn`, for the `sys_created_on` of the delete log. */
+  deletedOn?: string;
 }
 
 /**
@@ -179,25 +193,74 @@ const MAX_AGE_MS = MAX_AGE_MONTH * 30 * 24 * 60 * 60 * 1000;
 const toServiceNowDateTime = (date: Date): string =>
   date.toISOString().slice(0, 19).replace("T", " ");
 
+/**
+ * `oldest` is where a sync with no cursor starts. `clamp` keeps a saved cursor
+ * behind the start of the sync, minus the clock margin.
+ */
+const syncWindow = () => {
+  const now = Date.now();
+  const limit = toServiceNowDateTime(new Date(now - CURSOR_CLOCK_MARGIN_MS));
+  return {
+    oldest: toServiceNowDateTime(new Date(now - MAX_AGE_MS)),
+    clamp: (since: string): string => (since > limit ? limit : since),
+  };
+};
+
 const versionOf = (r: ChangeRequest): string =>
   `${r.sys_id}@${r.sys_updated_on}`;
 
-const watermarkOf = (cursor: Cursor | null): string | null => {
+const cursorField = (
+  cursor: Cursor | null,
+  field: keyof ChangeRequestsCursor,
+): string | null => {
   if (!cursor || typeof cursor !== "object") return null;
-  const value = (cursor as Partial<ChangeRequestsCursor>).updatedOn;
+  const value = (cursor as Partial<ChangeRequestsCursor>)[field];
   return typeof value === "string" ? value : null;
 };
 
 /**
- * Pages by keyset on `sys_updated_on`, not by offset alone. A record that
- * changes during the sync moves to the end of the order, and with plain offsets
- * every record behind it shifts back one place, so one is skipped.
+ * Pages by keyset on a timestamp, not by offset alone. A record that changes
+ * during the sync moves to the end of the order, and with plain offsets every
+ * record behind it shifts back one place, so one is skipped.
  *
  * Each page restarts from the newest timestamp of the one before. The query is
- * inclusive, so records of that second come back again and are dropped by id
- * and timestamp. Only when a full page sits inside one second does the offset
+ * inclusive, so records of that second come back again and are dropped by
+ * `dedupKeyOf`. Only when a full page sits inside one second does the offset
  * advance.
- *
+ */
+async function* keysetPages<T>(
+  start: string,
+  fetchRecords: (since: string, offset: number) => Promise<T[]>,
+  timestampOf: (record: T) => string,
+  dedupKeyOf: (record: T) => string,
+): AsyncIterable<{ items: T[]; since: string }> {
+  let since = start;
+  let offset = 0;
+  const seen = new Set<string>();
+
+  while (true) {
+    const records = await fetchRecords(since, offset);
+    const fresh = records.filter((r) => {
+      const key = dedupKeyOf(r);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const last = records.at(-1);
+    if (last && timestampOf(last) !== since) {
+      since = timestampOf(last);
+      offset = 0;
+    } else {
+      offset += PAGE_SIZE;
+    }
+
+    yield { items: fresh, since };
+    if (records.length < PAGE_SIZE) return;
+  }
+}
+
+/**
  * A record that changes during the sync comes back with its new timestamp and
  * is yielded again, so the same `sys_id` can occur twice. The caller keeps the
  * last one. A filter by id alone drops the repeat: the cursor then moves past
@@ -216,36 +279,88 @@ export async function* listChanged(
   session: Session,
   cursor: Cursor | null,
 ): AsyncIterable<Page<ChangeRequest>> {
-  const now = Date.now();
-  const limit = toServiceNowDateTime(new Date(now - CURSOR_CLOCK_MARGIN_MS));
-  let since =
-    watermarkOf(cursor) ?? toServiceNowDateTime(new Date(now - MAX_AGE_MS));
-  let offset = 0;
-  const seen = new Set<string>();
+  const { oldest, clamp } = syncWindow();
 
-  while (true) {
-    const records = await fetchPage(session, since, offset);
-    const fresh = records.filter((r) => {
-      const version = versionOf(r);
-      if (seen.has(version)) return false;
-      seen.add(version);
-      return true;
-    });
-
-    const last = records.at(-1);
-    if (last && last.sys_updated_on !== since) {
-      since = last.sys_updated_on;
-      offset = 0;
-    } else {
-      offset += PAGE_SIZE;
-    }
-
-    yield {
-      items: fresh,
-      cursor: { updatedOn: since > limit ? limit : since },
-    };
-    if (records.length < PAGE_SIZE) return;
+  for await (const { items, since } of keysetPages(
+    cursorField(cursor, "updatedOn") ?? oldest,
+    (from, offset) => fetchPage(session, from, offset),
+    (r) => r.sys_updated_on,
+    versionOf,
+  )) {
+    yield { items, cursor: { updatedOn: clamp(since) } };
   }
+}
+
+async function fetchDeletedPage(
+  session: Session,
+  since: string,
+  offset: number,
+): Promise<DeletedChangeRequest[]> {
+  const res = await session.request(
+    `${tableApiPath(DELETE_LOG_TABLE)}?${query({
+      sysparm_fields: "sys_id,documentkey,sys_created_on",
+      sysparm_query: `tablename=${CHANGE_REQUEST_TABLE}^sys_created_on>=${since}^ORDERBYsys_created_on^ORDERBYsys_id`,
+      sysparm_limit: String(PAGE_SIZE),
+      sysparm_offset: String(offset),
+    })}`,
+  );
+  const rows = z.array(deletedChangeRequestSchema).parse(await readResult(res));
+  // Without a read rule on the delete log, ServiceNow answers 200 and removes
+  // every row, but `X-Total-Count` still counts them. This is the only sign of
+  // the missing access, because an empty log has a count of 0.
+  const total = Number(res.headers.get("x-total-count"));
+  if (offset === 0 && rows.length === 0 && total > 0) {
+    throw new Error(
+      `${DELETE_LOG_TABLE} returned no rows, but X-Total-Count is ${total}. The integration user does not have read access to the rows.`,
+    );
+  }
+  return rows;
+}
+
+export const deletedOnOf = (cursor: Cursor | null): string | null =>
+  cursorField(cursor, "deletedOn");
+
+export const withDeletedOn = (
+  cursor: Cursor | null,
+  deletedOn: string | null,
+): Cursor =>
+  deletedOn ? { ...(cursor as ChangeRequestsCursor), deletedOn } : cursor;
+
+/** The `sys_id` of each change request in the delete log, and the next `deletedOn`. */
+export async function listDeleted(
+  session: Session,
+  cursor: Cursor | null,
+): Promise<{ externalIds: string[]; deletedOn: string }> {
+  const { oldest, clamp } = syncWindow();
+  const externalIds = new Set<string>();
+  let deletedOn = deletedOnOf(cursor) ?? oldest;
+
+  for await (const { items, since } of keysetPages(
+    deletedOn,
+    (from, offset) => fetchDeletedPage(session, from, offset),
+    (row) => row.sys_created_on,
+    (row) => row.sys_id,
+  )) {
+    for (const row of items) externalIds.add(row.documentkey);
+    deletedOn = since;
+  }
+  return { externalIds: [...externalIds], deletedOn: clamp(deletedOn) };
+}
+
+/**
+ * A change request can be in the delete log and also live, because ServiceNow
+ * can restore a deleted record with its old `sys_id`.
+ */
+export async function changeRequestExists(
+  session: Session,
+  externalId: string,
+): Promise<boolean> {
+  const res = await session.request(
+    `${tableApiPath(CHANGE_REQUEST_TABLE)}/${encodeURIComponent(externalId)}?${query({ sysparm_fields: "sys_id" })}`,
+  );
+  if (res.status === 404) return false;
+  await readResult(res);
+  return true;
 }
 
 export async function get(

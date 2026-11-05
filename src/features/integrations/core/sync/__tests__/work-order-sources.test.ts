@@ -13,6 +13,8 @@ const { mockPrisma } = vi.hoisted(() => ({
     },
     sourceRecord: { findMany: vi.fn(), createManyAndReturn: vi.fn() },
     sourceLink: { createMany: vi.fn() },
+    workOrderTicket: { updateMany: vi.fn(), deleteMany: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -37,7 +39,9 @@ import {
 } from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
 import {
+  deletePulledWorkOrders,
   ingestPulledWorkOrders,
+  listMappedWorkOrders,
   type PulledWorkOrder,
   recordWorkOrderSources,
   type WorkOrderSourceItem,
@@ -99,24 +103,48 @@ describe("recordWorkOrderSources", () => {
     });
   });
 
-  it("writes no snapshot when the record has not changed", async () => {
-    mockPrisma.externalSourceRecordMapping.findMany.mockResolvedValue([
-      { id: "srm-1", externalId: "sys-1" },
-    ]);
-    mockPrisma.sourceRecord.findMany.mockResolvedValue([
-      {
-        mappingId: "srm-1",
-        contentHash: sourceContentHash(item.raw, item.body),
-      },
-    ]);
+  describe("with an unchanged record", () => {
+    const newestSnapshot = (links: { workOrderTicketId: string | null }[]) => {
+      mockPrisma.externalSourceRecordMapping.findMany.mockResolvedValue([
+        { id: "srm-1", externalId: "sys-1" },
+      ]);
+      mockPrisma.sourceRecord.findMany.mockResolvedValue([
+        {
+          id: "sr-old",
+          mappingId: "srm-1",
+          contentHash: sourceContentHash(item.raw, item.body),
+          links,
+        },
+      ]);
+    };
 
-    await recordWorkOrderSources([item], "int-1");
+    it("writes nothing when the ticket has its link", async () => {
+      newestSnapshot([{ workOrderTicketId: "ticket-1" }]);
 
-    expect(
-      mockPrisma.externalSourceRecordMapping.updateMany,
-    ).toHaveBeenCalled();
-    expect(mockPrisma.sourceRecord.createManyAndReturn).not.toHaveBeenCalled();
-    expect(mockPrisma.sourceLink.createMany).not.toHaveBeenCalled();
+      await recordWorkOrderSources([item], "int-1");
+
+      expect(
+        mockPrisma.externalSourceRecordMapping.updateMany,
+      ).toHaveBeenCalled();
+      expect(
+        mockPrisma.sourceRecord.createManyAndReturn,
+      ).not.toHaveBeenCalled();
+      expect(mockPrisma.sourceLink.createMany).not.toHaveBeenCalled();
+    });
+
+    it("links the newest snapshot to a ticket with no link", async () => {
+      newestSnapshot([{ workOrderTicketId: "ticket-deleted" }]);
+
+      await recordWorkOrderSources([item], "int-1");
+
+      expect(
+        mockPrisma.sourceRecord.createManyAndReturn,
+      ).not.toHaveBeenCalled();
+      expect(mockPrisma.sourceLink.createMany).toHaveBeenCalledWith({
+        data: [{ sourceRecordId: "sr-old", workOrderTicketId: "ticket-1" }],
+        skipDuplicates: true,
+      });
+    });
   });
 
   it("snapshots only the last item of a repeated externalId", async () => {
@@ -228,5 +256,76 @@ describe("ingestPulledWorkOrders", () => {
     expect(mockProcessIntegrationSync.mock.invocationCallOrder[0]).toBeLessThan(
       mockPrisma.externalWorkOrderMapping.findMany.mock.invocationCallOrder[0],
     );
+  });
+});
+
+describe("listMappedWorkOrders", () => {
+  it("returns only the ids with a mapping on this integration", async () => {
+    await expect(
+      listMappedWorkOrders("int-1", ["sys-1", "sys-2"]),
+    ).resolves.toEqual(["sys-1"]);
+    expect(mockPrisma.externalWorkOrderMapping.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          integrationId: "int-1",
+          externalId: { in: ["sys-1", "sys-2"] },
+        },
+      }),
+    );
+  });
+
+  it("does not query for an empty list", async () => {
+    await expect(listMappedWorkOrders("int-1", [])).resolves.toEqual([]);
+    expect(mockPrisma.externalWorkOrderMapping.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("deletePulledWorkOrders", () => {
+  beforeEach(() => {
+    mockPrisma.$transaction.mockImplementation(
+      (run: (tx: typeof mockPrisma) => unknown) => run(mockPrisma),
+    );
+    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+      { itemId: "ticket-1" },
+    ]);
+  });
+
+  it("detaches attached sub-tickets before the parent goes", async () => {
+    await deletePulledWorkOrders("int-1", ["sys-1"]);
+
+    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
+      where: {
+        ticket: null,
+        OR: [
+          { parentId: { in: ["ticket-1"] } },
+          { parent: { ticket: { parentTicketId: { in: ["ticket-1"] } } } },
+        ],
+      },
+      data: { parentId: null },
+    });
+    expect(
+      mockPrisma.workOrderTicket.updateMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      mockPrisma.workOrderTicket.deleteMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("deletes the ticket and its asset sub-tickets", async () => {
+    await deletePulledWorkOrders("int-1", ["sys-1"]);
+
+    expect(mockPrisma.workOrderTicket.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { id: { in: ["ticket-1"] } },
+          { ticket: { parentTicketId: { in: ["ticket-1"] } } },
+        ],
+      },
+    });
+  });
+
+  it("does nothing for an empty list", async () => {
+    await deletePulledWorkOrders("int-1", []);
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 });

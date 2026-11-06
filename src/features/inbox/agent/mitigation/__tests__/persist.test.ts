@@ -17,6 +17,7 @@ const {
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
+    workOrderTicket: { deleteMany: vi.fn() },
     notificationVulnerabilityMapping: { count: vi.fn() },
     vulnerability: { findMany: vi.fn() },
     remediation: { findMany: vi.fn() },
@@ -101,6 +102,28 @@ beforeEach(() => {
   mockResolveDepartments.mockResolvedValue([]);
 });
 
+describe("persistMitigationPlans cleanup", () => {
+  it("deletes the asset sub-tickets of unaccepted plans before the plans", async () => {
+    mockCreatePlans.mockResolvedValue({ plans: [] });
+
+    await persistMitigationPlans("src-1", "notif-1");
+
+    const unaccepted = { notificationId: "notif-1", isAccepted: false };
+    expect(mockPrisma.workOrderTicket.deleteMany).toHaveBeenCalledWith({
+      where: { ticket: { parentTicket: { mitigationPlan: unaccepted } } },
+    });
+    expect(mockPrisma.mitigationPlan.deleteMany).toHaveBeenCalledWith({
+      where: unaccepted,
+    });
+    expect(
+      mockPrisma.workOrderTicket.deleteMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      mockPrisma.mitigationPlan.deleteMany.mock.invocationCallOrder[0],
+    );
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("persistMitigationPlans targeting", () => {
   it("stores the platform a draft will be filed on", async () => {
     mockCreatePlans.mockResolvedValue({ plans: [planWith(["m1"])] });
@@ -160,13 +183,9 @@ describe("persistMitigationPlans targeting", () => {
   // several queries per work order.
   it("resolves every target before opening the transaction", async () => {
     mockCreatePlans.mockResolvedValue({ plans: [planWith(["m1"])] });
-    let opened = false;
-    mockPrisma.$transaction.mockImplementation(async (ops: unknown[]) => {
-      opened = true;
-      return ops;
-    });
     mockResolveDraftTarget.mockImplementation(async () => {
-      expect(opened).toBe(false);
+      // Only the cleanup transaction ran, and it is closed.
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       return VIPER_ONLY;
     });
 

@@ -28,9 +28,15 @@ export async function persistMitigationPlans(
   });
   if (acceptedCount > 0) return { skipped: "accepted-exists" as const };
 
-  await prisma.mitigationPlan.deleteMany({
-    where: { notificationId, isAccepted: false },
-  });
+  const unacceptedPlans = { notificationId, isAccepted: false };
+  // An asset sub-ticket has no `mitigationPlanId`, so the plan cascade does not
+  // reach it.
+  await prisma.$transaction([
+    prisma.workOrderTicket.deleteMany({
+      where: { ticket: { parentTicket: { mitigationPlan: unacceptedPlans } } },
+    }),
+    prisma.mitigationPlan.deleteMany({ where: unacceptedPlans }),
+  ]);
 
   const vulnCount = await prisma.notificationVulnerabilityMapping.count({
     where: { notificationId, ...notRejected },

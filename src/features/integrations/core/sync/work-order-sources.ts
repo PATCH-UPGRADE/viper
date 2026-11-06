@@ -115,38 +115,25 @@ export async function listMappedWorkOrders(
  * An asset sub-ticket has no meaning without its parent, so it is deleted too.
  * An attached sub-ticket is independent and can have a live record of its own,
  * so it stays with no parent, whether its parent is the deleted ticket or one of
- * that ticket's asset sub-tickets. Without the `updateMany`, the `parentId`
- * cascade deletes it.
+ * that ticket's asset sub-tickets.
  */
 export async function deletePulledWorkOrders(
   integrationId: string,
   externalIds: string[],
 ): Promise<void> {
   if (externalIds.length === 0) return;
-  await prisma.$transaction(async (tx) => {
-    const mappings = await tx.externalWorkOrderMapping.findMany({
-      where: { integrationId, externalId: { in: externalIds } },
-      select: { itemId: true },
-    });
-    const ticketIds = mappings.map((mapping) => mapping.itemId);
-    await tx.workOrderTicket.updateMany({
-      where: {
-        ticket: null,
-        OR: [
-          { parentId: { in: ticketIds } },
-          { parent: { ticket: { parentTicketId: { in: ticketIds } } } },
-        ],
-      },
-      data: { parentId: null },
-    });
-    await tx.workOrderTicket.deleteMany({
-      where: {
-        OR: [
-          { id: { in: ticketIds } },
-          { ticket: { parentTicketId: { in: ticketIds } } },
-        ],
-      },
-    });
+  const mappings = await prisma.externalWorkOrderMapping.findMany({
+    where: { integrationId, externalId: { in: externalIds } },
+    select: { itemId: true },
+  });
+  const ticketIds = mappings.map((mapping) => mapping.itemId);
+  await prisma.workOrderTicket.deleteMany({
+    where: {
+      OR: [
+        { id: { in: ticketIds } },
+        { ticket: { parentTicketId: { in: ticketIds } } },
+      ],
+    },
   });
 }
 

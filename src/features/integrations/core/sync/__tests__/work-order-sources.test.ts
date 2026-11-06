@@ -13,8 +13,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     },
     sourceRecord: { findMany: vi.fn(), createManyAndReturn: vi.fn() },
     sourceLink: { createMany: vi.fn() },
-    workOrderTicket: { updateMany: vi.fn(), deleteMany: vi.fn() },
-    $transaction: vi.fn(),
+    workOrderTicket: { deleteMany: vi.fn() },
   },
 }));
 
@@ -281,35 +280,6 @@ describe("listMappedWorkOrders", () => {
 });
 
 describe("deletePulledWorkOrders", () => {
-  beforeEach(() => {
-    mockPrisma.$transaction.mockImplementation(
-      (run: (tx: typeof mockPrisma) => unknown) => run(mockPrisma),
-    );
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
-      { itemId: "ticket-1" },
-    ]);
-  });
-
-  it("detaches attached sub-tickets before the parent goes", async () => {
-    await deletePulledWorkOrders("int-1", ["sys-1"]);
-
-    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: {
-        ticket: null,
-        OR: [
-          { parentId: { in: ["ticket-1"] } },
-          { parent: { ticket: { parentTicketId: { in: ["ticket-1"] } } } },
-        ],
-      },
-      data: { parentId: null },
-    });
-    expect(
-      mockPrisma.workOrderTicket.updateMany.mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      mockPrisma.workOrderTicket.deleteMany.mock.invocationCallOrder[0],
-    );
-  });
-
   it("deletes the ticket and its asset sub-tickets", async () => {
     await deletePulledWorkOrders("int-1", ["sys-1"]);
 
@@ -326,6 +296,6 @@ describe("deletePulledWorkOrders", () => {
   it("does nothing for an empty list", async () => {
     await deletePulledWorkOrders("int-1", []);
 
-    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.deleteMany).not.toHaveBeenCalled();
   });
 });

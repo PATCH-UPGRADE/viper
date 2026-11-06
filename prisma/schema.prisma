@@ -1549,8 +1549,10 @@ model WorkOrderTicket {
 
   departments Department[] @relation("WorkOrderTicketDepartments")
 
+  // A child stays when its parent is deleted. An asset sub-ticket also stays,
+  // with no asset link, so code that deletes a parent must delete those itself.
   parentId String?
-  parent   WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  parent   WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: SetNull)
   children WorkOrderTicket[] @relation("WorkOrderTicketChildren")
 
   creatorId  String

@@ -68,8 +68,8 @@ field on every sync.
   rules don't shape the observation. For example, `ingestFleetAssets` doesn't apply the device on an
   asset Fleet didn't create, but the observation still records it. A `PATCH` holds only the fields it
   changed, because that is all it said.
-* **Each payload is stored once.** When a `SourceRecord` already holds the payload, as it does for pulled
-  work orders and for notifications, the observation points at it with `sourceRecordId` and leaves `raw`
+* **Each payload is stored once.** When a `SourceRecord` already holds the payload, as it does for
+  notifications and emailed work orders, the observation points at it with `sourceRecordId` and leaves `raw`
   null. This also traces an LLM-extracted value back to the document it read. Deleting an integration
   deletes its `SourceRecord`s, so those observations lose the exact payload but keep `fields`, `source`
   and `integrationName`.
@@ -79,6 +79,25 @@ field on every sync.
   `oldValue` only means detached. This covers ticket assets, children, links and departments.
 * **Values are compared after normalization, with deep equality.** For example, `patchFor` treats
   `""` and `null` bodies as equal, and JSON columns like `location` can't use `!==`.
+
+### where a work order came from
+
+Work orders use `SourceRecord` only for email, which is what it was added to them for. Integration tickets
+don't need it: `ExternalWorkOrderMapping` says which external record they came from, and `Observation`
+holds the payload and history.
+
+| Ticket comes from | Link to where it came from | Payload |
+|---|---|---|
+| ServiceNow or Fleet pull | `ExternalWorkOrderMapping` | `Observation.raw` |
+| `integrationUpload` | `ExternalWorkOrderMapping` | `Observation.raw` |
+| Email | `SourceLink` to the email's `SourceRecord` | `SourceRecord`, through `Observation.sourceRecordId` |
+| A person, or chat | None | `Observation.raw` |
+
+Two accepted changes for integration tickets:
+
+* A change to a payload field we don't map, like `work_notes`, writes no observation, so that version of
+  `raw` isn't kept. Assets work the same way.
+* A ticket deleted upstream and later restored gets a new `entityId`, so its history starts fresh.
 
 ### who can edit
 
@@ -179,7 +198,7 @@ model Observation {
   actorUserId String?
   actor       User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
-  // The document this came from, when a SourceRecord holds it. Null for most asset writes.
+  // The document this came from, when a SourceRecord holds it: notifications and emailed work orders.
   sourceRecordId String?
   sourceRecord   SourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
 
@@ -331,6 +350,7 @@ model SourceRecord {
   side. `VulnerabilityRecord.raw` stays on the record
 * `VulnerabilitySource`, `SourceChannel`, `SourceRecord`: email, EPSS and KEV stay outside `Integration`,
   so these stay as they are, apart from the new back-relation on `SourceRecord`
+* `SourceLink`: `workOrderTicketId` stays, but only emailed tickets use it
 * The automation user: it stays as the actor for VIPER's own automated writes
 * `TicketComment`, `TicketWatch`, `TicketSeen`: not provenance
 * `Webhook.userId`, `ChatThread.userId`, `CsvImport.userId`, `Note.userId`: these belong to a person or
@@ -357,14 +377,24 @@ model SourceRecord {
       routers, `work-orders/submit.ts`, `work-order-tools.ts`, `process-inbox-email`
 - [ ] Route notification writes: `inbox/pipeline.ts`, `triage/persist.ts`, the inbox router,
       `analyze-remediation.ts`
-- [ ] Set `sourceRecordId` on observations for work orders and notifications. `recordWorkOrderSources`
-      runs after `processIntegrationSync` today, so the order has to change
+- [ ] Set `sourceRecordId` on observations for notifications and emailed work orders
 - [ ] Callers using `updateMany` must read the affected rows first to know the old values
 - [ ] Return the PATCH response from `pushEditToPlatforms` and record it as the integration's observation
 - [ ] Keep the behavior of `fleetCreatedEquipmentKeys`, reading who created the asset from its `CREATE`
       observation, since `Asset.userId` is gone
 - [ ] Make demo seeds write through `applyObservation`, or their rows have no provenance
 - [ ] Add the raw SQL CHECK constraint on `Observation`
+
+### work orders and SourceRecord
+
+- [ ] Remove `recordWorkOrderSources` and the `ExternalSourceRecordMapping` rows it creates. Fold
+      `WorkOrderSourceItem` into `PulledWorkOrder`, whose `raw` now goes to `applyObservation`
+- [ ] Remove `source` from `integrationWorkOrderInputSchema`, and the `SourceRecord` that
+      `workOrders.integrationUpload` creates from it
+- [ ] Link emailed tickets in `process-inbox-email` with a `SourceLink`, replacing the commented-out `sources` line
+- [ ] Update `dev/work-orders.ts`, so only emailed demo tickets have a `SourceRecord`
+- [ ] Coordinate with VW-595, which removes the "Suggested" tab filter (`sourceLinks: { some: {} }`). If this
+      ships first, synced tickets leave that tab and emailed tickets join it until VW-595 lands
 
 ### removing shadow users
 
@@ -415,7 +445,7 @@ model SourceRecord {
 
 - [ ] `/api/v1` breaking changes to list in the PR: `user` and `userId` removed from assets; nullable `user`
       and `userId` on remediations, device artifacts and artifacts; nullable `creator`; `activities` on
-      tickets
+      tickets; `source` on the work order `integrationUpload` input
 - [ ] Update `CLAUDE.md` (key models, background jobs) and the shadow user comments in `vulnerability-schema.md`
 
 ## Out of scope

@@ -7,8 +7,10 @@ import { TicketStatus } from "@/generated/prisma";
 import type { Page, Session } from "../../../../core/types";
 import {
   type ChangeRequest,
+  changeRequestExists,
   get,
   listChanged,
+  listDeleted,
   mapStatus,
   PAGE_SIZE,
   toCanonical,
@@ -422,5 +424,143 @@ describe("get", () => {
       assignment_group: "287ebd7da9fe198100f92cc8d1d2154e",
       cmdb_ci: "",
     });
+  });
+});
+
+describe("listDeleted", () => {
+  const saved = { deletedOn: "2026-04-30 00:00:00" };
+  const row = (documentkey: string, sys_created_on: string) => ({
+    sys_id: `audit-${documentkey}`,
+    documentkey,
+    sys_created_on,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date("2026-05-02T10:00:00Z") });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads change request rows from the delete log in a stable order", async () => {
+    const { session, urls } = fakeSession([[]]);
+
+    await listDeleted(session, saved);
+
+    expect(urls[0].pathname).toBe("/api/now/table/sys_audit_delete");
+    expect(urls[0].searchParams.get("sysparm_query")).toBe(
+      "tablename=change_request^sys_created_on>=2026-04-30 00:00:00^ORDERBYsys_created_on^ORDERBYsys_id",
+    );
+  });
+
+  it("returns the sys_id of each deleted record and the newest time", async () => {
+    const { session } = fakeSession([[row("a1", "2026-05-01 08:00:00")]]);
+
+    await expect(listDeleted(session, saved)).resolves.toEqual({
+      externalIds: ["a1"],
+      deletedOn: "2026-05-01 08:00:00",
+    });
+  });
+
+  it("starts 12 months back, and keeps that start while the log is empty", async () => {
+    const { session, urls } = fakeSession([[]]);
+
+    await expect(listDeleted(session, null)).resolves.toEqual({
+      externalIds: [],
+      deletedOn: "2025-05-07 10:00:00",
+    });
+    expect(urls[0].searchParams.get("sysparm_query")).toContain(
+      "sys_created_on>=2025-05-07 10:00:00",
+    );
+  });
+
+  it("keeps a saved cursor when the log has nothing new", async () => {
+    const { session } = fakeSession([[]]);
+
+    await expect(listDeleted(session, saved)).resolves.toEqual({
+      externalIds: [],
+      deletedOn: "2026-04-30 00:00:00",
+    });
+  });
+
+  it("keeps the cursor behind the start of the sync", async () => {
+    const { session } = fakeSession([[row("a1", "2026-05-02 09:59:00")]]);
+
+    const { deletedOn } = await listDeleted(session, saved);
+
+    expect(deletedOn).toBe("2026-05-02 09:55:00");
+  });
+
+  describe("with the total count of the query", () => {
+    const withTotal = (total: string): Session => ({
+      request: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ result: [] }), {
+            headers: {
+              "content-type": "application/json",
+              "x-total-count": total,
+            },
+          }),
+      ),
+    });
+
+    it("throws when ServiceNow counts rows but returns none", async () => {
+      await expect(listDeleted(withTotal("1"), null)).rejects.toThrow(
+        "sys_audit_delete returned no rows, but X-Total-Count is 1.",
+      );
+    });
+
+    it("reads a count of 0 as an empty log", async () => {
+      await expect(listDeleted(withTotal("0"), saved)).resolves.toEqual({
+        externalIds: [],
+        deletedOn: "2026-04-30 00:00:00",
+      });
+    });
+
+    it("asks ServiceNow for the count", async () => {
+      const { session, urls } = fakeSession([[]]);
+
+      await listDeleted(session, null);
+
+      expect(urls[0].searchParams.has("sysparm_no_count")).toBe(false);
+    });
+  });
+
+  it("restarts each page from the last time and drops repeats", async () => {
+    const full = Array.from({ length: PAGE_SIZE }, (_, i) =>
+      row(`a${i}`, "2026-05-01 08:00:00"),
+    );
+    const { session, urls } = fakeSession([full, [full[0]]]);
+
+    const { externalIds } = await listDeleted(session, saved);
+
+    expect(urls[1].searchParams.get("sysparm_query")).toContain(
+      "sys_created_on>=2026-05-01 08:00:00",
+    );
+    expect(externalIds).toHaveLength(PAGE_SIZE);
+  });
+});
+
+describe("changeRequestExists", () => {
+  const withStatus = (response: Response): Session => ({
+    request: vi.fn(async () => response),
+  });
+
+  it("is false on a 404", async () => {
+    const session = withStatus(new Response("{}", { status: 404 }));
+
+    await expect(changeRequestExists(session, "a1")).resolves.toBe(false);
+  });
+
+  it("is true when the record comes back", async () => {
+    const session = withStatus(json({ sys_id: "a1" }));
+
+    await expect(changeRequestExists(session, "a1")).resolves.toBe(true);
+  });
+
+  it("throws on any other failure, so a ticket is not deleted by mistake", async () => {
+    const session = withStatus(new Response("{}", { status: 500 }));
+
+    await expect(changeRequestExists(session, "a1")).rejects.toThrow("500");
   });
 });

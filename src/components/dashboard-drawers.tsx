@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDistanceToNow } from "date-fns";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -209,3 +210,7 @@ export function DrawerField({
     </div>
   );
 }
+
+/** "3 days ago (11/6/2026, 12:48:57 PM)", for a drawer's Created and Last Updated fields. */
+export const formatDateWithAgo = (date: Date) =>
+  `${formatDistanceToNow(date, { addSuffix: true })} (${new Date(date).toLocaleString()})`;

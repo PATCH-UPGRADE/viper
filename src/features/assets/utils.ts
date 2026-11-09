@@ -139,11 +139,9 @@ export function getAssetSources(asset: AssetSourcesSource): string[] {
 
 /**
  * getAssetSources as dashboard blocks: the creator as a person, then each integration that reports
- * the asset. An integration's shadow user is the integration, so it shows once, as an integration.
+ * the asset
  * TODO VW-600: build these from the data provenance models instead (every source that has written
- * to the asset, not only its creator and current mappings). See docs/provenance-schema.md on the
- * data-provenance branch:
- * https://github.com/PATCH-UPGRADE/viper/blob/data-provenance/docs/provenance-schema.md
+ * to the asset, not only its creator and current mappings)
  */
 export function getAssetSourceBlocks(asset: AssetSourcesSource): SourceBlock[] {
   const integrationBlocks: SourceBlock[] = [];

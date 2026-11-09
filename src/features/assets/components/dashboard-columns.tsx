@@ -85,7 +85,7 @@ function createSeverityColumn(
 }
 
 /**
- * "Product • Device Type", like the asset drawer's title, over "Manufacturer • IP address" in small
+ * "Product • Device Type" over "Manufacturer • IP address" in small
  * muted text. An asset with no product shows getAssetTitle instead.
  */
 function DeviceCell({ asset }: { asset: AssetWithIssueRelations }) {
@@ -113,8 +113,6 @@ function DeviceCell({ asset }: { asset: AssetWithIssueRelations }) {
 
 export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
-    // The product and its device type, with the manufacturer and IP address underneath. Not
-    // sortable: it shows four fields, and no one of them is the obvious sort key.
     id: "device",
     meta: { title: "Device" },
     header: "Device",
@@ -130,7 +128,6 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     meta: { title: "Sources", headerClassName: "pl-6", cellClassName: "pl-6" },
     header: "Sources",
     accessorFn: (row) => getAssetSources(row).join(", "),
-    // TODO VW-600: use the data provenance models (see getAssetSourceBlocks).
     cell: ({ row }) => (
       <SourceBlocks blocks={getAssetSourceBlocks(row.original)} />
     ),

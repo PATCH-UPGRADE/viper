@@ -49,6 +49,7 @@ import { ImportCsvButton } from "@/features/integrations/platforms/csv-upload/co
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
+import { formatDateWithAgo } from "@/lib/date-utils";
 import { deviceLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
@@ -574,8 +575,7 @@ export function AssetDrawer({
                 Created
               </div>
               <div className="text-xs">
-                {formatDistanceToNow(asset.createdAt, { addSuffix: true })} (
-                {new Date(asset.createdAt).toLocaleString()})
+                {formatDateWithAgo(asset.createdAt)}
               </div>
             </div>
 
@@ -584,8 +584,7 @@ export function AssetDrawer({
                 Last Updated
               </div>
               <div className="text-xs">
-                {formatDistanceToNow(asset.updatedAt, { addSuffix: true })} (
-                {new Date(asset.updatedAt).toLocaleString()})
+                {formatDateWithAgo(asset.updatedAt)}
               </div>
             </div>
 

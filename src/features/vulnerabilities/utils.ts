@@ -111,33 +111,6 @@ interface RecordLike {
   user?: { name: string } | null;
 }
 
-/**
- * Where a vulnerability came from: its records' sources in order, without the EPSS and KEV feeds,
- * and the people who sent its TA3 records.
- */
-export function recordSources(records: RecordLike[]): {
-  sources: VulnerabilitySource[];
-  ta3Contributors: string[];
-} {
-  const sources = [
-    ...new Set(
-      records
-        .map((record) => record.source)
-        .filter((source) => !FEED_SOURCES.includes(source)),
-    ),
-  ];
-  const ta3Contributors = [
-    ...new Set(
-      records.flatMap((record) =>
-        record.source === VulnerabilitySource.TA3 && record.user
-          ? [record.user.name]
-          : [],
-      ),
-    ),
-  ];
-  return { sources, ta3Contributors };
-}
-
 interface NamedRecordLike extends RecordLike {
   sourceId?: string | null;
   externalMapping?: { integration: { name: string } } | null;

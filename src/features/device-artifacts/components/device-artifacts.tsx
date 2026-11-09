@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatDateWithAgo } from "@/lib/date-utils";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import {
   useRemoveDeviceArtifact,
@@ -245,10 +246,7 @@ function DeviceArtifactDrawer({
                   Created
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(deviceArtifact.createdAt, {
-                    addSuffix: true,
-                  })}{" "}
-                  ({new Date(deviceArtifact.createdAt).toLocaleString()})
+                  {formatDateWithAgo(deviceArtifact.createdAt)}
                 </div>
               </div>
 
@@ -257,10 +255,7 @@ function DeviceArtifactDrawer({
                   Last Updated
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(deviceArtifact.updatedAt, {
-                    addSuffix: true,
-                  })}{" "}
-                  ({new Date(deviceArtifact.updatedAt).toLocaleString()})
+                  {formatDateWithAgo(deviceArtifact.updatedAt)}
                 </div>
               </div>
 

@@ -1,4 +1,10 @@
-import { format, isThisYear, isToday, isYesterday } from "date-fns";
+import {
+  format,
+  formatDistanceToNow,
+  isThisYear,
+  isToday,
+  isYesterday,
+} from "date-fns";
 
 // `separator` sits between the date and the time (e.g. "Jul 21, 2026 at 3:00
 // PM" vs "· 3:00 PM"); it is a date-fns literal, so it is not interpreted.
@@ -74,3 +80,11 @@ export const DAY_NAMES_SHORT = [
   "Saturday",
   "Sunday",
 ] as const;
+
+/** "3 days ago", or "in 2 hours" for a date in the future. */
+export const relativeTime = (date: Date | string | number) =>
+  formatDistanceToNow(date, { addSuffix: true });
+
+/** "3 days ago (11/6/2026, 12:48:57 PM)", for a record's Created and Last Updated fields. */
+export const formatDateWithAgo = (date: Date | string) =>
+  `${relativeTime(date)} (${new Date(date).toLocaleString()})`;

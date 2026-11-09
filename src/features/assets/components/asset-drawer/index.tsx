@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
   FileText,
@@ -17,6 +16,9 @@ import {
   SuggestedQuestionsProvider,
 } from "@/features/chat/context/suggested-questions-context";
 import type { UserRole } from "@/features/chat/utils";
+import { DrawerIssuesList } from "@/features/issues/components/issue";
+import { RemediationCardList } from "@/features/remediations/components/remediations";
+import { relativeTime } from "@/lib/date-utils";
 import type { AssetWithIssueRelations } from "../../types";
 import {
   getAssetDeviceTypeLabel,
@@ -24,8 +26,6 @@ import {
   securityRemediationsOf,
 } from "../../utils";
 import { assetStatusVariant, OverviewSection } from "./overview-section";
-import { RemediationsSection } from "./remediations-section";
-import { VulnerabilitiesSection } from "./vulnerabilities-section";
 
 interface AssetDashboardDrawerProps {
   asset: AssetWithIssueRelations;
@@ -59,7 +59,7 @@ export function AssetDashboardDrawer({
 }: AssetDashboardDrawerProps) {
   const { userRole } = useChatUI();
 
-  const uniqueRemediationCount = securityRemediationsOf(asset.issues).length;
+  const remediations = securityRemediationsOf(asset.issues);
 
   const suggestedQuestions: Partial<Record<UserRole, SuggestedQuestion[]>> = {
     CISO: [
@@ -117,14 +117,20 @@ export function AssetDashboardDrawer({
       label: "Vulnerabilities",
       icon: BugIcon,
       count: asset.issues.length,
-      content: <VulnerabilitiesSection asset={asset} />,
+      content: (
+        <DrawerIssuesList
+          issues={asset.issues}
+          type="vulnerabilities"
+          assetId={asset.id}
+        />
+      ),
     },
     {
       value: "remediations",
       label: "Remediations",
       icon: Wrench,
-      count: uniqueRemediationCount,
-      content: <RemediationsSection asset={asset} />,
+      count: remediations.length,
+      content: <RemediationCardList remediations={remediations} />,
     },
     {
       value: "chat",
@@ -148,12 +154,7 @@ export function AssetDashboardDrawer({
       {asset.status && (
         <Badge variant={assetStatusVariant(asset.status)}>{asset.status}</Badge>
       )}
-      <span className="text-sm">
-        Updated{" "}
-        {formatDistanceToNow(asset.updatedAt, {
-          addSuffix: true,
-        })}
-      </span>
+      <span className="text-sm">Updated {relativeTime(asset.updatedAt)}</span>
     </>
   );
 

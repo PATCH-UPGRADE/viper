@@ -3,11 +3,12 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 
+import { SourceBlocks } from "@/components/sources";
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import type { VulnerabilityResponse } from "../types";
-import { VulnerabilitySources } from "./vulnerability-sources";
+import { recordSourceBlocks } from "../utils";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [
   {
@@ -45,7 +46,9 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
     id: "sources",
     meta: { title: "Sources" },
     header: "Sources",
-    cell: ({ row }) => <VulnerabilitySources records={row.original.records} />,
+    cell: ({ row }) => (
+      <SourceBlocks blocks={recordSourceBlocks(row.original.records)} />
+    ),
   },
   {
     accessorKey: "updatedAt",

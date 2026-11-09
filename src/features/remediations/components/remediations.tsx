@@ -9,6 +9,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { DrawerEmptyState } from "@/components/dashboard-drawers";
 import {
   EmptyView,
   EntityContainer,
@@ -444,5 +445,28 @@ export const RemediationCard = ({
         )}
       </CardContent>
     </Card>
+  );
+};
+
+/** A drawer tab's remediations as cards, or an empty state when there are none. */
+export const RemediationCardList = ({
+  remediations,
+}: {
+  remediations: RemediationCardType[];
+}) => {
+  if (remediations.length === 0) {
+    return (
+      <DrawerEmptyState icon={WrenchIcon} message="No remediations available" />
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {remediations.map((remediation) => (
+        <RemediationCard
+          remediation={remediation}
+          key={`remediation-${remediation.id}`}
+        />
+      ))}
+    </div>
   );
 };

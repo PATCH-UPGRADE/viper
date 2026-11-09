@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -34,14 +35,6 @@ const BLOCK_CLASS: Record<SourceBlock["kind"] | "more", string> = {
 
 /** Four blocks fit, so "+1" would save nothing. Past that, show three and a count. */
 const SOURCE_BLOCK_LIMIT = 4;
-
-export const initialsOf = (name: string) =>
-  (name.trim() || "?")
-    .split(/\s+/)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
 function Block({
   kind,

@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -222,6 +221,20 @@ export function DrawerField({
   );
 }
 
-/** "3 days ago (11/6/2026, 12:48:57 PM)", for a drawer's Created and Last Updated fields. */
-export const formatDateWithAgo = (date: Date) =>
-  `${formatDistanceToNow(date, { addSuffix: true })} (${new Date(date).toLocaleString()})`;
+/** A tab with nothing to list: a large faded icon over a message, centered. */
+export function DrawerEmptyState({
+  icon: Icon,
+  message,
+}: {
+  icon: LucideIcon;
+  message: string;
+}) {
+  return (
+    <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div className="text-center space-y-2">
+        <Icon className="h-12 w-12 mx-auto opacity-50" />
+        <p className="text-sm">{message}</p>
+      </div>
+    </div>
+  );
+}

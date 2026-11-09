@@ -2,6 +2,8 @@
 
 import { BugIcon, ComputerIcon } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
+import { DrawerEmptyState } from "@/components/dashboard-drawers";
 import {
   EntityContainer,
   ErrorView,
@@ -9,6 +11,7 @@ import {
 } from "@/components/entity-components";
 import { StatusFormBase, statusDetails } from "@/components/status-form";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AssetItem } from "@/features/assets/components/assets";
 import { locationSchema } from "@/features/assets/types";
 import {
@@ -260,5 +263,29 @@ export const IssuesSidebarList = ({
         </div>
       )}
     </>
+  );
+};
+
+/** A drawer tab's issues, or an empty state when there are none. */
+export const DrawerIssuesList = ({
+  issues,
+  type,
+  assetId,
+}: {
+  issues: Issue[];
+  type: "assets" | "vulnerabilities";
+  assetId?: string;
+}) => {
+  if (issues.length === 0) {
+    return type === "vulnerabilities" ? (
+      <DrawerEmptyState icon={BugIcon} message="No vulnerabilities detected" />
+    ) : (
+      <DrawerEmptyState icon={ComputerIcon} message="No affected assets" />
+    );
+  }
+  return (
+    <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+      <IssuesSidebarList issues={issues} type={type} assetId={assetId} />
+    </Suspense>
   );
 };

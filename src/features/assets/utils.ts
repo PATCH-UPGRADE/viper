@@ -123,23 +123,10 @@ export type AssetSourcesSource = {
 };
 
 /**
- * Where an asset came from: the user who created it, then each integration that
- * reports it. Every CSV import is its own integration, so each shows as "CSV
- * Upload". An integration's shadow user shares its name, so an asset an
- * integration created lists that integration once.
- */
-export function getAssetSources(asset: AssetSourcesSource): string[] {
-  const integrations = asset.externalMappings.map(({ integration }) =>
-    integration.platform === PlatformEnum.CSV_UPLOAD
-      ? CSV_UPLOAD_DISPLAY_NAME
-      : integration.name,
-  );
-  return [...new Set([asset.user.name, ...integrations])];
-}
-
-/**
- * getAssetSources as dashboard blocks: the creator as a person, then each integration that reports
- * the asset
+ * Where an asset came from, as dashboard blocks: the user who created it as a person, then each
+ * integration that reports it. Every CSV import is its own integration, so each shows as one "CSV
+ * Upload". An integration's shadow user shares its name, so an asset an integration created lists
+ * that integration once, as an integration.
  * TODO VW-600: build these from the data provenance models instead (every source that has written
  * to the asset, not only its creator and current mappings)
  */
@@ -173,6 +160,10 @@ export function getAssetSourceBlocks(asset: AssetSourcesSource): SourceBlock[] {
         ...integrationBlocks,
       ];
 }
+
+/** getAssetSourceBlocks' names, e.g. for sorting or searching the Sources column. */
+export const getAssetSources = (asset: AssetSourcesSource): string[] =>
+  getAssetSourceBlocks(asset).map((block) => block.name);
 
 export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
   UNKNOWN: "Unknown",

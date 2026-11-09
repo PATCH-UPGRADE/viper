@@ -1,18 +1,18 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { PlugIcon } from "lucide-react";
 import {
   DrawerField,
   DrawerFieldGrid,
   DrawerSection,
   DrawerSections,
-  formatDateWithAgo,
 } from "@/components/dashboard-drawers";
+import { mappingLinks, platformTagOf } from "@/components/external-mappings";
 import { SourceList } from "@/components/sources";
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { PlatformEnum } from "@/generated/prisma";
+import { formatDateWithAgo, relativeTime } from "@/lib/date-utils";
 import { type AssetWithIssueRelations, locationSchema } from "../../types";
 import {
   getAssetDeviceTypeLabel,
@@ -45,21 +45,13 @@ function AssetSourceList({ asset }: { asset: AssetWithIssueRelations }) {
         key: `${mapping.integration.id}:${mapping.externalId}`,
         icon: PlugIcon,
         name: mapping.integration.name,
-        tag:
-          mapping.integration.platform === PlatformEnum.CSV_UPLOAD
-            ? "CSV"
-            : undefined,
+        tag: platformTagOf(mapping.integration.platform),
         meta: mapping.lastSynced
-          ? `Last synced ${formatDistanceToNow(mapping.lastSynced, { addSuffix: true })}`
+          ? `Last synced ${relativeTime(mapping.lastSynced)}`
           : mapping.integration.platform === PlatformEnum.CSV_UPLOAD
             ? "Imported from a CSV file"
             : "Not synced yet",
-        links: [
-          ...(mapping.webUrl ? [{ label: "Web", href: mapping.webUrl }] : []),
-          ...(mapping.upstreamApi
-            ? [{ label: "API", href: mapping.upstreamApi }]
-            : []),
-        ],
+        links: mappingLinks(mapping),
       }))}
     />
   );

@@ -4,7 +4,6 @@ import {
   cvssScores,
   recordSourceBlocks,
   recordSourceName,
-  recordSources,
   recordTypeText,
   summarizeMetrics,
 } from "../utils";
@@ -155,29 +154,5 @@ describe("recordSourceBlocks", () => {
       ["Blueflow Service", "person"],
       ["AI crawler", "automation"],
     ]);
-  });
-});
-
-describe("recordSources", () => {
-  it("lists sources in record order, once each, without the EPSS and KEV feeds", () => {
-    const { sources } = recordSources([
-      { source: "VENDOR_ADVISORY" },
-      { source: "FIRST_EPSS" },
-      { source: "TA3" },
-      { source: "CISA_KEV" },
-      { source: "VENDOR_ADVISORY" },
-    ]);
-    expect(sources).toEqual(["VENDOR_ADVISORY", "TA3"]);
-  });
-
-  it("names each TA3 contributor once and skips records with no owner", () => {
-    const { ta3Contributors } = recordSources([
-      { source: "TA3", user: { name: "Ada" } },
-      { source: "TA3", user: null },
-      { source: "TA3", user: { name: "Ada" } },
-      { source: "TA3", user: { name: "Grace" } },
-      { source: "OTHER", user: { name: "Linus" } },
-    ]);
-    expect(ta3Contributors).toEqual(["Ada", "Grace"]);
   });
 });

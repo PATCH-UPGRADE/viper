@@ -82,14 +82,25 @@ export function DashboardDrawerShell({
           defaultValue={tabs[0]?.value}
           className="flex flex-1 flex-col min-h-0"
         >
-          <TabsList className="w-full justify-start rounded-none border-b bg-muted">
+          {/* The row scrolls sideways when the tabs don't fit. Its height is auto and each tab's
+              is fixed, so a scrollbar adds height to the row instead of squashing the tabs. */}
+          <TabsList className="w-full shrink-0 justify-start overflow-x-auto overflow-y-hidden rounded-none border-b bg-muted group-data-[orientation=horizontal]/tabs:h-auto min-h-10">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="gap-2"
+                  // Grow to fill the row, never shrink below the label.
+                  className="h-[34px] flex-[1_0_auto] gap-2"
+                  // Bring a tab that's partly scrolled out of view fully into it.
+                  onClick={(event) =>
+                    event.currentTarget.scrollIntoView({
+                      block: "nearest",
+                      inline: "nearest",
+                      behavior: "smooth",
+                    })
+                  }
                 >
                   <Icon className="h-4 w-4" />
                   {tab.label}

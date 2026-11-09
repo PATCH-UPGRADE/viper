@@ -88,3 +88,13 @@ export const relativeTime = (date: Date | string | number) =>
 /** "3 days ago (11/6/2026, 12:48:57 PM)", for a record's Created and Last Updated fields. */
 export const formatDateWithAgo = (date: Date | string) =>
   `${relativeTime(date)} (${new Date(date).toLocaleString()})`;
+
+/** "Nov 6, 2026", or null when there is no date. */
+export function formatDate(date: Date | string): string;
+export function formatDate(
+  date: Date | string | null | undefined,
+): string | null;
+export function formatDate(date: Date | string | null | undefined) {
+  if (!date) return null;
+  return format(date instanceof Date ? date : new Date(date), "MMM d, yyyy");
+}

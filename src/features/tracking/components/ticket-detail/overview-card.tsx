@@ -14,9 +14,9 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getChipClass } from "@/features/tag-colors/palette";
-import { formatScheduled } from "@/lib/date-utils";
+import { formatDate, formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
-import { CategoryChip, formatDate, StatusChip, useReadOnly } from "./shared";
+import { CategoryChip, StatusChip, useReadOnly } from "./shared";
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

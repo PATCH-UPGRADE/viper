@@ -574,8 +574,6 @@ model ExternalRemediationMapping {
   @@map("external_remediation_mappings")
 }
 
-/// Where a ticket lives on a vendor platform. A ticket is filed to, or pulled from, exactly one
-/// integration, so it has at most one mapping.
 model ExternalWorkOrderMapping {
   id            String          @id @default(cuid())
   itemId        String          @unique
@@ -595,8 +593,7 @@ model ExternalWorkOrderMapping {
 }
 
 /// The ID an integration knows a VulnerabilityRecord by, e.g. a partner's ID for its TA3
-/// submission, or the AI crawler's ID for an item it recorded. A record is one source's statement,
-/// so it has at most one mapping.
+/// submission, or the AI crawler's ID for an item it recorded.
 model ExternalVulnerabilityRecordMapping {
   id            String              @id @default(cuid())
   itemId        String              @unique

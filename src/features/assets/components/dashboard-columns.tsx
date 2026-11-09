@@ -4,24 +4,19 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { SeverityBadge, severityConfig } from "@/components/severity-badge";
+import { SourceBlocks } from "@/components/sources";
 import { Badge } from "@/components/ui/badge";
-import { ClampedCell } from "@/components/ui/clamped-cell";
 import { SortableHeader } from "@/components/ui/data-table";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   countAffectedRemediations,
   getAssetDeviceTypeLabel,
+  getAssetSourceBlocks,
   getAssetSources,
+  getAssetTitle,
 } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
-import { deviceLabel } from "@/lib/markdown";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
@@ -89,48 +84,56 @@ function createSeverityColumn(
   };
 }
 
+/**
+ * "Product • Device Type", like the asset drawer's title, over "Manufacturer • IP address" in small
+ * muted text. An asset with no product shows getAssetTitle instead.
+ */
+function DeviceCell({ asset }: { asset: AssetWithIssueRelations }) {
+  const product = asset.product?.canonicalDisplayName;
+  const deviceType = getAssetDeviceTypeLabel(asset);
+  const details = [asset.manufacturer?.canonicalDisplayName, asset.ip].filter(
+    Boolean,
+  );
+  return (
+    <div className="flex flex-col">
+      <span className="flex flex-wrap items-center gap-x-1.5">
+        <span className="font-medium">{product ?? getAssetTitle(asset)}</span>
+        {product && deviceType && (
+          <span className="text-[0.9em]">&bull; {deviceType}</span>
+        )}
+      </span>
+      {details.length > 0 && (
+        <span className="text-xs text-muted-foreground">
+          {details.join(" \u2022 ")}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
-    id: "deviceType",
-    meta: { title: "Device Type" },
-    header: ({ column }) => (
-      <SortableHeader header="Device Type" column={column} />
-    ),
-    accessorFn: getAssetDeviceTypeLabel,
-    cell: ({ row, getValue }) => (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-default">
-              {getValue<string | null>() ?? (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{deviceLabel(row.original)}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ),
+    // The product and its device type, with the manufacturer and IP address underneath. Not
+    // sortable: it shows four fields, and no one of them is the obvious sort key.
+    id: "device",
+    meta: { title: "Device" },
+    header: "Device",
+    enableSorting: false,
+    cell: ({ row }) => <DeviceCell asset={row.original} />,
   },
   createSeverityColumn(Severity.Critical, true),
   createSeverityColumn(Severity.High, false),
   createSeverityColumn(Severity.Medium, false),
   createSeverityColumn(Severity.Low, false),
   {
-    meta: {
-      title: "IP Address",
-      headerClassName: "pl-6",
-      cellClassName: "pl-6",
-    },
-    accessorKey: "ip",
-    header: "IP Address",
-  },
-  {
     id: "sources",
-    meta: { title: "Sources" },
+    meta: { title: "Sources", headerClassName: "pl-6", cellClassName: "pl-6" },
     header: "Sources",
     accessorFn: (row) => getAssetSources(row).join(", "),
-    cell: ({ getValue }) => <ClampedCell text={getValue<string>()} />,
+    // TODO VW-600: use the data provenance models (see getAssetSourceBlocks).
+    cell: ({ row }) => (
+      <SourceBlocks blocks={getAssetSourceBlocks(row.original)} />
+    ),
   },
   {
     id: "remediations",

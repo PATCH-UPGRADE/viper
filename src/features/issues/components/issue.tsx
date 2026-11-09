@@ -166,10 +166,18 @@ export const IssuesSidebarList = ({
                   size={16}
                 />
                 {type === "vulnerabilities" ? (
-                  <div className="text-xs flex-1">
-                    <p className="font-semibold mb-2">
-                      {issueData.vulnerability?.description}
+                  <div className="text-xs flex-1 min-w-0">
+                    <p className="text-sm font-semibold">
+                      {issueData.vulnerability?.displayId}
                     </p>
+                    {issueData.vulnerability?.description && (
+                      <p
+                        className="text-muted-foreground truncate mb-2"
+                        title={issueData.vulnerability.description}
+                      >
+                        {issueData.vulnerability.description}
+                      </p>
+                    )}
                     <IssueStatusForm issue={issue} />
                   </div>
                 ) : (

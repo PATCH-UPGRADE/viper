@@ -6,6 +6,7 @@ import {
   BugIcon,
   FileText,
   MessageSquare,
+  PlugIcon,
   ServerIcon,
   Wrench,
 } from "lucide-react";
@@ -13,12 +14,13 @@ import { Suspense, useCallback, useState } from "react";
 import { Layer, Rectangle, ResponsiveContainer, Sankey } from "recharts";
 import {
   DashboardDrawerShell,
-  InfoColumn,
-  type InfoColumnSection,
+  DrawerField,
+  DrawerFieldGrid,
+  DrawerSection,
+  DrawerSections,
 } from "@/components/dashboard-drawers";
-import { ExternalMappingList } from "@/components/external-mappings";
+import { SourceList } from "@/components/sources";
 import { Badge } from "@/components/ui/badge";
-import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/features/chat/components/chat";
@@ -34,7 +36,7 @@ import type {
   NetworkConnection,
 } from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
-import { deviceLabel } from "@/lib/markdown";
+import { PlatformEnum } from "@/generated/prisma";
 import { useTRPC } from "@/trpc/client";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
 import {
@@ -42,6 +44,7 @@ import {
   getAssetTitle,
   securityRemediationsOf,
   UNKNOWN_DEVICE_TYPE_STRING,
+  VERSION_STATUS_LABELS,
 } from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 import { AssetUtilizationHeatMapGridVertical } from "./asset-utilization-grid";
@@ -244,11 +247,7 @@ function NetworkFlowSection({ assetId }: { assetId: string }) {
   );
 
   return (
-    <>
-      <div className="border-t my-4" />
-      <h3 className="text-sm font-medium text-muted-foreground mb-2">
-        Network Flow
-      </h3>
+    <DrawerSection title="Network Flow">
       <div className="relative h-64 w-full rounded-md border overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
           <Sankey
@@ -267,82 +266,159 @@ function NetworkFlowSection({ assetId }: { assetId: string }) {
           </div>
         )}
       </div>
-    </>
+    </DrawerSection>
   );
 }
 
 // ============================================================================
-// Details Section
+// Overview Section
 // ============================================================================
 
-function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
+const assetStatusVariant = (status: AssetWithIssueRelations["status"]) =>
+  status === "Active"
+    ? "default"
+    : status === "Decommissioned"
+      ? "secondary"
+      : "outline";
+
+const dateWithAgo = (date: Date) =>
+  `${formatDistanceToNow(date, { addSuffix: true })} (${new Date(date).toLocaleString()})`;
+
+/**
+ * Where VIPER gets its information about the asset. Only its integrations for now.
+ * TODO VW-600: list every source from the data provenance models (people, API keys and
+ * automations too), with when each last wrote to the asset.
+ */
+function AssetSourceList({ asset }: { asset: AssetWithIssueRelations }) {
+  return (
+    <SourceList
+      emptyMessage="Not mapped to any integration."
+      items={asset.externalMappings.map((mapping) => ({
+        key: `${mapping.integration.id}:${mapping.externalId}`,
+        icon: PlugIcon,
+        name: mapping.integration.name,
+        tag:
+          mapping.integration.platform === PlatformEnum.CSV_UPLOAD
+            ? "CSV"
+            : undefined,
+        meta: mapping.lastSynced
+          ? `Last synced ${formatDistanceToNow(mapping.lastSynced, { addSuffix: true })}`
+          : mapping.integration.platform === PlatformEnum.CSV_UPLOAD
+            ? "Imported from a CSV file"
+            : "Not synced yet",
+        links: [
+          ...(mapping.webUrl ? [{ label: "Web", href: mapping.webUrl }] : []),
+          ...(mapping.upstreamApi
+            ? [{ label: "API", href: mapping.upstreamApi }]
+            : []),
+        ],
+      }))}
+    />
+  );
+}
+
+function OverviewSection({ asset }: { asset: AssetWithIssueRelations }) {
   const locationResult = asset.location
     ? locationSchema.safeParse(asset.location)
     : null;
   const location = locationResult?.success ? locationResult.data : null;
+  const locationText = [
+    location?.facility,
+    location?.building,
+    location?.floor,
+    location?.room,
+  ]
+    .filter(Boolean)
+    .join(" / ");
 
-  type Section =
-    | { header: string; text: string }
-    | { header: string; content: React.ReactNode };
+  return (
+    <DrawerSections>
+      <DrawerSection title="Device Information">
+        <DrawerFieldGrid>
+          <DrawerField label="Manufacturer">
+            {asset.manufacturer?.canonicalDisplayName}
+          </DrawerField>
+          <DrawerField label="Product">
+            {asset.product?.canonicalDisplayName}
+          </DrawerField>
+          <DrawerField label="Device Type">
+            {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
+          </DrawerField>
+          <DrawerField label="Version">
+            {asset.version?.canonicalDisplayName}
+          </DrawerField>
+          <DrawerField label="Version Status">
+            {VERSION_STATUS_LABELS[asset.versionStatus]}
+          </DrawerField>
+          <DrawerField label="Role">{asset.role}</DrawerField>
+          <DrawerField label="Serial Number">{asset.serialNumber}</DrawerField>
+          <DrawerField label="Status">
+            {asset.status && (
+              <Badge variant={assetStatusVariant(asset.status)}>
+                {asset.status}
+              </Badge>
+            )}
+          </DrawerField>
+          <DrawerField label="Location">{locationText}</DrawerField>
+        </DrawerFieldGrid>
+      </DrawerSection>
 
-  const sections: Section[] = [
-    {
-      header: "Device Overview",
-      text: `${getAssetTitle(asset)} — ${deviceLabel(asset)}`,
-    },
-    ...(location
-      ? [
-          {
-            header: "Location",
-            text: [
-              location.facility,
-              location.building,
-              location.floor,
-              location.room,
-            ]
-              .filter(Boolean)
-              .join(" / "),
-          } satisfies Section,
-        ]
-      : []),
-    ...(asset.hostname
-      ? [{ header: "Hostname", text: asset.hostname } satisfies Section]
-      : []),
-    {
-      header: "Device Utilization",
-      content: (
+      <DrawerSection title="Network Information">
+        <DrawerFieldGrid>
+          <DrawerField label="Hostname">{asset.hostname}</DrawerField>
+          <DrawerField label="IP Address">
+            {asset.ip && <CopyCode>{asset.ip}</CopyCode>}
+          </DrawerField>
+          <DrawerField label="MAC Address">
+            {asset.macAddress && <CopyCode>{asset.macAddress}</CopyCode>}
+          </DrawerField>
+          <DrawerField label="Network Segment">
+            {asset.networkSegment}
+          </DrawerField>
+        </DrawerFieldGrid>
+      </DrawerSection>
+
+      <DrawerSection
+        title="Sources"
+        description="Where VIPER gets its information about this asset from"
+      >
+        <AssetSourceList asset={asset} />
+      </DrawerSection>
+
+      <DrawerSection title="Device Utilization">
         <div className="overflow-x-auto">
           <AssetUtilizationHeatMapGridVertical
             utilization={asset.utilization}
           />
         </div>
-      ),
-    },
-    {
-      header: "Links",
-      content: <AssetQrPdfLink assetId={asset.id} />,
-    },
-  ];
+      </DrawerSection>
 
-  return (
-    <div className="h-full overflow-y-scroll overflow-x-hidden">
-      <div className="p-6 space-y-6">
-        {sections.map((section, i) => (
-          <div key={`details-${i}`}>
-            {i > 0 && <div className="border-t my-4" />}
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">
-              {section.header}
-            </h3>
-            {"text" in section ? (
-              <p className="text-sm leading-relaxed">{section.text}</p>
-            ) : (
-              section.content
-            )}
-          </div>
-        ))}
-        <NetworkFlowSection assetId={asset.id} />
-      </div>
-    </div>
+      <NetworkFlowSection assetId={asset.id} />
+
+      <DrawerSection title="Links">
+        <AssetQrPdfLink assetId={asset.id} />
+      </DrawerSection>
+
+      <DrawerSection title="Metadata">
+        <DrawerFieldGrid className="sm:grid-cols-1 lg:grid-cols-1">
+          <DrawerField label="Created">
+            {dateWithAgo(asset.createdAt)}
+            <div className="text-xs text-muted-foreground">
+              By {asset.user.name}
+            </div>
+          </DrawerField>
+          <DrawerField label="Last Updated">
+            {dateWithAgo(asset.updatedAt)}
+          </DrawerField>
+          <DrawerField label="Asset ID">
+            <CopyCode>{asset.id}</CopyCode>
+          </DrawerField>
+        </DrawerFieldGrid>
+      </DrawerSection>
+
+      {/* TODO VW-600: an Activity section goes here: the asset's field changes over time, from
+          the data provenance models, like work order and notification activity. */}
+    </DrawerSections>
   );
 }
 
@@ -405,163 +481,22 @@ function VulnerabilitiesSection({ asset }: { asset: AssetWithIssueRelations }) {
   );
 }
 
-// ============================================================================
-// Info Column
-// ============================================================================
-
-function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
-  const locationResult = asset.location
-    ? locationSchema.safeParse(asset.location)
-    : null;
-  const location = locationResult?.success ? locationResult.data : null;
-  const locationParts = [
-    location?.facility,
-    location?.building,
-    location?.floor,
-    location?.room,
-  ].filter(Boolean);
-
-  const sections: InfoColumnSection[] = [
-    {
-      header: "Device Information",
-      items: [
-        {
-          header: "Device Type",
-          content: (
-            <div className="text-sm">
-              {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
-            </div>
-          ),
-        },
-        {
-          header: "Role",
-          content: (
-            <div className="text-sm">
-              <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
-            </div>
-          ),
-        },
-        ...(asset.serialNumber
-          ? [
-              {
-                header: "Serial Number",
-                content: <div className="text-sm">{asset.serialNumber}</div>,
-              },
-            ]
-          : []),
-        ...(locationParts.length > 0
-          ? [
-              {
-                header: "Location",
-                content: (
-                  <div className="text-sm">{locationParts.join(" / ")}</div>
-                ),
-              },
-            ]
-          : []),
-        ...(asset.status
-          ? [
-              {
-                header: "Status",
-                content: (
-                  <Badge
-                    variant={
-                      asset.status === "Active"
-                        ? "default"
-                        : asset.status === "Decommissioned"
-                          ? "secondary"
-                          : "outline"
-                    }
-                  >
-                    {asset.status}
-                  </Badge>
-                ),
-              },
-            ]
-          : []),
-      ],
-    },
-    {
-      header: "Network Information",
-      items: [
-        ...(asset.ip
-          ? [
-              {
-                header: "IP Address",
-                content: <CopyCode>{asset.ip}</CopyCode>,
-              },
-            ]
-          : []),
-        ...(asset.networkSegment
-          ? [
-              {
-                header: "Network Segment",
-                content: <div className="text-sm">{asset.networkSegment}</div>,
-              },
-            ]
-          : []),
-        ...(asset.macAddress
-          ? [
-              {
-                header: "MAC Address",
-                content: <CopyCode>{asset.macAddress}</CopyCode>,
-              },
-            ]
-          : []),
-      ],
-    },
-    {
-      header: "Connectors",
-      items: [
-        ...(asset.externalMappings.length > 0
-          ? [
-              {
-                header: "Integrations",
-                content: (
-                  <ExternalMappingList
-                    mappings={asset.externalMappings}
-                    emptyMessage={
-                      <p className="text-sm text-muted-foreground">
-                        Not mapped to any integration.
-                      </p>
-                    }
-                  />
-                ),
-              },
-            ]
-          : []),
-      ],
-    },
-    {
-      header: "Metadata",
-      items: [
-        {
-          header: "Created",
-          content: (
-            <div className="text-sm">
-              {formatDistanceToNow(asset.createdAt, { addSuffix: true })} (
-              {new Date(asset.createdAt).toLocaleString()})
-            </div>
-          ),
-        },
-        {
-          header: "Last Updated",
-          content: (
-            <div className="text-sm">
-              {formatDistanceToNow(asset.updatedAt, { addSuffix: true })} (
-              {new Date(asset.updatedAt).toLocaleString()})
-            </div>
-          ),
-        },
-        {
-          header: "Asset ID",
-          content: <CopyCode>{asset.id}</CopyCode>,
-        },
-      ],
-    },
-  ];
-
-  return <InfoColumn sections={sections} />;
+/**
+ * The product as the title, with its device type beside it after a bullet, a little smaller.
+ * An asset with no product falls back to getAssetTitle (its device type, or "Unknown Asset").
+ */
+function AssetDrawerTitle({ asset }: { asset: AssetWithIssueRelations }) {
+  const product = asset.product?.canonicalDisplayName;
+  const deviceType = getAssetDeviceTypeLabel(asset);
+  if (!product) return getAssetTitle(asset);
+  return (
+    <span className="flex flex-wrap items-center gap-x-1.5">
+      <span>{product}</span>
+      {deviceType && (
+        <span className="text-[0.8em] font-medium">&bull; {deviceType}</span>
+      )}
+    </span>
+  );
 }
 
 // ============================================================================
@@ -624,11 +559,24 @@ export function AssetDashboardDrawer({
 
   const tabs = [
     {
-      value: "details",
-      label: "Details",
+      value: "overview",
+      label: "Overview",
       icon: FileText,
-      rawContent: true,
-      content: <DetailsSection asset={asset} />,
+      content: <OverviewSection asset={asset} />,
+    },
+    {
+      value: "vulnerabilities",
+      label: "Vulnerabilities",
+      icon: BugIcon,
+      count: asset.issues.length,
+      content: <VulnerabilitiesSection asset={asset} />,
+    },
+    {
+      value: "remediations",
+      label: "Remediations",
+      icon: Wrench,
+      count: uniqueRemediationCount,
+      content: <RemediationsSection asset={asset} />,
     },
     {
       value: "chat",
@@ -641,20 +589,6 @@ export function AssetDashboardDrawer({
       ),
       rawContent: true,
     },
-    {
-      value: "remediations",
-      label: "Remediations",
-      icon: Wrench,
-      count: uniqueRemediationCount,
-      content: <RemediationsSection asset={asset} />,
-    },
-    {
-      value: "vulnerabilities",
-      label: "Vulnerabilities",
-      icon: BugIcon,
-      count: asset.issues.length,
-      content: <VulnerabilitiesSection asset={asset} />,
-    },
   ];
 
   const description = (
@@ -664,17 +598,7 @@ export function AssetDashboardDrawer({
         Hospital Asset
       </Badge>
       {asset.status && (
-        <Badge
-          variant={
-            asset.status === "Active"
-              ? "default"
-              : asset.status === "Decommissioned"
-                ? "secondary"
-                : "outline"
-          }
-        >
-          {asset.status}
-        </Badge>
+        <Badge variant={assetStatusVariant(asset.status)}>{asset.status}</Badge>
       )}
       <span className="text-sm">
         Updated{" "}
@@ -689,10 +613,9 @@ export function AssetDashboardDrawer({
     <DashboardDrawerShell
       open={open}
       setOpen={setOpen}
-      title={getAssetTitle(asset)}
+      title={<AssetDrawerTitle asset={asset} />}
       description={description}
       tabs={tabs}
-      infoColumn={<AssetInfoColumn asset={asset} />}
     >
       {children}
     </DashboardDrawerShell>

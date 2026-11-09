@@ -1,3 +1,4 @@
+import type { SourceBlock } from "@/components/sources";
 import {
   type Metric,
   MetricType,
@@ -137,12 +138,68 @@ export function recordSources(records: RecordLike[]): {
   return { sources, ta3Contributors };
 }
 
-/** Names one record for a reader: "Vendor advisory GE-2020-004", "TA3 (Seed User)". */
-export function recordAttribution(
-  record: RecordLike & { sourceId?: string | null },
-): string {
-  const label = VULNERABILITY_SOURCE_LABELS[record.source];
-  const sourceId = record.sourceId ? ` ${record.sourceId}` : "";
-  const user = record.user ? ` (${record.user.name})` : "";
-  return `${label}${sourceId}${user}`;
+interface NamedRecordLike extends RecordLike {
+  sourceId?: string | null;
+  externalMapping?: { integration: { name: string } } | null;
+}
+
+/**
+ * How a record is named wherever it is listed: the integration it came through when it has an
+ * external mapping, otherwise the user who sent it (for a TA3 submission, the TA3 performer),
+ * otherwise its source.
+ */
+export function recordSourceName(record: NamedRecordLike): string {
+  if (record.externalMapping) return record.externalMapping.integration.name;
+  if (record.user) return record.user.name;
+  return VULNERABILITY_SOURCE_LABELS[record.source];
+}
+
+/**
+ * The record's kind and the ID its source gives it ("Vendor advisory GE-2020-004"), or null when
+ * recordSourceName already says it. A feed's sourceId is the CVE itself, so it is left off.
+ */
+export function recordTypeText(record: NamedRecordLike): string | null {
+  const sourceId =
+    record.sourceId && !FEED_SOURCES.includes(record.source)
+      ? ` ${record.sourceId}`
+      : "";
+  const text = `${VULNERABILITY_SOURCE_LABELS[record.source]}${sourceId}`;
+  return text === recordSourceName(record) ? null : text;
+}
+
+/** What kind of source a record is, as a source block's tooltip shows it. */
+export const VULNERABILITY_SOURCE_TYPE_LABELS: Record<
+  VulnerabilitySource,
+  string
+> = {
+  TA3: "TA3",
+  VENDOR_ADVISORY: "Advisory",
+  AI: "Automation",
+  OTHER: "API",
+  INBOX: "Inbox",
+  FIRST_EPSS: "Feed",
+  CISA_KEV: "Feed",
+};
+
+/**
+ * One dashboard block per record, named by recordSourceName. The EPSS and KEV feeds are on nearly
+ * every vulnerability, so they are left out.
+ */
+export function recordSourceBlocks(
+  records: (NamedRecordLike & { id: string })[],
+): SourceBlock[] {
+  return records
+    .filter((record) => !FEED_SOURCES.includes(record.source))
+    .map((record) => ({
+      key: record.id,
+      name: recordSourceName(record),
+      kind: record.externalMapping
+        ? "integration"
+        : record.user
+          ? "person"
+          : record.source === VulnerabilitySource.AI
+            ? "automation"
+            : "integration",
+      typeLabel: VULNERABILITY_SOURCE_TYPE_LABELS[record.source],
+    }));
 }

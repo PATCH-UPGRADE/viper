@@ -1,6 +1,12 @@
 import { z } from "zod";
+import type { SourceBlock } from "@/components/sources";
 import { CSV_UPLOAD_DISPLAY_NAME } from "@/features/integrations/platforms/csv-upload/contract";
-import { IssueStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
+import {
+  IssueStatus,
+  PlatformEnum,
+  type Prisma,
+  type VersionStatus,
+} from "@/generated/prisma";
 import { isSecurityRelated } from "../remediations/release";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
@@ -130,6 +136,52 @@ export function getAssetSources(asset: AssetSourcesSource): string[] {
   );
   return [...new Set([asset.user.name, ...integrations])];
 }
+
+/**
+ * getAssetSources as dashboard blocks: the creator as a person, then each integration that reports
+ * the asset. An integration's shadow user is the integration, so it shows once, as an integration.
+ * TODO VW-600: build these from the data provenance models instead (every source that has written
+ * to the asset, not only its creator and current mappings). See docs/provenance-schema.md on the
+ * data-provenance branch:
+ * https://github.com/PATCH-UPGRADE/viper/blob/data-provenance/docs/provenance-schema.md
+ */
+export function getAssetSourceBlocks(asset: AssetSourcesSource): SourceBlock[] {
+  const integrationBlocks: SourceBlock[] = [];
+  for (const { integration } of asset.externalMappings) {
+    const name =
+      integration.platform === PlatformEnum.CSV_UPLOAD
+        ? CSV_UPLOAD_DISPLAY_NAME
+        : integration.name;
+    if (integrationBlocks.some((block) => block.name === name)) continue;
+    integrationBlocks.push({
+      key: `integration:${name}`,
+      name,
+      kind: "integration",
+      typeLabel: "Integration",
+    });
+  }
+  const creatorIsIntegration = asset.externalMappings.some(
+    ({ integration }) => integration.name === asset.user.name,
+  );
+  return creatorIsIntegration
+    ? integrationBlocks
+    : [
+        {
+          key: `user:${asset.user.name}`,
+          name: asset.user.name,
+          kind: "person",
+          typeLabel: "Created by",
+        },
+        ...integrationBlocks,
+      ];
+}
+
+export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
+  UNKNOWN: "Unknown",
+  NOT_APPLICABLE: "Not applicable",
+  KNOWN: "Known",
+  UNSURE: "Unsure",
+};
 
 // One remediation can fix several of the asset's vulnerabilities, so count
 // distinct remediations, not a sum of per-vulnerability counts.

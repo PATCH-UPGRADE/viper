@@ -2,7 +2,6 @@
 
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,13 +13,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -39,21 +32,12 @@ export interface DrawerTab {
   rawContent?: boolean;
 }
 
-export interface InfoColumnSection {
-  header: string;
-  items: Array<{
-    header: string;
-    content: ReactNode;
-  }>;
-}
-
 interface DashboardDrawerShellProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  title: string;
+  title: ReactNode;
   description: ReactNode;
   tabs: DrawerTab[];
-  infoColumn: ReactNode;
   children?: ReactNode;
 }
 
@@ -67,7 +51,6 @@ export function DashboardDrawerShell({
   title,
   description,
   tabs,
-  infoColumn,
   children,
 }: DashboardDrawerShellProps) {
   const isMobile = useIsMobile();
@@ -94,95 +77,135 @@ export function DashboardDrawerShell({
           </div>
         </DrawerHeader>
 
-        <ResizablePanelGroup direction="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={60} minSize={30}>
-            <Tabs
-              defaultValue={tabs[0]?.value}
-              className="flex flex-col h-full"
-            >
-              <TabsList className="w-full justify-start rounded-none border-b bg-muted">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <TabsTrigger
-                      key={tab.value}
-                      value={tab.value}
-                      className="gap-2"
-                    >
-                      <Icon className="h-4 w-4" />
-                      {tab.label}
-                      {tab.count !== undefined && (
-                        <Badge variant="secondary">{tab.count}</Badge>
-                      )}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-
-              {tabs.map((tab) => (
-                <TabsContent
+        <Tabs
+          defaultValue={tabs[0]?.value}
+          className="flex flex-1 flex-col min-h-0"
+        >
+          <TabsList className="w-full justify-start rounded-none border-b bg-muted">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="flex-1 m-0 overflow-hidden"
+                  className="gap-2"
                 >
-                  {tab.rawContent ? (
-                    tab.content
-                  ) : (
-                    <ScrollArea className="h-full">
-                      <div className="p-6">{tab.content}</div>
-                    </ScrollArea>
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                  {tab.count !== undefined && (
+                    <Badge variant="secondary">{tab.count}</Badge>
                   )}
-                </TabsContent>
-              ))}
-            </Tabs>
-          </ResizablePanel>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
 
-          <ResizableHandle withHandle />
-
-          <ResizablePanel defaultSize={40} minSize={25}>
-            {infoColumn}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          {tabs.map((tab) => (
+            <TabsContent
+              key={tab.value}
+              value={tab.value}
+              className="flex-1 m-0 overflow-hidden"
+            >
+              {tab.rawContent ? (
+                tab.content
+              ) : (
+                // Radix lays the viewport's content out as a table, so a line that can't wrap (a
+                // truncated description, a wide table) would widen the whole tab instead of
+                // truncating or scrolling on its own. Lay it out as a block.
+                <ScrollArea className="h-full [&_[data-slot=scroll-area-viewport]>div]:block!">
+                  <div className="p-6">{tab.content}</div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
       </DrawerContent>
     </Drawer>
   );
 }
 
 // ============================================================================
-// InfoColumn
+// Tab content building blocks
 // ============================================================================
 
-export function InfoColumn({
-  sections,
+/** A tab's sections, stacked. */
+export function DrawerSections({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-7">{children}</div>;
+}
+
+/**
+ * A titled section of a tab. The title sticks while the section scrolls past. It is h-10, so
+ * anything else sticky inside the section (an accordion header, say) should stick at top-10.
+ */
+export function DrawerSection({
+  title,
+  description,
+  action,
+  children,
   className,
 }: {
-  sections: InfoColumnSection[];
+  title: string;
+  description?: string;
+  /** Shown at the right of the title, e.g. a toggle. */
+  action?: ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
-    <ScrollArea className={cn("h-full", className)}>
-      <div className="flex flex-col gap-6 p-4 text-sm">
-        {sections.map((section, i) => (
-          <Fragment key={`${i}-${section.header}`}>
-            {i > 0 && <Separator />}
-            <div className="flex flex-col gap-3">
-              <h3 className="font-semibold sticky top-0 bg-background">
-                {section.header}
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                {section.items.map(({ header, content }) => (
-                  <div key={header}>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      {header}
-                    </div>
-                    {content}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Fragment>
-        ))}
+    <section className={className}>
+      <div className="sticky top-0 z-20 mb-2 flex h-10 items-center justify-between gap-3 bg-background">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {action}
       </div>
-    </ScrollArea>
+      {description && (
+        <p className="-mt-1 mb-2.5 text-xs text-muted-foreground">
+          {description}
+        </p>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Fields in up to three columns. */
+export function DrawerFieldGrid({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** One labelled value. An empty value shows as a muted dash. */
+export function DrawerField({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const empty = children == null || children === "" || children === false;
+  return (
+    <div className={cn("min-w-0 text-sm", className)}>
+      <div className="mb-0.5 text-xs font-medium text-muted-foreground">
+        {label}
+      </div>
+      <div className="break-words">
+        {empty ? <span className="text-muted-foreground">—</span> : children}
+      </div>
+    </div>
   );
 }

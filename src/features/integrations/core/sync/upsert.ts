@@ -107,6 +107,12 @@ export interface SyncConfig<
     "findFirst" | "create" | "update"
   >;
 
+  // The relation on `model` that holds its mapping. Most items can be known by
+  // several integrations (`externalMappings`); a work order has at most one
+  // (`externalMapping`). The model delegates are untyped, so a wrong name only
+  // fails at runtime.
+  mappingRelation?: "externalMappings" | "externalMapping";
+
   // Transform functions
   transformInputItem: (
     item: TInputItem,
@@ -228,7 +234,7 @@ export async function processIntegrationSync<
           data: {
             ...createData,
             ...(config.additionalCreateFields?.(userId) || {}),
-            externalMappings: {
+            [config.mappingRelation ?? "externalMappings"]: {
               create: {
                 integrationId,
                 externalId,

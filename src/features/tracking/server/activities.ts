@@ -273,18 +273,17 @@ export async function recordCreationActivity(ticketId: string): Promise<void> {
       sourceLabel: true,
       notification: { select: { title: true } },
       vulnerabilities: { select: { displayId: true }, take: 1 },
-      externalMappings: {
+      externalMapping: {
         select: {
           externalId: true,
           integration: { select: { name: true } },
         },
-        take: 1,
       },
     },
   });
   if (!t) return;
 
-  const mapping = t.externalMappings[0];
+  const mapping = t.externalMapping;
   await prisma.ticketActivity.create({
     data: {
       ticketId,

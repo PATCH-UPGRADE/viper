@@ -255,13 +255,13 @@ const withRelatedTickets = <
 const toTicketDetail = <
   T extends {
     watchers: { userId: string }[];
-    externalMappings: Parameters<typeof lockedFieldsFor>[0];
+    externalMapping: Parameters<typeof lockedFieldsFor>[0];
   } & Parameters<typeof withRelatedTickets>[0],
 >(
   row: T,
 ) => ({
   ...withRelatedTickets(withIsWatching(row)),
-  lockedFields: lockedFieldsFor(row.externalMappings),
+  lockedFields: lockedFieldsFor(row.externalMapping),
 });
 
 type ScheduleWindow = {
@@ -645,7 +645,7 @@ export const trackingRouter = createTRPCRouter({
         assets: assets.map(({ asset, ticket }) => ({
           ...asset,
           status: ticket.status,
-          externalMappings: ticket.externalMappings,
+          externalMapping: ticket.externalMapping,
         })),
       };
     }),
@@ -1124,7 +1124,7 @@ export const trackingRouter = createTRPCRouter({
           id: true,
           summary: true,
           status: true,
-          externalMappings: { select: { externalId: true }, take: 1 },
+          externalMapping: { select: { externalId: true } },
         },
         orderBy: [{ summary: "asc" }, { id: "asc" }],
         take: 100,
@@ -1536,9 +1536,9 @@ export const trackingRouter = createTRPCRouter({
           isDraft: true,
           submissionState: true,
           submissionError: true,
-          externalMappings: { select: { externalId: true } },
+          externalMapping: { select: { externalId: true } },
           children: {
-            select: { externalMappings: { select: { externalId: true } } },
+            select: { externalMapping: { select: { externalId: true } } },
           },
         },
       });
@@ -1551,12 +1551,9 @@ export const trackingRouter = createTRPCRouter({
         // The mapping lives on the per-asset child, because one platform record
         // exists per asset. The parent carries one only for platforms that file
         // per ticket.
-        externalIds: [
-          ...ticket.externalMappings.map((m) => m.externalId),
-          ...ticket.children.flatMap((c) =>
-            c.externalMappings.map((m) => m.externalId),
-          ),
-        ],
+        externalIds: [ticket, ...ticket.children].flatMap((t) =>
+          t.externalMapping ? [t.externalMapping.externalId] : [],
+        ),
       };
     }),
 
@@ -1674,6 +1671,7 @@ export const trackingRouter = createTRPCRouter({
         {
           model: prisma.workOrderTicket,
           mappingModel: prisma.externalWorkOrderMapping,
+          mappingRelation: "externalMapping",
           transformInputItem: async (item, creatorId) => {
             const {
               externalId,

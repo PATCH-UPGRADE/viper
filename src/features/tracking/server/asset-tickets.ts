@@ -29,9 +29,9 @@ export interface ExternalMappingInput {
 }
 
 /**
- * Record where a ticket lives on a vendor platform. Idempotent on
- * `(itemId, integrationId)`, so a retry refreshes the row rather than failing
- * on the unique constraint.
+ * Record where a ticket lives on a vendor platform. A ticket has at most one
+ * mapping, so this is idempotent on the ticket: a retry refreshes the row
+ * rather than failing on the unique constraint.
  */
 export async function attachExternalMapping(
   tx: TransactionClient,
@@ -39,13 +39,9 @@ export async function attachExternalMapping(
   mapping: ExternalMappingInput,
 ): Promise<void> {
   await tx.externalWorkOrderMapping.upsert({
-    where: {
-      external_work_order_mappings_item_integration_key: {
-        itemId: ticketId,
-        integrationId: mapping.integrationId,
-      },
-    },
+    where: { itemId: ticketId },
     update: {
+      integrationId: mapping.integrationId,
       externalId: mapping.externalId,
       lastSynced: mapping.lastSynced,
     },
@@ -127,7 +123,7 @@ export async function createAssetTicket(
       parent: { connect: { id: parentTicketId } },
       ticket: { create: { assetId, parentTicketId } },
       ...(externalMapping && {
-        externalMappings: { create: externalMapping },
+        externalMapping: { create: externalMapping },
       }),
     },
     select: { id: true },
@@ -210,7 +206,7 @@ export async function cascadeDoneStatus(
         select: {
           status: true,
           children: { select: { status: true } },
-          externalMappings: {
+          externalMapping: {
             select: { integration: { select: { name: true, platform: true } } },
           },
         },
@@ -221,7 +217,7 @@ export async function cascadeDoneStatus(
   if (ticket.parent.status === TicketStatus.DONE) return;
   // VIPER cannot send this status to a platform that owns it, so the two would
   // disagree.
-  const statusIsLocked = lockedFieldsFor(ticket.parent.externalMappings).some(
+  const statusIsLocked = lockedFieldsFor(ticket.parent.externalMapping).some(
     (lock) => lock.field === "status",
   );
   if (statusIsLocked) return;

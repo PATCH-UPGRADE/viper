@@ -576,7 +576,7 @@ model ExternalRemediationMapping {
 
 model ExternalWorkOrderMapping {
   id            String          @id @default(cuid())
-  itemId        String
+  itemId        String          @unique
   integrationId String
   externalId    String
   item          WorkOrderTicket @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -588,9 +588,7 @@ model ExternalWorkOrderMapping {
   upstreamApi String?
   webUrl      String?
 
-  @@unique([itemId, integrationId], name: "external_work_order_mappings_item_integration_key")
   @@unique([integrationId, externalId], name: "external_work_order_mappings_integration_external_key")
-  @@index([itemId])
   @@map("external_work_order_mappings")
 }
 
@@ -598,7 +596,7 @@ model ExternalWorkOrderMapping {
 /// submission, or the AI crawler's ID for an item it recorded.
 model ExternalVulnerabilityRecordMapping {
   id            String              @id @default(cuid())
-  itemId        String
+  itemId        String              @unique
   integrationId String
   externalId    String
   item          VulnerabilityRecord @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -610,9 +608,7 @@ model ExternalVulnerabilityRecordMapping {
   upstreamApi String?
   webUrl      String?
 
-  @@unique([itemId, integrationId], name: "external_vulnerability_record_mappings_item_integration_key")
   @@unique([integrationId, externalId], name: "external_vulnerability_record_mappings_integration_external_key")
-  @@index([itemId])
   @@map("external_vulnerability_record_mappings")
 }
 
@@ -849,7 +845,7 @@ model VulnerabilityRecord {
 
   ta3Submission    TA3Submission?
   metrics          Metric[]
-  externalMappings ExternalVulnerabilityRecordMapping[]
+  externalMapping  ExternalVulnerabilityRecordMapping?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1577,7 +1573,7 @@ model WorkOrderTicket {
   watchers         TicketWatch[]
   seenBy           TicketSeen[]
   activities       TicketActivity[]
-  externalMappings ExternalWorkOrderMapping[]
+  externalMapping  ExternalWorkOrderMapping?
   lastCommentAt    DateTime?
 
   rescheduleRequests RescheduleRequest[]

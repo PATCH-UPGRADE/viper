@@ -54,6 +54,7 @@ export async function ingestPulledWorkOrders(
     {
       model: prisma.workOrderTicket,
       mappingModel: prisma.externalWorkOrderMapping,
+      mappingRelation: "externalMapping",
       // Every other ingest path records this, so a synced work order gets the
       // same "created" entry in its timeline.
       onItemCreated: (id: string) => recordCreationActivity(id),

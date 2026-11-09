@@ -13,19 +13,19 @@ import { type LockedField, lockedFieldMessage } from "../locked-fields";
 
 // Edits to a work order that a platform also holds.
 //
-// Nothing here knows a platform. The ticket's mappings name the integrations,
-// and each work order module says what it accepts (`update`, `pushedFields`)
+// Nothing here knows a platform. The ticket's mapping names the integration,
+// and its work order module says what it accepts (`update`, `pushedFields`)
 // and what it owns (`lockedFields`).
 
-/** The fields that a ticket's platforms own, so a VIPER user cannot edit them. */
+/** The fields that a ticket's platform owns, so a VIPER user cannot edit them. */
 export const lockedFieldsFor = (
-  mappings: { integration: { name: string; platform: PlatformEnum } }[],
+  mapping: { integration: { name: string; platform: PlatformEnum } } | null,
 ): LockedField[] =>
-  mappings.flatMap(({ integration }) =>
-    (registry[integration.platform]?.workOrders?.lockedFields ?? []).map(
-      (field) => ({ field, managedBy: integration.name }),
-    ),
-  );
+  mapping
+    ? (
+        registry[mapping.integration.platform]?.workOrders?.lockedFields ?? []
+      ).map((field) => ({ field, managedBy: mapping.integration.name }))
+    : [];
 
 /** The ticket columns that `patchFor` compares. */
 export const editableTicketSelect = {
@@ -95,13 +95,14 @@ const pick = (
   );
 
 /**
- * Refuse an edit to a field a platform owns, then send the rest of the edit to
- * each platform that holds the ticket.
+ * Refuse an edit to a field the ticket's platform owns, then send the rest of
+ * the edit to that platform.
  *
- * Call it before the edit is saved. If a platform refuses, nothing is saved, so
- * VIPER never shows a value the platform does not have. If the save fails after
- * the push, the next pull brings the platform's value back. The call is outside
- * the database transaction, so the HTTP request never holds the row lock.
+ * Call it before the edit is saved. If the platform refuses, nothing is saved,
+ * so VIPER never shows a value the platform does not have. If the save fails
+ * after the push, the next pull brings the platform's value back. The call is
+ * outside the database transaction, so the HTTP request never holds the row
+ * lock.
  *
  * A disabled integration keeps its locks, and VIPER refuses an edit to a field
  * that it pushes. A pull reads only records that changed on the platform, so a
@@ -115,7 +116,7 @@ export async function pushEditToPlatforms(
   const patch = patchFor(current, edit);
   if (Object.keys(patch).length === 0) return;
 
-  const mappings = await prisma.externalWorkOrderMapping.findMany({
+  const mapping = await prisma.externalWorkOrderMapping.findUnique({
     where: { itemId: ticketId },
     select: {
       externalId: true,
@@ -124,9 +125,9 @@ export async function pushEditToPlatforms(
       },
     },
   });
-  if (mappings.length === 0) return;
+  if (!mapping) return;
 
-  const lock = lockedFieldsFor(mappings).find((l) => l.field in patch);
+  const lock = lockedFieldsFor(mapping).find((l) => l.field in patch);
   if (lock) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -134,44 +135,37 @@ export async function pushEditToPlatforms(
     });
   }
 
-  const pushes = mappings.flatMap(({ externalId, integration }) => {
-    const module = registry[integration.platform]?.workOrders;
-    if (!module?.update) return [];
-    const pushed = pick(patch, module.pushedFields ?? []);
-    if (Object.keys(pushed).length === 0) return [];
-    return [{ externalId, integration, update: module.update, pushed }];
-  });
+  const { externalId, integration } = mapping;
+  const module = registry[integration.platform]?.workOrders;
+  if (!module?.update) return;
+  const pushed = pick(patch, module.pushedFields ?? []);
+  if (Object.keys(pushed).length === 0) return;
 
-  // Checked before any push, so a disabled integration never leaves another
-  // platform with half of the edit.
-  const disabled = pushes.find((p) => !p.integration.enabled)?.integration;
-  if (disabled) {
+  if (!integration.enabled) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `${disabled.name} is disabled, so VIPER cannot send this change. Enable the integration, or make the change in ${disabled.name}.`,
+      message: `${integration.name} is disabled, so VIPER cannot send this change. Enable the integration, or make the change in ${integration.name}.`,
     });
   }
 
-  for (const { externalId, integration, update, pushed } of pushes) {
-    try {
-      const {
-        module: connector,
-        config,
-        creds,
-      } = await loadIntegrationContext(integration.id);
-      const session = openSession(connector, {
-        integrationId: integration.id,
-        config,
-        creds,
-      });
-      await update(session, externalId, pushed, config);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `${integration.name} did not accept the change, so VIPER saved nothing: ${reason}`,
-        cause: error,
-      });
-    }
+  try {
+    const {
+      module: connector,
+      config,
+      creds,
+    } = await loadIntegrationContext(integration.id);
+    const session = openSession(connector, {
+      integrationId: integration.id,
+      config,
+      creds,
+    });
+    await module.update(session, externalId, pushed, config);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `${integration.name} did not accept the change, so VIPER saved nothing: ${reason}`,
+      cause: error,
+    });
   }
 }

@@ -57,7 +57,7 @@ describe("every include that selects mappings still resolves", () => {
     const resource = ResourceType.Vulnerability;
     expect(
       mappingPaths("Vulnerability", { include: vulnerabilityInclude }),
-    ).toEqual([{ path: ["records", "externalMappings"], resource }]);
+    ).toEqual([{ path: ["records", "externalMapping"], resource }]);
   });
 
   it("vulnerabilityByPriorityInclude", () => {
@@ -67,7 +67,7 @@ describe("every include that selects mappings still resolves", () => {
       }),
     ).toEqual([
       {
-        path: ["records", "externalMappings"],
+        path: ["records", "externalMapping"],
         resource: ResourceType.Vulnerability,
       },
       {
@@ -84,10 +84,10 @@ describe("every include that selects mappings still resolves", () => {
     expect(
       mappingPaths("WorkOrderTicket", { include: ticketDetailInclude }),
     ).toEqual([
-      { path: ["externalMappings"], resource },
-      { path: ["mitigationPlan", "workOrders", "externalMappings"], resource },
-      { path: ["linksAsA", "ticketB", "externalMappings"], resource },
-      { path: ["linksAsB", "ticketA", "externalMappings"], resource },
+      { path: ["externalMapping"], resource },
+      { path: ["mitigationPlan", "workOrders", "externalMapping"], resource },
+      { path: ["linksAsA", "ticketB", "externalMapping"], resource },
+      { path: ["linksAsB", "ticketA", "externalMapping"], resource },
     ]);
   });
 });

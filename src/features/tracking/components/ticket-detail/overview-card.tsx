@@ -39,7 +39,7 @@ const MetaField = ({
 
 const SourceHeader = ({ data }: { data: TicketDetail }) => {
   const readOnly = useReadOnly();
-  const mapping = data.externalMappings[0];
+  const mapping = data.externalMapping;
   const source = data.sourceLinks[0]?.sourceRecord;
   const label = data.sourceLabel ?? mapping?.integration.name;
   const externalRef = mapping?.externalId ?? source?.externalId;
@@ -97,7 +97,7 @@ const CreatedFooter = ({ data }: { data: TicketDetail }) => {
   // integration user that created the record.
   const fromAutomation =
     !!data.sourceLabel ||
-    data.externalMappings.length > 0 ||
+    data.externalMapping !== null ||
     data.sourceLinks.length > 0;
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t pt-3 text-xs text-muted-foreground">

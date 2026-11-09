@@ -134,6 +134,19 @@ describe("processIntegrationSync — the three branches", () => {
     });
   });
 
+  it("creates the mapping through the relation the config names", async () => {
+    const config = makeConfig({ mappingRelation: "externalMapping" });
+
+    await run(config, items(1));
+
+    const { data } = config.model.create.mock.calls[0][0];
+    expect(data).not.toHaveProperty("externalMappings");
+    expect(data.externalMapping.create).toMatchObject({
+      integrationId: "integration-1",
+      externalId: "v1",
+    });
+  });
+
   it("creates only the mapping when the item already exists", async () => {
     const config = makeConfig();
     config.transformInputItem.mockResolvedValue({

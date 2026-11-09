@@ -18,7 +18,7 @@ const { mockPrisma, mockUpdate, fakeRegistry } = vi.hoisted(() => {
     },
   };
   return {
-    mockPrisma: { externalWorkOrderMapping: { findMany: vi.fn() } },
+    mockPrisma: { externalWorkOrderMapping: { findUnique: vi.fn() } },
     mockUpdate,
     fakeRegistry: {
       SERVICENOW: connector,
@@ -62,9 +62,9 @@ const mapping = (platform: string, overrides = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+  mockPrisma.externalWorkOrderMapping.findUnique.mockResolvedValue(
     mapping("SERVICENOW"),
-  ]);
+  );
   mockLoadContext.mockImplementation(async (integrationId: string) => ({
     module: fakeRegistry[integrationId.replace("int-", "")],
     config: { instanceUrl: "https://dev.service-now.com" },
@@ -108,13 +108,13 @@ describe("patchFor", () => {
 
 describe("lockedFieldsFor", () => {
   it("names the integration that owns each locked field", () => {
-    expect(lockedFieldsFor([mapping("SERVICENOW")] as never)).toEqual([
+    expect(lockedFieldsFor(mapping("SERVICENOW") as never)).toEqual([
       { field: "status", managedBy: "ServiceNow" },
     ]);
   });
 
-  it("returns nothing for a ticket with no mappings", () => {
-    expect(lockedFieldsFor([])).toEqual([]);
+  it("returns nothing for a ticket with no mapping", () => {
+    expect(lockedFieldsFor(null)).toEqual([]);
   });
 });
 
@@ -134,7 +134,7 @@ describe("pushEditToPlatforms", () => {
   });
 
   it("does nothing for a ticket that no platform holds", async () => {
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([]);
+    mockPrisma.externalWorkOrderMapping.findUnique.mockResolvedValue(null);
 
     await pushEditToPlatforms("t1", current, { summary: "New title" });
 
@@ -213,9 +213,9 @@ describe("pushEditToPlatforms", () => {
   });
 
   it("skips a platform that takes no edits", async () => {
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+    mockPrisma.externalWorkOrderMapping.findUnique.mockResolvedValue(
       mapping("TEAMPLAY_FLEET"),
-    ]);
+    );
 
     await pushEditToPlatforms("t1", current, { summary: "New title" });
 
@@ -224,9 +224,9 @@ describe("pushEditToPlatforms", () => {
 
   describe("on a disabled integration", () => {
     beforeEach(() => {
-      mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+      mockPrisma.externalWorkOrderMapping.findUnique.mockResolvedValue(
         mapping("SERVICENOW", { enabled: false }),
-      ]);
+      );
     });
 
     it("refuses a change to a field that the integration pushes", async () => {
@@ -252,21 +252,6 @@ describe("pushEditToPlatforms", () => {
         code: "BAD_REQUEST",
         message: expect.stringContaining("managed in ServiceNow"),
       });
-    });
-
-    it("refuses before any other platform gets the edit", async () => {
-      mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
-        mapping("SERVICENOW"),
-        {
-          ...mapping("SERVICENOW", { enabled: false }),
-          externalId: "sys-2",
-        },
-      ]);
-
-      await expect(
-        pushEditToPlatforms("t1", current, { summary: "New title" }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 

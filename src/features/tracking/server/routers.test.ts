@@ -165,7 +165,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   watchers: [],
   activities: [],
   sourceLinks: [],
-  externalMappings: [],
+  externalMapping: null,
   notification: null,
   mitigationPlan: null,
   linksAsA: [],
@@ -184,7 +184,7 @@ const makeRelatedTicketRef = (overrides: Record<string, any> = {}): any => ({
   summary: "Related ticket",
   status: "TO_DO",
   departments: [],
-  externalMappings: [],
+  externalMapping: null,
   ...overrides,
 });
 
@@ -1727,7 +1727,7 @@ describe("trackingRouter.getManyForLlm", () => {
 });
 
 describe("trackingRouter.getOneForLlm", () => {
-  it("flattens each asset with its per-asset status and external ids", async () => {
+  it("flattens each asset with its per-asset status and external id", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
       id: "wo_1",
@@ -1738,9 +1738,11 @@ describe("trackingRouter.getOneForLlm", () => {
           asset: { id: "a1", hostname: "pacs-01" },
           ticket: {
             status: "IN_PROGRESS",
-            externalMappings: [
-              { externalId: "fleet-9", webUrl: null, integration: null },
-            ],
+            externalMapping: {
+              externalId: "fleet-9",
+              webUrl: null,
+              integration: null,
+            },
           },
         },
       ],
@@ -1754,9 +1756,11 @@ describe("trackingRouter.getOneForLlm", () => {
         id: "a1",
         hostname: "pacs-01",
         status: "IN_PROGRESS",
-        externalMappings: [
-          { externalId: "fleet-9", webUrl: null, integration: null },
-        ],
+        externalMapping: {
+          externalId: "fleet-9",
+          webUrl: null,
+          integration: null,
+        },
       },
     ]);
     expect(result.comments).toHaveLength(1);

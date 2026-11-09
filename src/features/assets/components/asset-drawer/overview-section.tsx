@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { PlatformEnum } from "@/generated/prisma";
 import { formatDateWithAgo, relativeTime } from "@/lib/date-utils";
-import { type AssetWithIssueRelations, locationSchema } from "../../types";
+import { parseLocation } from "@/lib/markdown";
+import type { AssetWithIssueRelations } from "../../types";
 import {
   getAssetDeviceTypeLabel,
   UNKNOWN_DEVICE_TYPE_STRING,
@@ -58,19 +59,6 @@ function AssetSourceList({ asset }: { asset: AssetWithIssueRelations }) {
 }
 
 export function OverviewSection({ asset }: { asset: AssetWithIssueRelations }) {
-  const locationResult = asset.location
-    ? locationSchema.safeParse(asset.location)
-    : null;
-  const location = locationResult?.success ? locationResult.data : null;
-  const locationText = [
-    location?.facility,
-    location?.building,
-    location?.floor,
-    location?.room,
-  ]
-    .filter(Boolean)
-    .join(" / ");
-
   return (
     <DrawerSections>
       <DrawerSection title="Device Information">
@@ -99,7 +87,9 @@ export function OverviewSection({ asset }: { asset: AssetWithIssueRelations }) {
               </Badge>
             )}
           </DrawerField>
-          <DrawerField label="Location">{locationText}</DrawerField>
+          <DrawerField label="Location">
+            {parseLocation(asset.location)}
+          </DrawerField>
         </DrawerFieldGrid>
       </DrawerSection>
 

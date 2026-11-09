@@ -1,7 +1,6 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { SeverityBadge, severityConfig } from "@/components/severity-badge";
 import { SourceBlocks } from "@/components/sources";
@@ -17,6 +16,7 @@ import {
 } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
+import { relativeTime } from "@/lib/date-utils";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
@@ -153,8 +153,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     header: ({ column }) => (
       <SortableHeader header="Last Updated" column={column} />
     ),
-    cell: ({ row }) =>
-      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+    cell: ({ row }) => relativeTime(row.original.updatedAt),
   },
   {
     id: "actions",
@@ -205,8 +204,7 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
   {
     accessorKey: "updatedAt",
     header: "Updated At",
-    cell: ({ row }) =>
-      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+    cell: ({ row }) => relativeTime(row.original.updatedAt),
   },
   {
     id: "actions",

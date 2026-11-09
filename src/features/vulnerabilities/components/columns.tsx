@@ -1,11 +1,10 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
-
 import { SourceBlocks } from "@/components/sources";
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
+import { relativeTime } from "@/lib/date-utils";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import type { VulnerabilityResponse } from "../types";
 import { recordSourceBlocks } from "../utils";
@@ -56,7 +55,6 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
     header: ({ column }) => (
       <SortableHeader header="Last Updated" column={column} />
     ),
-    accessorFn: (row) =>
-      formatDistanceToNow(row.updatedAt, { addSuffix: true }),
+    accessorFn: (row) => relativeTime(row.updatedAt),
   },
 ];

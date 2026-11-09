@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   CircleAlert,
   CircleArrowDown,
@@ -49,7 +48,7 @@ import { ImportCsvButton } from "@/features/integrations/platforms/csv-upload/co
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import { formatDateWithAgo } from "@/lib/date-utils";
+import { formatDateWithAgo, relativeTime } from "@/lib/date-utils";
 import { deviceLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
@@ -412,8 +411,7 @@ export const AssetItem = ({ data }: { data: DrawerAsset }) => {
         <AssetDrawer asset={data}>{getAssetTitle(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip ? <>{data.ip} &bull; </> : null}
-          {deviceLabel(data)} &bull; Updated{" "}
-          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {deviceLabel(data)} &bull; Updated {relativeTime(data.updatedAt)}
           {hasIssues && data.issues.length >= 1 && (
             <>
               {" "}
@@ -468,7 +466,7 @@ export function AssetDrawer({
             Hospital Asset
           </Badge>
           <span className="text-xs">
-            Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
+            Updated {relativeTime(asset.updatedAt)}
           </span>
         </DrawerDescription>
       </DrawerHeader>

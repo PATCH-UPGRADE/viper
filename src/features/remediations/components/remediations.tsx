@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   AlertTriangleIcon,
   BadgeCheckIcon,
@@ -38,6 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { relativeTime } from "@/lib/date-utils";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import { formatFileSize } from "@/lib/utils";
 import {
@@ -158,8 +158,7 @@ export const RemediationItem = ({ data }: { data: RemediationResponse }) => {
             ? data.description.substring(0, 100)
             : "Remediation"}
           {data.description && data.description.length > 100 ? "..." : ""}{" "}
-          &bull; Updated{" "}
-          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          &bull; Updated {relativeTime(data.updatedAt)}
         </div>
       </div>
       <Button
@@ -204,8 +203,7 @@ function RemediationDrawer({
               Remediation
             </Badge>
             <span className="text-xs">
-              Updated{" "}
-              {formatDistanceToNow(remediation.updatedAt, { addSuffix: true })}
+              Updated {relativeTime(remediation.updatedAt)}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -398,11 +396,7 @@ export const RemediationCard = ({
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <span>By {remediation.user.name}</span>
           <span>•</span>
-          <span>
-            {formatDistanceToNow(remediation.createdAt, {
-              addSuffix: true,
-            })}
-          </span>
+          <span>{relativeTime(remediation.createdAt)}</span>
         </div>
 
         {artifactsWithUrls.length > 0 && (

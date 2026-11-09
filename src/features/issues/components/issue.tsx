@@ -13,7 +13,6 @@ import { StatusFormBase, statusDetails } from "@/components/status-form";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssetItem } from "@/features/assets/components/assets";
-import { locationSchema } from "@/features/assets/types";
 import {
   type DeviceTypeSource,
   getAssetIdentifier,
@@ -21,6 +20,7 @@ import {
 } from "@/features/assets/utils";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 import { type Issue, IssueStatus } from "@/generated/prisma";
+import { parseLocation } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import {
   useSuspenseIssue,
@@ -143,16 +143,7 @@ export const IssuesSidebarList = ({
           const asset = issueData.asset as
             | (NonNullable<typeof issueData.asset> & DeviceTypeSource)
             | null;
-          const locationResult = asset?.location
-            ? locationSchema.safeParse(asset.location)
-            : null;
-          const location = locationResult?.success ? locationResult.data : null;
-          const locationParts = [
-            location?.facility,
-            location?.building,
-            location?.floor,
-            location?.room,
-          ].filter(Boolean);
+          const location = parseLocation(asset?.location);
 
           return (
             <li key={issue.id}>
@@ -191,9 +182,9 @@ export const IssuesSidebarList = ({
                           ? `${getAssetTitle(asset)} · ${getAssetIdentifier(asset)}`
                           : "Device Group"}
                       </p>
-                      {locationParts.length > 0 && (
+                      {location && (
                         <p className="text-xs text-muted-foreground">
-                          {locationParts.join(" • ")}
+                          {location}
                         </p>
                       )}
                     </div>

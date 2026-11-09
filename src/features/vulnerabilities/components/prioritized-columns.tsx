@@ -1,7 +1,6 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { SourceBlocks } from "@/components/sources";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { getAssetTitle } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
+import { relativeTime } from "@/lib/date-utils";
 import type { VulnerabilityWithRelations } from "../types";
 import { recordSourceBlocks, summarizeMetrics } from "../utils";
 
@@ -73,7 +73,7 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger>
-            {formatDistanceToNow(row.original.createdAt, { addSuffix: true })}
+            {relativeTime(row.original.createdAt)}
           </TooltipTrigger>
           <TooltipContent>
             {row.original.createdAt.toLocaleString()}
@@ -153,8 +153,7 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
     accessorKey: "updatedAt",
     header: "Updated At",
-    cell: ({ row }) =>
-      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+    cell: ({ row }) => relativeTime(row.original.updatedAt),
   },
   {
     id: "actions",

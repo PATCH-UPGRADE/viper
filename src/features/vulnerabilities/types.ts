@@ -225,7 +225,7 @@ export const vulnerabilityRecordResponseSchema = z.object({
   userId: z.string().nullable(),
   metrics: z.array(metricResponseSchema),
   ta3Submission: ta3SubmissionResponseSchema.nullable(),
-  externalMappings: z.array(externalMappingResponseSchema),
+  externalMapping: externalMappingResponseSchema.nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -243,7 +243,7 @@ export const vulnerabilityRecordDeleteResponseSchema = z.object({
 export const vulnerabilityRecordInclude = {
   metrics: { orderBy: { createdAt: "asc" } },
   ta3Submission: true,
-  externalMappings: externalMappingSelect,
+  externalMapping: externalMappingSelect,
 } satisfies Prisma.VulnerabilityRecordInclude;
 
 export const ta3SubmissionInclude = {

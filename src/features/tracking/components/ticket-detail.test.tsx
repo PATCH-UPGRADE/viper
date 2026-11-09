@@ -91,7 +91,9 @@ const {
           id: "cand-1",
           summary: "Candidate ticket A",
           status: "TO_DO",
-          externalMappings: [{ externalId: "INC0048512" }],
+          externalMapping: { externalId: "INC0048512" } as {
+            externalId: string;
+          } | null,
         },
       ],
     })),
@@ -353,7 +355,7 @@ const makeTicket = (
     assigneeId: "u1",
     isWatching: false,
     activities: [],
-    externalMappings: [],
+    externalMapping: null,
     lockedFields: [],
     sourceLinks: [],
     notification: null,
@@ -1216,7 +1218,7 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   assigneeId: "u2",
   isWatching: false,
   activities: [],
-  externalMappings: [],
+  externalMapping: null,
   lockedFields: [],
   sourceLinks: [],
   notification: null,
@@ -1575,7 +1577,7 @@ describe("TicketDetailContent — embedded", () => {
               summary: "Patch PACS Server",
               status: "TO_DO",
               departments: [],
-              externalMappings: [],
+              externalMapping: null,
             },
           },
         ],
@@ -1792,7 +1794,7 @@ describe("TicketDetailContent — related tickets", () => {
       status: "REQUIRES_APPROVAL",
       assignee: null,
       departments: [{ id: "d-it", name: "IT", color: "purple" }],
-      externalMappings: [{ externalId: "INC0048512" }],
+      externalMapping: { externalId: "INC0048512" },
     },
   };
 
@@ -1800,7 +1802,7 @@ describe("TicketDetailContent — related tickets", () => {
     id: "cand-1",
     summary: "Candidate ticket A",
     status: "TO_DO",
-    externalMappings: [{ externalId: "INC0048512" }],
+    externalMapping: { externalId: "INC0048512" },
   };
 
   beforeEach(() => {
@@ -1865,7 +1867,7 @@ describe("TicketDetailContent — related tickets", () => {
       summary: "Verify DICOM VLAN ACL enforcement",
       status: "TO_DO",
       departments: [],
-      externalMappings: [],
+      externalMapping: null,
     },
   };
 
@@ -1964,7 +1966,7 @@ describe("TicketDetailContent — related tickets", () => {
           ...defaultCandidate,
           id: "cand-2",
           summary: "No mapping",
-          externalMappings: [],
+          externalMapping: null,
         },
       ],
     });

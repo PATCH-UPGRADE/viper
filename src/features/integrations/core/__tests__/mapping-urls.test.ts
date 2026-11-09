@@ -48,7 +48,7 @@ describe("mappingPaths", () => {
           assets: {
             include: { asset: { include: { externalMappings: true } } },
           },
-          externalMappings: true,
+          externalMapping: true,
         },
       }),
     ).toEqual([
@@ -56,7 +56,7 @@ describe("mappingPaths", () => {
         path: ["assets", "asset", "externalMappings"],
         resource: ResourceType.Asset,
       },
-      { path: ["externalMappings"], resource: ResourceType.WorkOrder },
+      { path: ["externalMapping"], resource: ResourceType.WorkOrder },
     ]);
   });
 

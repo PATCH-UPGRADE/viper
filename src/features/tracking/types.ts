@@ -173,7 +173,7 @@ const relatedTicketRefSelect = {
     select: { id: true, name: true, color: true },
     orderBy: { name: "asc" as const },
   },
-  externalMappings: { select: { externalId: true }, take: 1 },
+  externalMapping: { select: { externalId: true } },
 } satisfies Prisma.WorkOrderTicketSelect;
 
 const relatedLinkSelect = { id: true, reason: true, createdAt: true } as const;
@@ -302,7 +302,7 @@ export const ticketDetailInclude = {
     },
     orderBy: { createdAt: "desc" as const },
   },
-  externalMappings: externalMappingWithSyncSelect,
+  externalMapping: externalMappingWithSyncSelect,
   notification: { select: { id: true, title: true, type: true } },
   // The plan's work orders and both sides of the undirected link table; the
   // server merges them into `relatedTickets` (see withRelatedTickets in
@@ -483,14 +483,14 @@ export const workOrderLlmDetailSelect = {
       ticket: {
         select: {
           status: true,
-          externalMappings: externalMappingSelect,
+          externalMapping: externalMappingSelect,
         },
       },
     },
     take: WORK_ORDER_LLM_ASSET_LIMIT,
   },
   remediations: { select: { id: true, description: true } },
-  externalMappings: externalMappingSelect,
+  externalMapping: externalMappingSelect,
   comments: {
     select: {
       body: true,
@@ -641,7 +641,7 @@ const relatedTicketRefSchema = z.object({
   summary: z.string(),
   status: z.enum(TicketStatus),
   departments: z.array(departmentItemSchema),
-  externalMappings: z.array(z.object({ externalId: z.string() })),
+  externalMapping: z.object({ externalId: z.string() }).nullable(),
 });
 
 const relatedTicketLinkSchema = z.object({
@@ -829,7 +829,7 @@ export const workOrderDetailResponseSchema = z.object({
   isWatching: z.boolean(),
   activities: z.array(ticketActivitySchema),
   sourceLinks: z.array(ticketSourceSchema),
-  externalMappings: z.array(ticketExternalMappingSchema),
+  externalMapping: ticketExternalMappingSchema.nullable(),
   // Fields a platform owns. The edit form disables them, and an update that
   // changes one is refused.
   lockedFields: z.array(

@@ -36,11 +36,13 @@ const LinkTicketPopover = ({ ticketId }: { ticketId: string }) => {
       }
       confirmWithReason
       renderItemMeta={(t) =>
-        t.externalMappings[0] ? (
-          <ExternalId externalId={t.externalMappings[0].externalId} />
+        t.externalMapping ? (
+          <ExternalId externalId={t.externalMapping.externalId} />
         ) : null
       }
-      searchKeywords={(t) => t.externalMappings.map((m) => m.externalId)}
+      searchKeywords={(t) =>
+        t.externalMapping ? [t.externalMapping.externalId] : []
+      }
     />
   );
 };
@@ -64,9 +66,7 @@ const RelatedTicketRow = ({
       summary={ticket.summary}
       status={ticket.status}
       icon={<LinkIcon className="size-4 shrink-0 text-muted-foreground" />}
-      leading={
-        <ExternalId externalId={ticket.externalMappings[0]?.externalId} />
-      }
+      leading={<ExternalId externalId={ticket.externalMapping?.externalId} />}
       details={
         hasDetails && (
           <>

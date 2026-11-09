@@ -1,8 +1,9 @@
+import { relativeTime } from "@/lib/date-utils";
+
 // TODO(VW-499): Fix changes after VW-427
-"use client";
+("use client");
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 import { MailIcon, RssIcon } from "lucide-react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,7 @@ function SourceDisplay({
         <span className="truncate max-w-[200px]">{label}</span>
       </span>
       <span className="text-xs text-muted-foreground">
-        {formatDistanceToNow(source.observedAt, { addSuffix: true })}
+        {relativeTime(source.observedAt)}
       </span>
     </span>
   );
@@ -112,11 +113,9 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
           <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
             <NotificationTypeBadge type={type} />
             <span>•</span>
-            <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
+            <span>{relativeTime(createdAt)}</span>
             <span>•</span>
-            <span>
-              updated {formatDistanceToNow(updatedAt, { addSuffix: true })}
-            </span>
+            <span>updated {relativeTime(updatedAt)}</span>
           </div>
         </div>
       );
@@ -199,9 +198,7 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
                           </span>
                         </span>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {formatDistanceToNow(source.observedAt, {
-                            addSuffix: true,
-                          })}
+                          {relativeTime(source.observedAt)}
                         </span>
                       </div>
                     );

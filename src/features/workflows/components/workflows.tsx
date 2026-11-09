@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { WorkflowIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -16,6 +15,7 @@ import {
 } from "@/components/entity-components";
 import type { Workflow } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
+import { relativeTime } from "@/lib/date-utils";
 import {
   useCreateWorkflow,
   useRemoveWorkflow,
@@ -159,9 +159,8 @@ const WorkflowItem = ({ data }: { data: Workflow }) => {
             </div>
           )}
           <div>
-            Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}{" "}
-            &bull; Created{" "}
-            {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+            Updated {relativeTime(data.updatedAt)} &bull; Created{" "}
+            {relativeTime(data.createdAt)}
           </div>
         </>
       }

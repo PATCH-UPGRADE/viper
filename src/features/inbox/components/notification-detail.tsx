@@ -1,7 +1,8 @@
-// TODO(VW-499): Fix changes after VW-427
-"use client";
+import { relativeTime } from "@/lib/date-utils";
 
-import { formatDistanceToNow } from "date-fns";
+// TODO(VW-499): Fix changes after VW-427
+("use client");
+
 import { type ReactNode, Suspense, useEffect, useState } from "react";
 import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
@@ -307,7 +308,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
       {/* Meta line */}
       <p className="text-sm text-muted-foreground -mt-3">
-        {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+        {relativeTime(notification.createdAt)}
         {sources.length > 0 && (
           <>
             {" · "}

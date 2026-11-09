@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { formatDistanceToNow } from "date-fns";
 import { AlertCircleIcon, Copy, EyeIcon, EyeOffIcon } from "lucide-react";
 import { useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
@@ -51,6 +50,7 @@ import {
 import type { Apikey } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { handleCopy } from "@/lib/copy";
+import { relativeTime } from "@/lib/date-utils";
 import {
   useCreateApiToken,
   useRemoveApiToken,
@@ -382,19 +382,14 @@ export const ApiTokenItem = ({ data }: { data: Apikey }) => {
         </div>
 
         <div className="text-xs text-muted-foreground mt-4">
-          Created: {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+          Created: {relativeTime(data.createdAt)}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
           Last used:{" "}
-          {data.lastRequest
-            ? formatDistanceToNow(data.lastRequest, { addSuffix: true })
-            : "Never"}
+          {data.lastRequest ? relativeTime(data.lastRequest) : "Never"}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          Expires:{" "}
-          {data.expiresAt
-            ? formatDistanceToNow(data.expiresAt, { addSuffix: true })
-            : "Never"}
+          Expires: {data.expiresAt ? relativeTime(data.expiresAt) : "Never"}
         </div>
       </div>
       <Button

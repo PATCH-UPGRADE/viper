@@ -1,11 +1,11 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { InfoIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
+import { relativeTime } from "@/lib/date-utils";
 import {
   useAddRemediationComment,
   useRemediationComments,
@@ -165,9 +165,7 @@ export const MedIsaoRemediationComments = ({
                     fromYourHospital={comment.fromYourHospital}
                   />
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(comment.createdAt), {
-                      addSuffix: true,
-                    })}
+                    {relativeTime(comment.createdAt)}
                   </span>
                 </span>
                 <p className="text-sm whitespace-pre-wrap wrap-anywhere">

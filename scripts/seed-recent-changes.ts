@@ -16,10 +16,12 @@ import {
   ConfidenceLevel,
   NotificationType,
   Priority,
+  SourceChannel,
   TicketActivityType,
   TicketStatus,
 } from "@/generated/prisma";
 import prisma from "../src/lib/db";
+import { sourceContentHash } from "../src/lib/source-hash";
 
 const TAG = "[recent-changes-test]";
 const SEED_USER_EMAIL = "user@example.com";
@@ -179,10 +181,25 @@ async function seed() {
         priority: row.priority,
         createdAt: at,
         updatedAt: at,
-        deviceGroupsMatchings: {
+        sourceLinks: {
           create: {
-            deviceGroupMatchingId: row.matchingId,
-            confidence: ConfidenceLevel.Matched,
+            sourceRecord: {
+              create: {
+                channel: SourceChannel.Email,
+                raw: { tag: TAG, title: row.title },
+                markdown: row.title,
+                contentHash: sourceContentHash(
+                  { tag: TAG, title: row.title },
+                  row.title,
+                ),
+                deviceGroupMatchings: {
+                  create: {
+                    deviceGroupMatchingId: row.matchingId,
+                    confidence: ConfidenceLevel.Matched,
+                  },
+                },
+              },
+            },
           },
         },
       },

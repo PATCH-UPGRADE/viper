@@ -610,20 +610,6 @@ const seedAdvisory = async (
       priority: fixture.copy.priority,
       priorityReasonWhy: fixture.copy.priorityReasonWhy,
       hospitalImpact: fixture.copy.hospitalImpact,
-      vulnerabilities: {
-        create: {
-          vulnerabilityId: vulnerability.id,
-          confidence: ConfidenceLevel.Matched,
-          reasonWhy: `The advisory names ${fixture.cve} directly.`,
-        },
-      },
-      deviceGroupsMatchings: {
-        create: vulnerability.deviceGroupMatchings.map((matching) => ({
-          deviceGroupMatchingId: matching.id,
-          confidence: ConfidenceLevel.Matched,
-          reasonWhy: "The advisory's product tree names this make and model.",
-        })),
-      },
       sourceLinks: {
         create: {
           sourceRecord: {
@@ -634,6 +620,21 @@ const seedAdvisory = async (
               raw: fixture.doc as Prisma.InputJsonValue,
               markdown,
               contentHash: sourceContentHash(fixture.doc, markdown),
+              vulnerabilities: {
+                create: {
+                  vulnerabilityId: vulnerability.id,
+                  confidence: ConfidenceLevel.Matched,
+                  reasonWhy: `The advisory names ${fixture.cve} directly.`,
+                },
+              },
+              deviceGroupMatchings: {
+                create: vulnerability.deviceGroupMatchings.map((matching) => ({
+                  deviceGroupMatchingId: matching.id,
+                  confidence: ConfidenceLevel.Matched,
+                  reasonWhy:
+                    "The advisory's product tree names this make and model.",
+                })),
+              },
             },
           },
         },

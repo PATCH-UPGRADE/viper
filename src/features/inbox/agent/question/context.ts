@@ -9,7 +9,7 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
-import { notRejected } from "../../types";
+import { linked } from "../../server/source-links";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
@@ -166,23 +166,32 @@ export async function gatherQuestionContext(
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
     include: {
-      vulnerabilities: {
-        where: notRejected,
-        include: {
-          vulnerability: {
-            include: {
-              deviceGroupMatchings: {
+      sourceLinks: {
+        select: {
+          sourceRecord: {
+            select: {
+              vulnerabilities: {
                 include: {
-                  manufacturer: { select: { canonicalDisplayName: true } },
-                  product: { select: { canonicalDisplayName: true } },
-                  version: { select: { canonicalDisplayName: true } },
-                },
-              },
-              issues: {
-                where: {
-                  deviceGroupMatchingId: { not: null },
-                  status: "UNDER_INVESTIGATION",
-                  questions: { none: { status: "PENDING" } },
+                  vulnerability: {
+                    include: {
+                      deviceGroupMatchings: {
+                        include: {
+                          manufacturer: {
+                            select: { canonicalDisplayName: true },
+                          },
+                          product: { select: { canonicalDisplayName: true } },
+                          version: { select: { canonicalDisplayName: true } },
+                        },
+                      },
+                      issues: {
+                        where: {
+                          deviceGroupMatchingId: { not: null },
+                          status: "UNDER_INVESTIGATION",
+                          questions: { none: { status: "PENDING" } },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -194,9 +203,10 @@ export async function gatherQuestionContext(
 
   if (!notification) return null;
 
-  const vulnerabilities = notification.vulnerabilities.map(
-    (m) => m.vulnerability,
-  );
+  const vulnerabilities = linked(
+    notification.sourceLinks,
+    "vulnerabilities",
+  ).map((m) => m.vulnerability);
 
   if (vulnerabilities.length === 0) return null;
 

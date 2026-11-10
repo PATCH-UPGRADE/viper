@@ -1,4 +1,5 @@
 import "server-only";
+import { inNotification } from "@/features/inbox/server/source-links";
 import type {
   NoteActionRequest,
   NoteActionSource,
@@ -24,10 +25,10 @@ async function resolveMatchingFeedbackTarget(
   notificationId: string,
 ): Promise<ResolvedTarget | null> {
   // if we need to target to different type later, remove this check and potentially update this function to a swtich(targetType)
-  if (targetType !== "NotificationDeviceGroupMapping") return null;
+  if (targetType !== "SourceRecordDeviceGroupMapping") return null;
 
-  const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
-    where: { id: targetId, notificationId },
+  const mapping = await prisma.sourceRecordDeviceGroupMapping.findFirst({
+    where: { id: targetId, ...inNotification(notificationId) },
     select: {
       deviceGroupMatchingId: true,
       deviceGroupMatching: {

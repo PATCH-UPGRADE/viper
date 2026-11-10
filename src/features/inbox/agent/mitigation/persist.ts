@@ -8,7 +8,7 @@ import {
 import type { PdfAttachment } from "@/lib/agent-messages";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
-import { notRejected } from "../../types";
+import { notificationVulnerabilityIds } from "../../server/source-links";
 import { existingIds, keepValidIds } from "../../utils";
 import { createMitigationPlans } from ".";
 import type { PlanWorkOrder } from "./schema";
@@ -38,10 +38,8 @@ export async function persistMitigationPlans(
     prisma.mitigationPlan.deleteMany({ where: unacceptedPlans }),
   ]);
 
-  const vulnCount = await prisma.notificationVulnerabilityMapping.count({
-    where: { notificationId, ...notRejected },
-  });
-  if (vulnCount === 0) return { skipped: "no-vulnerabilities" as const };
+  const vulnIds = await notificationVulnerabilityIds(notificationId);
+  if (vulnIds.length === 0) return { skipped: "no-vulnerabilities" as const };
 
   const { plans } = await createMitigationPlans(
     sourceId,

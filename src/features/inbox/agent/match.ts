@@ -71,11 +71,13 @@ const matchSchema = z.object({
 
 export type Decision = z.infer<typeof decisionSchema>;
 
-// A device-group mapping belongs to exactly one parent — a Notification or a
-// WorkOrderTicket. Callers pick which by passing the matching key.
-export type MatchOwner =
-  | { notificationId: string }
-  | { workOrderTicketId: string };
+// Every link lands on the source record that named the entity. A work order
+// extracted from that record also gets the device groups on its own table, so
+// a ticket never reads them through its source records.
+export type MatchOwner = {
+  sourceRecordId: string;
+  workOrderTicketId?: string;
+};
 
 export type MatchSummary = {
   linked: number;
@@ -288,7 +290,7 @@ export async function matchAndLinkEntities(
  * Deterministically apply a list of matching decisions to the database.
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
- * Idempotent: mappings are upserted on (owner, deviceGroupMatchingId) and new
+ * Idempotent: mappings are upserted on (source record, deviceGroupMatchingId) and new
  * matchings are resolved to their canonical (manufacturer/product/version)
  * identity via resolveMatchingId, so replaying does not duplicate rows.
  */
@@ -306,8 +308,8 @@ export async function applyDecisions(
 
   const rejectedDeviceGroupMatchingIds = new Set(
     (
-      await prisma.notificationDeviceGroupMapping.findMany({
-        where: { ...owner, confidence: "Rejected" },
+      await prisma.sourceRecordDeviceGroupMapping.findMany({
+        where: { sourceRecordId: owner.sourceRecordId, confidence: "Rejected" },
         select: { deviceGroupMatchingId: true },
       })
     ).map((m) => m.deviceGroupMatchingId),
@@ -345,41 +347,35 @@ export async function applyDecisions(
         decision.confidence === "Matched" ? "Matched" : "NeedsReview";
 
       if (decision.kind === "deviceGroupMatching") {
-        // A device-group mapping is the only link kind a WorkOrderTicket can
-        // own; Notifications additionally own vulnerability/remediation/asset
-        // mappings (handled below). Pick the matching compound key from `owner`.
-        const upsertMapping = (deviceGroupMatchingId: string) => {
-          const isNotification = "notificationId" in owner;
-          const where = isNotification
-            ? {
-                notificationId_deviceGroupMatchingId: {
-                  notificationId: owner.notificationId,
-                  deviceGroupMatchingId,
-                },
-              }
-            : {
-                workOrderTicketId_deviceGroupMatchingId: {
-                  workOrderTicketId: owner.workOrderTicketId,
-                  deviceGroupMatchingId,
-                },
-              };
-          const create = isNotification
-            ? {
-                notificationId: owner.notificationId,
+        const update = { confidence, reasonWhy: decision.reasonWhy };
+        const upsertMapping = async (deviceGroupMatchingId: string) => {
+          await tx.sourceRecordDeviceGroupMapping.upsert({
+            where: {
+              sourceRecordId_deviceGroupMatchingId: {
+                sourceRecordId: owner.sourceRecordId,
                 deviceGroupMatchingId,
-                confidence,
-                reasonWhy: decision.reasonWhy,
-              }
-            : {
+              },
+            },
+            create: {
+              sourceRecordId: owner.sourceRecordId,
+              deviceGroupMatchingId,
+              ...update,
+            },
+            update,
+          });
+          if (!owner.workOrderTicketId) return;
+          await tx.workOrderDeviceGroupMapping.upsert({
+            where: {
+              workOrderTicketId_deviceGroupMatchingId: {
                 workOrderTicketId: owner.workOrderTicketId,
                 deviceGroupMatchingId,
-                confidence,
-                reasonWhy: decision.reasonWhy,
-              };
-          const update = { confidence, reasonWhy: decision.reasonWhy };
-          return tx.notificationDeviceGroupMapping.upsert({
-            where,
-            create,
+              },
+            },
+            create: {
+              workOrderTicketId: owner.workOrderTicketId,
+              deviceGroupMatchingId,
+              ...update,
+            },
             update,
           });
         };
@@ -513,12 +509,6 @@ export async function applyDecisions(
           summary.created++;
         }
       } else if (decision.kind === "vulnerability") {
-        // Vulnerability/remediation/asset mappings exist only for
-        // Notifications — a WorkOrderTicket owns device-group links only.
-        if (!("notificationId" in owner)) {
-          summary.skipped++;
-          continue;
-        }
         if (
           !decision.targetId ||
           !validIds.vulnerability.has(decision.targetId)
@@ -530,9 +520,9 @@ export async function applyDecisions(
         // upsert would overwrite that. Update only a link that is not rejected,
         // else create one. A rejected row makes both write nothing.
         const { count: updated } =
-          await tx.notificationVulnerabilityMapping.updateMany({
+          await tx.sourceRecordVulnerabilityMapping.updateMany({
             where: {
-              notificationId: owner.notificationId,
+              sourceRecordId: owner.sourceRecordId,
               vulnerabilityId: decision.targetId,
               ...notRejected,
             },
@@ -541,10 +531,10 @@ export async function applyDecisions(
         const { count: created } =
           updated > 0
             ? { count: 0 }
-            : await tx.notificationVulnerabilityMapping.createMany({
+            : await tx.sourceRecordVulnerabilityMapping.createMany({
                 data: [
                   {
-                    notificationId: owner.notificationId,
+                    sourceRecordId: owner.sourceRecordId,
                     vulnerabilityId: decision.targetId,
                     confidence,
                     reasonWhy: decision.reasonWhy,
@@ -565,17 +555,13 @@ export async function applyDecisions(
         }
         pendingCvss.push({
           vulnerabilityId: decision.targetId,
-          notificationId: owner.notificationId,
+          sourceRecordId: owner.sourceRecordId,
           cvssScore: data.cvssScore,
           cvssVector: data.cvssVector,
         });
         if (decision.op === "update") summary.updated++;
         else summary.linked++;
       } else if (decision.kind === "remediation") {
-        if (!("notificationId" in owner)) {
-          summary.skipped++;
-          continue;
-        }
         if (
           !decision.targetId ||
           !validIds.remediation.has(decision.targetId)
@@ -583,15 +569,15 @@ export async function applyDecisions(
           summary.skipped++;
           continue;
         }
-        await tx.notificationRemediationMapping.upsert({
+        await tx.sourceRecordRemediationMapping.upsert({
           where: {
-            notificationId_remediationId: {
-              notificationId: owner.notificationId,
+            sourceRecordId_remediationId: {
+              sourceRecordId: owner.sourceRecordId,
               remediationId: decision.targetId,
             },
           },
           create: {
-            notificationId: owner.notificationId,
+            sourceRecordId: owner.sourceRecordId,
             remediationId: decision.targetId,
             confidence,
             reasonWhy: decision.reasonWhy,
@@ -630,23 +616,19 @@ export async function applyDecisions(
           summary.linked++;
         }
       } else if (decision.kind === "asset") {
-        if (!("notificationId" in owner)) {
-          summary.skipped++;
-          continue;
-        }
         if (!decision.targetId || !validIds.asset.has(decision.targetId)) {
           summary.skipped++;
           continue;
         }
-        await tx.notificationAssetMapping.upsert({
+        await tx.sourceRecordAssetMapping.upsert({
           where: {
-            notificationId_assetId: {
-              notificationId: owner.notificationId,
+            sourceRecordId_assetId: {
+              sourceRecordId: owner.sourceRecordId,
               assetId: decision.targetId,
             },
           },
           create: {
-            notificationId: owner.notificationId,
+            sourceRecordId: owner.sourceRecordId,
             assetId: decision.targetId,
             confidence,
             reasonWhy: decision.reasonWhy,

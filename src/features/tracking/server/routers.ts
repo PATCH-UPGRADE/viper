@@ -14,7 +14,7 @@ import {
   assetNameSelect,
   deviceTypeLabelSelect,
 } from "@/features/assets/utils";
-import { notRejected } from "@/features/inbox/types";
+import { notificationVulnerabilityIds } from "@/features/inbox/server/source-links";
 import {
   Priority,
   type Prisma,
@@ -580,21 +580,13 @@ export const trackingRouter = createTRPCRouter({
       // Most tickets (chat, email, Fleet sync) carry no notification FK, so a
       // ticket that shares a vulnerability with the notification also counts.
       if (notificationId) {
-        const mappings = await prisma.notificationVulnerabilityMapping.findMany(
-          {
-            where: { notificationId, ...notRejected },
-            select: { vulnerabilityId: true },
-          },
-        );
+        const vulnerabilityIds =
+          await notificationVulnerabilityIds(notificationId);
         filters.push({
           OR: [
             { notificationId },
             { mitigationPlan: { notificationId } },
-            {
-              vulnerabilities: {
-                some: { id: { in: mappings.map((m) => m.vulnerabilityId) } },
-              },
-            },
+            { vulnerabilities: { some: { id: { in: vulnerabilityIds } } } },
           ],
         });
       }

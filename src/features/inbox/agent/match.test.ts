@@ -5,11 +5,12 @@ vi.mock("server-only", () => ({}));
 
 const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
   const prisma = {
-    notificationDeviceGroupMapping: {
+    sourceRecordDeviceGroupMapping: {
       upsert: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
     },
-    notificationVulnerabilityMapping: {
+    workOrderDeviceGroupMapping: { upsert: vi.fn() },
+    sourceRecordVulnerabilityMapping: {
       updateMany: vi.fn(),
       createMany: vi.fn(),
     },
@@ -19,7 +20,7 @@ const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
       findFirst: vi.fn(),
       update: vi.fn(),
     },
-    notificationRemediationMapping: { upsert: vi.fn() },
+    sourceRecordRemediationMapping: { upsert: vi.fn() },
     remediation: { findUnique: vi.fn(), update: vi.fn() },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
@@ -80,20 +81,48 @@ beforeEach(() => {
 });
 
 describe("applyDecisions — device-group mapping owner", () => {
-  it("links to a work order via the workOrderTicketId compound key", async () => {
+  it("links to the source record via the sourceRecordId compound key", async () => {
     const summary = await applyDecisions(
-      { workOrderTicketId: "wo-1" },
+      { sourceRecordId: "src-1" },
       [linkDecision],
       candidates,
     );
 
     expect(summary.linked).toBe(1);
     expect(
-      mockPrisma.notificationDeviceGroupMapping.upsert,
-    ).toHaveBeenCalledTimes(1);
-    expect(
-      mockPrisma.notificationDeviceGroupMapping.upsert,
+      mockPrisma.sourceRecordDeviceGroupMapping.upsert,
     ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          sourceRecordId_deviceGroupMatchingId: {
+            sourceRecordId: "src-1",
+            deviceGroupMatchingId: "dg-1",
+          },
+        },
+        create: expect.objectContaining({
+          sourceRecordId: "src-1",
+          deviceGroupMatchingId: "dg-1",
+          confidence: "Matched",
+        }),
+      }),
+    );
+    expect(
+      mockPrisma.workOrderDeviceGroupMapping.upsert,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("also tags the work order when the record was extracted into one", async () => {
+    const summary = await applyDecisions(
+      { sourceRecordId: "src-1", workOrderTicketId: "wo-1" },
+      [linkDecision],
+      candidates,
+    );
+
+    expect(summary.linked).toBe(1);
+    expect(
+      mockPrisma.sourceRecordDeviceGroupMapping.upsert,
+    ).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.workOrderDeviceGroupMapping.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           workOrderTicketId_deviceGroupMatchingId: {
@@ -110,42 +139,19 @@ describe("applyDecisions — device-group mapping owner", () => {
     );
   });
 
-  it("links to a notification via the notificationId compound key", async () => {
-    const summary = await applyDecisions(
-      { notificationId: "n-1" },
-      [linkDecision],
-      candidates,
-    );
-
-    expect(summary.linked).toBe(1);
-    expect(
-      mockPrisma.notificationDeviceGroupMapping.upsert,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          notificationId_deviceGroupMatchingId: {
-            notificationId: "n-1",
-            deviceGroupMatchingId: "dg-1",
-          },
-        },
-        create: expect.objectContaining({
-          notificationId: "n-1",
-          deviceGroupMatchingId: "dg-1",
-        }),
-      }),
-    );
-  });
-
   it("skips link decisions whose targetId wasn't a surfaced candidate", async () => {
     const summary = await applyDecisions(
-      { workOrderTicketId: "wo-1" },
+      { sourceRecordId: "src-1", workOrderTicketId: "wo-1" },
       [{ ...linkDecision, targetId: "hallucinated" }],
       candidates,
     );
 
     expect(summary).toMatchObject({ linked: 0, skipped: 1 });
     expect(
-      mockPrisma.notificationDeviceGroupMapping.upsert,
+      mockPrisma.sourceRecordDeviceGroupMapping.upsert,
+    ).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.workOrderDeviceGroupMapping.upsert,
     ).not.toHaveBeenCalled();
   });
 });
@@ -171,7 +177,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue(null);
 
     const summary = await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [updateDecision],
       candidates,
     );
@@ -191,7 +197,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     });
 
     const summary = await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [updateDecision],
       candidates,
     );
@@ -209,7 +215,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     });
     expect(mockPrisma.deviceGroupMatching.update).not.toHaveBeenCalled();
     expect(
-      mockPrisma.notificationDeviceGroupMapping.upsert,
+      mockPrisma.sourceRecordDeviceGroupMapping.upsert,
     ).toHaveBeenCalledTimes(1);
   });
 
@@ -217,7 +223,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue(null);
 
     await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [{ ...updateDecision, fields: { versionRange: "vers:all/*" } }],
       candidates,
     );
@@ -238,7 +244,7 @@ describe("applyDecisions — device-group update adds a versionRange", () => {
     });
 
     await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [{ ...updateDecision, fields: { versionRange: "vers:all/*" } }],
       candidates,
     );
@@ -274,27 +280,27 @@ describe("applyDecisions — vulnerability mapping", () => {
     fields: null,
   };
 
-  it("creates a link when the notification has none", async () => {
-    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+  it("creates a link when the source record has none", async () => {
+    mockPrisma.sourceRecordVulnerabilityMapping.updateMany.mockResolvedValue({
       count: 0,
     });
-    mockPrisma.notificationVulnerabilityMapping.createMany.mockResolvedValue({
+    mockPrisma.sourceRecordVulnerabilityMapping.createMany.mockResolvedValue({
       count: 1,
     });
 
     const summary = await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [vulnDecision],
       vulnCandidates,
     );
 
     expect(summary).toMatchObject({ linked: 1, skipped: 0 });
     expect(
-      mockPrisma.notificationVulnerabilityMapping.createMany,
+      mockPrisma.sourceRecordVulnerabilityMapping.createMany,
     ).toHaveBeenCalledWith({
       data: [
         expect.objectContaining({
-          notificationId: "n-1",
+          sourceRecordId: "src-1",
           vulnerabilityId: "vuln-1",
         }),
       ],
@@ -303,44 +309,44 @@ describe("applyDecisions — vulnerability mapping", () => {
   });
 
   it("updates an existing link that is not rejected", async () => {
-    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+    mockPrisma.sourceRecordVulnerabilityMapping.updateMany.mockResolvedValue({
       count: 1,
     });
 
     const summary = await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [vulnDecision],
       vulnCandidates,
     );
 
     expect(summary).toMatchObject({ linked: 1, skipped: 0 });
     expect(
-      mockPrisma.notificationVulnerabilityMapping.updateMany,
+      mockPrisma.sourceRecordVulnerabilityMapping.updateMany,
     ).toHaveBeenCalledWith({
       where: {
-        notificationId: "n-1",
+        sourceRecordId: "src-1",
         vulnerabilityId: "vuln-1",
         ...notRejected,
       },
       data: { confidence: "Matched", reasonWhy: "same CVE" },
     });
     expect(
-      mockPrisma.notificationVulnerabilityMapping.createMany,
+      mockPrisma.sourceRecordVulnerabilityMapping.createMany,
     ).not.toHaveBeenCalled();
   });
 
-  it("skips a vulnerability that a user rejected on this notification", async () => {
+  it("skips a vulnerability that a user rejected on this source record", async () => {
     // A rejected row matches neither write: the update filters it out, and the
     // create sees a duplicate.
-    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+    mockPrisma.sourceRecordVulnerabilityMapping.updateMany.mockResolvedValue({
       count: 0,
     });
-    mockPrisma.notificationVulnerabilityMapping.createMany.mockResolvedValue({
+    mockPrisma.sourceRecordVulnerabilityMapping.createMany.mockResolvedValue({
       count: 0,
     });
 
     const summary = await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [vulnDecision],
       vulnCandidates,
     );
@@ -350,7 +356,7 @@ describe("applyDecisions — vulnerability mapping", () => {
   });
 
   it("keeps the CVSS an update decision found, once the transaction has committed", async () => {
-    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+    mockPrisma.sourceRecordVulnerabilityMapping.updateMany.mockResolvedValue({
       count: 1,
     });
     const order: string[] = [];
@@ -364,7 +370,7 @@ describe("applyDecisions — vulnerability mapping", () => {
     });
 
     const summary = await applyDecisions(
-      { notificationId: "n-1" },
+      { sourceRecordId: "src-1" },
       [
         {
           ...vulnDecision,
@@ -378,7 +384,7 @@ describe("applyDecisions — vulnerability mapping", () => {
     expect(summary).toMatchObject({ updated: 1 });
     expect(recordInboxCvss).toHaveBeenCalledWith({
       vulnerabilityId: "vuln-1",
-      notificationId: "n-1",
+      sourceRecordId: "src-1",
       cvssScore: 8.2,
       cvssVector: "CVSS:3.1/AV:N",
     });
@@ -442,7 +448,7 @@ describe("applyDecision - remediation impact", () => {
   it("fills impact fields and rows that are still empty", async () => {
     mockPrisma.remediation.findUnique.mockResolvedValue(stored());
     const summary = await applyDecisions(
-      { notificationId: "notif-1" },
+      { sourceRecordId: "src-1" },
       [updateDecision],
       remCandidates,
     );
@@ -461,7 +467,7 @@ describe("applyDecision - remediation impact", () => {
       stored({ requiresDowntime: false }, 1),
     );
     await applyDecisions(
-      { notificationId: "notif-1" },
+      { sourceRecordId: "src-1" },
       [updateDecision],
       remCandidates,
     );
@@ -475,7 +481,7 @@ describe("applyDecision - remediation impact", () => {
       stored({ requiresDowntime: false, estimatedDowntimeSeconds: 900 }, 1),
     );
     await applyDecisions(
-      { notificationId: "notif-1" },
+      { sourceRecordId: "src-1" },
       [updateDecision],
       remCandidates,
     );
@@ -502,7 +508,7 @@ describe("applyDecision - remediation impact", () => {
     };
 
     await applyDecisions(
-      { notificationId: "notif-1" },
+      { sourceRecordId: "src-1" },
       [{ ...updateDecision, extractedIndex: 2 }],
       wrongIndex,
     );
@@ -512,7 +518,7 @@ describe("applyDecision - remediation impact", () => {
 
   it("still writes a new description when nothing about impact is stated", async () => {
     await applyDecisions(
-      { notificationId: "notif-1" },
+      { sourceRecordId: "src-1" },
       [
         {
           ...updateDecision,
@@ -530,12 +536,12 @@ describe("applyDecision - remediation impact", () => {
   });
   it("does not touch impact on a link decision", async () => {
     await applyDecisions(
-      { notificationId: "notif-1" },
+      { sourceRecordId: "src-1" },
       [{ ...updateDecision, op: "link" }],
       remCandidates,
     );
     expect(
-      mockPrisma.notificationRemediationMapping.upsert,
+      mockPrisma.sourceRecordRemediationMapping.upsert,
     ).toHaveBeenCalledTimes(1);
     expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
   });

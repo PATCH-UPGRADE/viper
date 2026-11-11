@@ -1,7 +1,5 @@
-import { relativeTime } from "@/lib/date-utils";
-
 // TODO(VW-499): Fix changes after VW-427
-("use client");
+"use client";
 
 import { type ReactNode, Suspense, useEffect, useState } from "react";
 import { BadgeSelect } from "@/components/badge-select";
@@ -31,6 +29,7 @@ import {
 } from "@/features/questions/hooks/use-questions";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
+import { relativeTime } from "@/lib/date-utils";
 import {
   useMarkNotificationRead,
   useSuspenseNotification,

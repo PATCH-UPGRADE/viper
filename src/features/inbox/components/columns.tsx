@@ -1,7 +1,5 @@
-import { relativeTime } from "@/lib/date-utils";
-
 // TODO(VW-499): Fix changes after VW-427
-("use client");
+"use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { MailIcon, RssIcon } from "lucide-react";
@@ -14,6 +12,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Pill } from "@/components/ui/pill";
+import { relativeTime } from "@/lib/date-utils";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import type { NotificationWithRelations, RawEmailPayload } from "../types";
 import { NotificationTypeBadge } from "./notification-type-badge";

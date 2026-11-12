@@ -12,27 +12,7 @@ const { mockPrisma } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 const { buildTextPrompt, classifyContext } = await import("./classify");
-
-const matching = (
-  id: string,
-  manufacturer: string,
-  product: string,
-  version: string | null,
-) => ({
-  deviceGroupMatchingId: id,
-  confidence: "Matched",
-  deviceGroupMatching: {
-    id,
-    manufacturerId: "m-1",
-    productId: "p-1",
-    versionId: version ? "v-1" : null,
-    versionRange: null,
-    versionStatus: null,
-    manufacturer: { canonicalDisplayName: manufacturer },
-    product: { canonicalDisplayName: product },
-    version: version ? { canonicalDisplayName: version } : null,
-  },
-});
+const { notRejected } = await import("../types");
 
 const linkedRecord = {
   vulnerabilities: [
@@ -42,7 +22,19 @@ const linkedRecord = {
       vulnerability: { displayId: "CVE-2026-0001" },
     },
   ],
-  deviceGroupMatchings: [matching("dgm-1", "Acme", "Radiator", "2.1")],
+  deviceGroupMatchings: [
+    {
+      deviceGroupMatchingId: "dgm-1",
+      confidence: "Matched",
+      deviceGroupMatching: {
+        versionRange: null,
+        versionStatus: null,
+        manufacturer: { canonicalDisplayName: "Acme" },
+        product: { canonicalDisplayName: "Radiator" },
+        version: { canonicalDisplayName: "2.1" },
+      },
+    },
+  ],
 };
 
 beforeEach(() => {
@@ -64,12 +56,18 @@ describe("classifyContext", () => {
               OR: [
                 {
                   vulnerabilities: {
-                    some: { vulnerabilityId: { in: ["vuln-1"] } },
+                    some: {
+                      vulnerabilityId: { in: ["vuln-1"] },
+                      ...notRejected,
+                    },
                   },
                 },
                 {
                   deviceGroupMatchings: {
-                    some: { deviceGroupMatchingId: { in: ["dgm-1"] } },
+                    some: {
+                      deviceGroupMatchingId: { in: ["dgm-1"] },
+                      ...notRejected,
+                    },
                   },
                 },
               ],
@@ -100,9 +98,6 @@ describe("classifyContext", () => {
 
     const { select } =
       mockPrisma.sourceRecord.findUniqueOrThrow.mock.calls[0][0];
-    const notRejected = {
-      OR: [{ confidence: null }, { confidence: { not: "Rejected" } }],
-    };
     expect(select.vulnerabilities.where).toEqual(notRejected);
     expect(select.deviceGroupMatchings.where).toEqual(notRejected);
   });

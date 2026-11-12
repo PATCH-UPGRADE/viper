@@ -176,6 +176,20 @@ export function keepValidIds(
   return [...new Set(ids)].filter((id) => valid.has(id));
 }
 
+/**
+ * The rows with these ids, in this order. A `findMany` over `in` returns no
+ * order, and skips nothing when the list is empty, so this does both.
+ */
+export async function byIds<T extends { id: string }>(
+  ids: string[],
+  findMany: (where: { id: { in: string[] } }) => Promise<T[]>,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const rows = await findMany({ id: { in: ids } });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 /** Ids of the given set that exist in the table, as a Set for membership tests. */
 export async function existingIds<T extends { id: string }>(
   findMany: (args: {

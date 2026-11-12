@@ -9,7 +9,9 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
-import { inOrder, linkedIds, linkedIdsSelect } from "../../server/source-links";
+import { notificationLinkedIds } from "../../server/source-links";
+import { matchingLabelsInclude } from "../../types";
+import { byIds } from "../../utils";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
@@ -163,32 +165,14 @@ async function gatherManagingVendors(
 export async function gatherQuestionContext(
   notificationId: string,
 ): Promise<QuestionContext | null> {
-  const notification = await prisma.notification.findUnique({
-    where: { id: notificationId },
-    select: { sourceLinks: linkedIdsSelect },
-  });
+  const linked = await notificationLinkedIds(notificationId);
+  if (!linked || linked.vulnerabilityIds.length === 0) return null;
 
-  if (!notification) return null;
-
-  const vulnerabilityIds = linkedIds(
-    notification.sourceLinks,
-    "vulnerabilities",
-  );
-  if (vulnerabilityIds.length === 0) return null;
-
-  const canonicalLabel = { select: { canonicalDisplayName: true } };
-  const vulnerabilities = inOrder(
-    vulnerabilityIds,
-    await prisma.vulnerability.findMany({
-      where: { id: { in: vulnerabilityIds } },
+  const vulnerabilities = await byIds(linked.vulnerabilityIds, (where) =>
+    prisma.vulnerability.findMany({
+      where,
       include: {
-        deviceGroupMatchings: {
-          include: {
-            manufacturer: canonicalLabel,
-            product: canonicalLabel,
-            version: canonicalLabel,
-          },
-        },
+        deviceGroupMatchings: matchingLabelsInclude,
         issues: {
           where: {
             deviceGroupMatchingId: { not: null },

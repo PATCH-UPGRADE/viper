@@ -11,7 +11,8 @@ import {
 
 // `confidence` is nullable, and `{ not: "Rejected" }` alone also drops NULL rows.
 // Reads across a notification go through `linked` (server/source-links.ts)
-// instead; this is for a write that must leave a rejected row alone.
+// instead. This is for a query scoped to one record, or a write that must
+// leave a rejected row alone.
 export const notRejected = {
   OR: [{ confidence: null }, { confidence: { not: "Rejected" } }],
 } satisfies Prisma.SourceRecordVulnerabilityMappingWhereInput;
@@ -36,21 +37,31 @@ export type WithoutMappings<L> = L extends { sourceRecord: infer S }
   ? Omit<L, "sourceRecord"> & { sourceRecord: Omit<S, SourceRecordMappingKind> }
   : L;
 
+const canonicalLabel = { select: { canonicalDisplayName: true } };
+
+// A matching with only the display names it resolves to, for a prompt or a
+// label. The UI payloads load the full vendor rows through
+// `deviceGroupMappingInclude` instead.
+export const matchingLabelsInclude = {
+  include: {
+    manufacturer: canonicalLabel,
+    product: canonicalLabel,
+    version: canonicalLabel,
+  },
+} satisfies Prisma.DeviceGroupMatchingDefaultArgs;
+
 // A device group mapping with the labels its matching resolves to.
 export const deviceGroupMappingInclude = {
   include: {
     deviceGroupMatching: {
-      include: {
-        manufacturer: true,
-        product: true,
-        version: true,
-      },
+      include: { manufacturer: true, product: true, version: true },
     },
   },
 } satisfies Prisma.SourceRecord$deviceGroupMatchingsArgs;
 
 export const notificationInclude = {
   sourceLinks: {
+    orderBy: { createdAt: "asc" },
     select: {
       sourceRecord: {
         select: {
@@ -95,6 +106,7 @@ export type NotificationSource =
 
 export const notificationDetailInclude = {
   sourceLinks: {
+    orderBy: { createdAt: "asc" },
     select: {
       sourceType: true,
       reasonWhy: true,

@@ -17,10 +17,12 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import {
-  inOrder,
   linkedIds,
   linkedIdsRecordSelect,
+  linkedIdsSelect,
 } from "../../server/source-links";
+import { matchingLabelsInclude } from "../../types";
+import { byIds } from "../../utils";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 /** A baseline (device-group-matching-level) issue the agent may refine. */
@@ -58,6 +60,7 @@ export async function gatherVexContext(
     where: { id: notificationId },
     select: {
       sourceLinks: {
+        ...linkedIdsSelect,
         select: {
           sourceRecord: {
             select: { markdown: true, channel: true, ...linkedIdsRecordSelect },
@@ -72,31 +75,26 @@ export async function gatherVexContext(
   const links = notification.sourceLinks;
   const vulnerabilityIds = linkedIds(links, "vulnerabilities");
   if (vulnerabilityIds.length === 0) return null;
-  const remediationIds = linkedIds(links, "remediations");
 
-  const canonicalLabel = { select: { canonicalDisplayName: true } };
   const [vulnerabilities, remediations] = await Promise.all([
-    prisma.vulnerability
-      .findMany({
-        where: { id: { in: vulnerabilityIds } },
+    byIds(vulnerabilityIds, (where) =>
+      prisma.vulnerability.findMany({
+        where,
         include: {
-          deviceGroupMatchings: {
-            include: {
-              manufacturer: canonicalLabel,
-              product: canonicalLabel,
-              version: canonicalLabel,
-            },
-          },
+          deviceGroupMatchings: matchingLabelsInclude,
           issues: { where: { deviceGroupMatchingId: { not: null } } },
           records: { select: { metrics: true } },
           // TODO: continue testing, may need to include asset-level issues
           // here as well
         },
-      })
-      .then((rows) => inOrder(vulnerabilityIds, rows)),
-    prisma.remediation
-      .findMany({ where: { id: { in: remediationIds } } })
-      .then((rows) => inOrder(remediationIds, rows)),
+      }),
+    ),
+    byIds(linkedIds(links, "remediations"), (where) =>
+      prisma.remediation.findMany({
+        where,
+        select: { id: true, description: true, narrative: true },
+      }),
+    ),
   ]);
 
   // All matchings referenced by the linked vulnerabilities.

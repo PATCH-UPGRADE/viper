@@ -82,34 +82,53 @@ export function linkedIds<
   return linked(sourceLinks, kind).map((row) => (row as MappingRow<K>)[key]);
 }
 
-/** `rows` in the order of `ids`. A `findMany` over `in` returns no order. */
-export function inOrder<T extends { id: string }>(
-  ids: string[],
-  rows: T[],
-): T[] {
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  return ids.flatMap((id) => {
-    const row = byId.get(id);
-    return row ? [row] : [];
-  });
-}
-
 /**
- * The mapping ids of every kind on a record. Cheap enough for any query, so a
- * caller that needs the entities loads each one once by id afterwards, instead
- * of once per record that names it.
+ * The vulnerability, remediation and device group ids on a record. Cheap
+ * enough for any query, so a caller that needs the entities loads each one
+ * once by id afterwards, instead of once per record that names it.
+ *
+ * The rows are ordered, and so are the links in `linkedIdsSelect`, so the ids
+ * come out in the same order on every run and a prompt built from them is
+ * deterministic.
  */
 export const linkedIdsRecordSelect = {
-  vulnerabilities: { select: { vulnerabilityId: true, confidence: true } },
-  remediations: { select: { remediationId: true, confidence: true } },
+  vulnerabilities: {
+    orderBy: { id: "asc" },
+    select: { vulnerabilityId: true, confidence: true },
+  },
+  remediations: {
+    orderBy: { id: "asc" },
+    select: { remediationId: true, confidence: true },
+  },
   deviceGroupMatchings: {
+    orderBy: { id: "asc" },
     select: { deviceGroupMatchingId: true, confidence: true },
   },
 } satisfies Prisma.SourceRecordSelect;
 
 export const linkedIdsSelect = {
+  orderBy: { createdAt: "asc" },
   select: { sourceRecord: { select: linkedIdsRecordSelect } },
 } satisfies Prisma.Notification$sourceLinksArgs;
+
+/**
+ * The ids of every kind a notification links, after rejections. Null when the
+ * notification does not exist. `notificationVulnerabilityIds` is the cheaper
+ * query for a caller that needs one kind.
+ */
+export async function notificationLinkedIds(notificationId: string) {
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+    select: { sourceLinks: linkedIdsSelect },
+  });
+  if (!notification) return null;
+  const links = notification.sourceLinks;
+  return {
+    vulnerabilityIds: linkedIds(links, "vulnerabilities"),
+    remediationIds: linkedIds(links, "remediations"),
+    deviceGroupMatchingIds: linkedIds(links, "deviceGroupMatchings"),
+  };
+}
 
 /** A mapping row that sits on a record which feeds this notification. */
 export const inNotification = (notificationId: string) => ({

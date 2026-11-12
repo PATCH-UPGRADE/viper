@@ -18,7 +18,9 @@ import {
   vulnerabilityToMarkdown,
   workflowClinicalSummary,
 } from "@/lib/markdown";
-import { inOrder, linkedIds, linkedIdsSelect } from "../../server/source-links";
+import { notificationLinkedIds } from "../../server/source-links";
+import { matchingLabelsInclude } from "../../types";
+import { byIds } from "../../utils";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
@@ -49,12 +51,9 @@ export async function gatherTriageContext(
   notificationId: string,
   opts: { includeIds?: boolean } = {},
 ): Promise<TriageContext> {
-  const notification = await prisma.notification.findUnique({
-    where: { id: notificationId },
-    select: { sourceLinks: linkedIdsSelect },
-  });
+  const linked = await notificationLinkedIds(notificationId);
 
-  if (!notification) {
+  if (!linked) {
     return {
       notificationId,
       markdown: "",
@@ -64,40 +63,40 @@ export async function gatherTriageContext(
     };
   }
 
-  const links = notification.sourceLinks;
-  const vulnerabilityIds = linkedIds(links, "vulnerabilities");
-  const remediationIds = linkedIds(links, "remediations");
-  const matchingIds = linkedIds(links, "deviceGroupMatchings");
-
-  const withLabels = {
-    include: { manufacturer: true, product: true, version: true },
-  };
   const remediationInclude = {
-    deviceGroupMatchings: withLabels,
+    deviceGroupMatchings: matchingLabelsInclude,
     vulnerabilities: { select: { id: true, displayId: true } },
   };
   const [vulnerabilities, linkedRemediations, linkedMatchings] =
     await Promise.all([
-      prisma.vulnerability
-        .findMany({
-          where: { id: { in: vulnerabilityIds } },
+      byIds(linked.vulnerabilityIds, (where) =>
+        prisma.vulnerability.findMany({
+          where,
           include: {
-            deviceGroupMatchings: withLabels,
+            deviceGroupMatchings: matchingLabelsInclude,
             remediations: { include: remediationInclude },
-            issues: true,
+            issues: {
+              select: {
+                status: true,
+                notAffectedJustification: true,
+                statusConfidence: true,
+                deviceGroupMatchingId: true,
+                assetId: true,
+              },
+            },
             records: { select: { metrics: true } },
           },
-        })
-        .then((rows) => inOrder(vulnerabilityIds, rows)),
-      prisma.remediation
-        .findMany({
-          where: { id: { in: remediationIds } },
-          include: remediationInclude,
-        })
-        .then((rows) => inOrder(remediationIds, rows)),
-      prisma.deviceGroupMatching
-        .findMany({ where: { id: { in: matchingIds } }, ...withLabels })
-        .then((rows) => inOrder(matchingIds, rows)),
+        }),
+      ),
+      byIds(linked.remediationIds, (where) =>
+        prisma.remediation.findMany({ where, include: remediationInclude }),
+      ),
+      byIds(linked.deviceGroupMatchingIds, (where) =>
+        prisma.deviceGroupMatching.findMany({
+          where,
+          ...matchingLabelsInclude,
+        }),
+      ),
     ]);
 
   const remediationsById = new Map(linkedRemediations.map((r) => [r.id, r]));

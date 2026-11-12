@@ -7,7 +7,11 @@ import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
-import { notificationPayloadSchema, notRejected } from "../types";
+import {
+  matchingLabelsInclude,
+  notificationPayloadSchema,
+  notRejected,
+} from "../types";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
 
@@ -102,9 +106,7 @@ export async function classifyContext(
         select: {
           deviceGroupMatchingId: true,
           confidence: true,
-          deviceGroupMatching: {
-            include: { manufacturer: true, product: true, version: true },
-          },
+          deviceGroupMatching: matchingLabelsInclude,
         },
       },
     },
@@ -123,12 +125,18 @@ export async function classifyContext(
                 OR: [
                   {
                     vulnerabilities: {
-                      some: { vulnerabilityId: { in: vulnerabilityIds } },
+                      some: {
+                        vulnerabilityId: { in: vulnerabilityIds },
+                        ...notRejected,
+                      },
                     },
                   },
                   {
                     deviceGroupMatchings: {
-                      some: { deviceGroupMatchingId: { in: matchingIds } },
+                      some: {
+                        deviceGroupMatchingId: { in: matchingIds },
+                        ...notRejected,
+                      },
                     },
                   },
                 ],
@@ -159,40 +167,32 @@ export async function classifyContext(
   };
 }
 
-const linkedLines = (items: Linked[]): string =>
+const bulletsOrNone = <T>(items: T[], line: (item: T) => string): string =>
   items.length > 0
-    ? items
-        .map(
-          (item) =>
-            `- ${item.label}${item.confidence ? ` (${item.confidence})` : ""}`,
-        )
-        .join("\n")
+    ? items.map((item) => `- ${line(item)}`).join("\n")
     : "(none)";
+
+const linkedLine = (item: Linked): string =>
+  `${item.label}${item.confidence ? ` (${item.confidence})` : ""}`;
 
 export function buildTextPrompt(
   email: InboundEmail,
   context: ClassifyContext,
 ): string {
-  const existing =
-    context.existingNotifications.length > 0
-      ? context.existingNotifications
-          .map(
-            (n) =>
-              `- id: ${n.id} | type: ${n.type} | title: ${n.title ?? "(untitled)"} | summary: ${n.summary ?? "(none)"}`,
-          )
-          .join("\n")
-      : "(none)";
-
   return `${emailPromptText(email)}
 
 --- LINKED ENTITIES ---
 Vulnerabilities:
-${linkedLines(context.linked.vulnerabilities)}
+${bulletsOrNone(context.linked.vulnerabilities, linkedLine)}
 Device groups:
-${linkedLines(context.linked.deviceGroups)}
+${bulletsOrNone(context.linked.deviceGroups, linkedLine)}
 
 --- EXISTING NOTIFICATIONS ---
-${existing}`;
+${bulletsOrNone(
+  context.existingNotifications,
+  (n) =>
+    `id: ${n.id} | type: ${n.type} | title: ${n.title ?? "(untitled)"} | summary: ${n.summary ?? "(none)"}`,
+)}`;
 }
 
 export async function classifyNotification(

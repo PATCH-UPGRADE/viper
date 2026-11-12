@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   BadgeCheckIcon,
   BotIcon,
@@ -14,7 +13,7 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getChipClass } from "@/features/tag-colors/palette";
-import { formatDate, formatScheduled } from "@/lib/date-utils";
+import { formatDate, formatScheduled, relativeTime } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
 import { CategoryChip, StatusChip, useReadOnly } from "./shared";
 
@@ -62,10 +61,7 @@ const SourceHeader = ({ data }: { data: TicketDetail }) => {
           <p className="truncate text-sm font-semibold">{label}</p>
           {mapping?.lastSynced && (
             <p className="text-xs text-muted-foreground">
-              Last synced{" "}
-              {formatDistanceToNow(new Date(mapping.lastSynced), {
-                addSuffix: true,
-              })}
+              Last synced {relativeTime(mapping.lastSynced)}
             </p>
           )}
         </div>

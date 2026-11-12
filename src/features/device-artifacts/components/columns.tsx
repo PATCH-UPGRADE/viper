@@ -1,8 +1,8 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/table-core";
-import { formatDistanceToNow } from "date-fns";
 import { SortableHeader } from "@/components/ui/data-table";
+import { relativeTime } from "@/lib/date-utils";
 import type { DeviceArtifactResponse } from "../types";
 
 export const columns: ColumnDef<DeviceArtifactResponse>[] = [
@@ -34,7 +34,6 @@ export const columns: ColumnDef<DeviceArtifactResponse>[] = [
     header: ({ column }) => (
       <SortableHeader header="Last Updated" column={column} />
     ),
-    cell: ({ row }) =>
-      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+    cell: ({ row }) => relativeTime(row.original.updatedAt),
   },
 ];

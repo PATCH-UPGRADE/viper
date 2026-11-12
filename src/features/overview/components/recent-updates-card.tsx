@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   AlertTriangleIcon,
   ChevronDownIcon,
@@ -15,6 +14,7 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { statusLabels } from "@/features/tracking/components/ticket-detail/shared";
+import { relativeTime } from "@/lib/date-utils";
 import { cn, plural } from "@/lib/utils";
 import { useSuspenseRecentUpdates } from "../hooks/use-overview";
 
@@ -74,7 +74,7 @@ const WorkOrderRows = ({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="text-sm font-semibold">{item.summary}</p>
           <p className="text-xs text-muted-foreground">
-            {formatDistanceToNow(item.changedAt, { addSuffix: true })}
+            {relativeTime(item.changedAt)}
             {item.from && item.to && (
               <>
                 {" · "}

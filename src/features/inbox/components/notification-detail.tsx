@@ -1,7 +1,6 @@
 // TODO(VW-499): Fix changes after VW-427
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { type ReactNode, Suspense, useEffect, useState } from "react";
 import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
@@ -30,6 +29,7 @@ import {
 } from "@/features/questions/hooks/use-questions";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
+import { relativeTime } from "@/lib/date-utils";
 import {
   useMarkNotificationRead,
   useSuspenseNotification,
@@ -307,7 +307,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
       {/* Meta line */}
       <p className="text-sm text-muted-foreground -mt-3">
-        {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+        {relativeTime(notification.createdAt)}
         {sources.length > 0 && (
           <>
             {" · "}

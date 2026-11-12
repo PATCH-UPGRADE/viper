@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { ChevronDownIcon, ClockIcon, SquareCheckBigIcon } from "lucide-react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
+import { relativeTime } from "@/lib/date-utils";
 import { plural } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import {
@@ -140,9 +141,7 @@ export const InterruptionsList = () => {
                               {format(item.scheduledAt, "EEE, MMM d · h:mm a")}
                               {item.scheduledAt < new Date() && (
                                 <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(item.scheduledAt, {
-                                    addSuffix: true,
-                                  })}
+                                  {relativeTime(item.scheduledAt)}
                                 </span>
                               )}
                             </>

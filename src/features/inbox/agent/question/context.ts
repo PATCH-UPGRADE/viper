@@ -9,7 +9,7 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
-import { linked } from "../../server/source-links";
+import { inOrder, linkedIds, linkedIdsSelect } from "../../server/source-links";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
@@ -165,50 +165,40 @@ export async function gatherQuestionContext(
 ): Promise<QuestionContext | null> {
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
-    include: {
-      sourceLinks: {
-        select: {
-          sourceRecord: {
-            select: {
-              vulnerabilities: {
-                include: {
-                  vulnerability: {
-                    include: {
-                      deviceGroupMatchings: {
-                        include: {
-                          manufacturer: {
-                            select: { canonicalDisplayName: true },
-                          },
-                          product: { select: { canonicalDisplayName: true } },
-                          version: { select: { canonicalDisplayName: true } },
-                        },
-                      },
-                      issues: {
-                        where: {
-                          deviceGroupMatchingId: { not: null },
-                          status: "UNDER_INVESTIGATION",
-                          questions: { none: { status: "PENDING" } },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+    select: { sourceLinks: linkedIdsSelect },
   });
 
   if (!notification) return null;
 
-  const vulnerabilities = linked(
+  const vulnerabilityIds = linkedIds(
     notification.sourceLinks,
     "vulnerabilities",
-  ).map((m) => m.vulnerability);
+  );
+  if (vulnerabilityIds.length === 0) return null;
 
-  if (vulnerabilities.length === 0) return null;
+  const canonicalLabel = { select: { canonicalDisplayName: true } };
+  const vulnerabilities = inOrder(
+    vulnerabilityIds,
+    await prisma.vulnerability.findMany({
+      where: { id: { in: vulnerabilityIds } },
+      include: {
+        deviceGroupMatchings: {
+          include: {
+            manufacturer: canonicalLabel,
+            product: canonicalLabel,
+            version: canonicalLabel,
+          },
+        },
+        issues: {
+          where: {
+            deviceGroupMatchingId: { not: null },
+            status: "UNDER_INVESTIGATION",
+            questions: { none: { status: "PENDING" } },
+          },
+        },
+      },
+    }),
+  );
 
   const matchingsById = new Map<string, MatchingWithRefs>();
   for (const v of vulnerabilities) {

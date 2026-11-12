@@ -65,9 +65,9 @@ async function prepareRemediationNotification(
 
   try {
     return await prisma.$transaction(async (tx) => {
-      const notification = await tx.notification.create({
-        data: { type: "UpdateAvailable", title, summary },
-      });
+      // The record and what it names come first. A TA4 submission states its
+      // vulnerabilities and its remediation outright, so the mappings carry no
+      // confidence: nothing was matched.
       const source = await tx.sourceRecord.create({
         data: {
           channel: REMEDIATION_SOURCE_CHANNEL,
@@ -75,29 +75,23 @@ async function prepareRemediationNotification(
           raw,
           markdown,
           contentHash: sourceContentHash(raw, markdown),
-          remediationId,
-          links: {
+          vulnerabilities: {
+            create: vulnerabilities.map((v) => ({ vulnerabilityId: v.id })),
+          },
+          remediations: { create: { remediationId } },
+        },
+      });
+      const notification = await tx.notification.create({
+        data: {
+          type: "UpdateAvailable",
+          title,
+          summary,
+          sourceLinks: {
             create: {
-              notificationId: notification.id,
+              sourceRecordId: source.id,
               sourceType: SourceLinkType.Source,
             },
           },
-        },
-      });
-      await tx.sourceRecordVulnerabilityMapping.createMany({
-        data: vulnerabilities.map((v) => ({
-          sourceRecordId: source.id,
-          vulnerabilityId: v.id,
-          confidence: "Matched" as const,
-          reasonWhy: "Vulnerability declared by the TA4 remediation.",
-        })),
-      });
-      await tx.sourceRecordRemediationMapping.create({
-        data: {
-          sourceRecordId: source.id,
-          remediationId,
-          confidence: "Matched",
-          reasonWhy: "Source remediation for this update.",
         },
       });
       return { notificationId: notification.id, sourceId: source.id };

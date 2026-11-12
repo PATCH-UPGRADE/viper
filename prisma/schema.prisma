@@ -1106,8 +1106,6 @@ model Remediation {
   publishedAt DateTime? // when manufacturer released it
 
   externalMappings         ExternalRemediationMapping[]
-  // raw TA4 submissions that produced this remediation
-  sourceRecords            SourceRecord[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([userId])
@@ -1800,6 +1798,9 @@ enum SourceChannel {
   TA4 // POSTed to /api/v1/remediations
 }
 
+// On a source record mapping, a null confidence means the source stated the
+// entity itself, as a TA4 submission names its vulnerabilities, so no match
+// was made that a confidence could describe.
 enum ConfidenceLevel {
   NeedsReview // An LLM matched this but with low confidence
   Matched // An LLM matched this with high confidence
@@ -1905,11 +1906,6 @@ model SourceRecord {
 
   observedAt DateTime @default(now())
 
-  // A SourceRecord can optionally be a TA4 remediation: the raw submission,
-  // pointing at the Remediation it created.
-  remediationId String?
-  remediation   Remediation? @relation(fields: [remediationId], references: [id], onDelete: SetNull)
-
   links       SourceLink[] // what notifications / work orders this source feeds
   attachments SourceRecordAttachment[]
 
@@ -1924,7 +1920,6 @@ model SourceRecord {
 
   @@unique([channel, externalId])
   @@index([mappingId, observedAt])
-  @@index([remediationId])
   @@map("source_record")
 }
 

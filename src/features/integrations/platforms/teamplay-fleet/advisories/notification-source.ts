@@ -16,14 +16,14 @@ const SOURCE_LABEL = `${SIEMENS_HEALTHINEERS.canonicalDisplayName} teamplay Flee
 
 export const linkAdvisoryVulnerabilities =
   (advisory: FleetAdvisoryItem): LinkEntities =>
-  (step, notificationId, { sourceId }) =>
+  (step, { sourceId }) =>
     step.run("link-advisory-vulnerabilities", async () => {
       const cveIds = [
         ...new Set(
           parseCveIds(advisory.raw.cveIds).map((id) => id.toUpperCase()),
         ),
       ];
-      if (!notificationId || cveIds.length === 0) {
+      if (cveIds.length === 0) {
         return { linked: 0, skipped: 0 };
       }
       const known = await prisma.vulnerability.findMany({
@@ -82,9 +82,9 @@ export const advisorySourceAdapter: SourceRecordAdapter = {
     const linkVulnerabilities = linkAdvisoryVulnerabilities(advisory);
     return {
       doc,
-      linkEntities: async (step, notificationId, ctx) => ({
-        matched: await extractAndMatch(step, notificationId, ctx),
-        vulnerabilities: await linkVulnerabilities(step, notificationId, ctx),
+      linkEntities: async (step, ctx) => ({
+        matched: await extractAndMatch(step, ctx),
+        vulnerabilities: await linkVulnerabilities(step, ctx),
       }),
     };
   },

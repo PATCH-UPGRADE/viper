@@ -23,7 +23,7 @@ import type { KnownNotificationFields } from "./source-adapter";
 export type PipelineStep = Pick<GetStepTools<typeof inngest>, "run">;
 
 /**
- * Attach the entities a document refers to, once its Notification exists.
+ * Attach the entities a document refers to, on its source record.
  *
  * The caller owns this and its step ids, because how the links are found
  * differs by source. An email names its devices in prose and needs two LLM
@@ -32,11 +32,6 @@ export type PipelineStep = Pick<GetStepTools<typeof inngest>, "run">;
  */
 export type LinkEntities = (
   step: PipelineStep,
-  /**
-   * Nullable because `step.run` reports the classifier's optional id as null.
-   * Every stage here guards on it rather than assuming the classifier ran.
-   */
-  notificationId: string | null,
   /** The record that named the entities. Every link lands on it. */
   ctx: { sourceId: string; attachments?: PdfAttachment[] },
 ) => Promise<unknown>;
@@ -69,6 +64,11 @@ export async function runNotificationPipeline({
   linkEntities,
   known,
 }: NotificationPipelineInput) {
+  // Links land on the source record, so they need no notification. They run
+  // first so the classifier sees what the record names when it writes the
+  // title and picks the notification to update.
+  const linkSummary = await linkEntities(step, { sourceId, attachments });
+
   const notificationId = await step.run("classify-notification", async () => {
     const result = await classifyNotification(sourceId, doc, attachments);
 
@@ -122,11 +122,6 @@ export async function runNotificationPipeline({
       }
       return notification.id;
     });
-  });
-
-  const linkSummary = await linkEntities(step, notificationId, {
-    sourceId,
-    attachments,
   });
 
   // VEX sort: if the notification has linked vulnerabilities, sort each

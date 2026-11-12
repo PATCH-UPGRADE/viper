@@ -315,7 +315,7 @@ export const processInboxEmail = inngest.createFunction(
       return { workOrderTicketId, sourceId, emailId, linkSummary };
     }
 
-    // 7-11. Classify, link, VEX, triage and plan. Shared with every other
+    // 7-11. Link, classify, VEX, triage and plan. Shared with every other
     // source that lands a SourceRecord; only the linking differs.
     const doc = {
       from: email.from,

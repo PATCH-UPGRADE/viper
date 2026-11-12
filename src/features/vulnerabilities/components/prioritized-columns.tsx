@@ -1,8 +1,8 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { SourceBlocks } from "@/components/sources";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/ui/data-table";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
@@ -15,19 +15,15 @@ import {
 } from "@/components/ui/tooltip";
 import { getAssetTitle } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
+import { relativeTime } from "@/lib/date-utils";
 import type { VulnerabilityWithRelations } from "../types";
-import {
-  recordSources,
-  summarizeMetrics,
-  VULNERABILITY_SOURCE_LABELS,
-} from "../utils";
-import { VulnerabilitySources } from "./vulnerability-sources";
+import { recordSourceBlocks, summarizeMetrics } from "../utils";
 
 type Records = VulnerabilityWithRelations["records"];
 
 const sourcesText = (records: Records) =>
-  recordSources(records)
-    .sources.map((source) => VULNERABILITY_SOURCE_LABELS[source])
+  recordSourceBlocks(records)
+    .map((block) => block.name)
     .join(", ");
 
 /** "Unknown" when the KEV catalog was never checked for this vulnerability. */
@@ -64,7 +60,9 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
     id: "sources",
     accessorFn: (row) => sourcesText(row.records),
     header: ({ column }) => <SortableHeader header="Sources" column={column} />,
-    cell: ({ row }) => <VulnerabilitySources records={row.original.records} />,
+    cell: ({ row }) => (
+      <SourceBlocks blocks={recordSourceBlocks(row.original.records)} />
+    ),
   },
   {
     accessorKey: "createdAt",
@@ -75,7 +73,7 @@ export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger>
-            {formatDistanceToNow(row.original.createdAt, { addSuffix: true })}
+            {relativeTime(row.original.createdAt)}
           </TooltipTrigger>
           <TooltipContent>
             {row.original.createdAt.toLocaleString()}
@@ -155,8 +153,7 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
     accessorKey: "updatedAt",
     header: "Updated At",
-    cell: ({ row }) =>
-      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+    cell: ({ row }) => relativeTime(row.original.updatedAt),
   },
   {
     id: "actions",

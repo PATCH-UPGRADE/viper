@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { PencilIcon, RefreshCw, TrashIcon } from "lucide-react";
 import ms from "ms";
 import { useState } from "react";
@@ -23,6 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SyncStatusEnum } from "@/generated/prisma";
+import { relativeTime } from "@/lib/date-utils";
 import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
@@ -38,9 +38,6 @@ import type {
 } from "../types";
 import { resourceTypeLabel } from "../types";
 import { IntegrationFormDialog } from "./create-integration-dialog";
-
-const relativeTime = (date: Date) =>
-  formatDistanceToNow(date, { addSuffix: true });
 
 type TimingInput = Pick<
   IntegrationResourceSyncItem,

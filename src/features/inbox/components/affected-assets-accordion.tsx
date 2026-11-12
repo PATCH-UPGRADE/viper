@@ -227,7 +227,7 @@ export function MatchingAssetTable({
     {
       head: "Location",
       fullOnly: false,
-      cell: (asset) => parseLocation(asset.location),
+      cell: (asset) => parseLocation(asset.location) || "—",
     },
     { head: "Status", fullOnly: true, cell: (asset) => asset.status ?? "—" },
     {

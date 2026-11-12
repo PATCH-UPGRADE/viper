@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { MetricResponse } from "../types";
 import {
   cvssScores,
-  recordAttribution,
-  recordSources,
+  recordSourceBlocks,
+  recordSourceName,
+  recordTypeText,
   summarizeMetrics,
 } from "../utils";
 
@@ -88,41 +89,70 @@ describe("cvssScores", () => {
   });
 });
 
-describe("recordAttribution", () => {
-  it("names the source, its ID and the owner when there are any", () => {
+const mapped = (name: string) => ({ integration: { name } });
+
+describe("recordSourceName", () => {
+  it("names a record by its integration when it has an external mapping", () => {
     expect(
-      recordAttribution({
+      recordSourceName({
         source: "VENDOR_ADVISORY",
-        sourceId: "GE-2020-004",
-        user: null,
+        user: { name: "CISA CSAF Service" },
+        externalMapping: mapped("CISA CSAF"),
       }),
-    ).toBe("Vendor advisory GE-2020-004");
+    ).toBe("CISA CSAF");
+  });
+
+  it("names a TA3 submission by the TA3 user who sent it", () => {
     expect(
-      recordAttribution({ source: "TA3", user: { name: "Seed User" } }),
-    ).toBe("TA3 (Seed User)");
+      recordSourceName({ source: "TA3", user: { name: "Blueflow Service" } }),
+    ).toBe("Blueflow Service");
+  });
+
+  it("falls back to the source", () => {
+    expect(recordSourceName({ source: "FIRST_EPSS", user: null })).toBe(
+      "FIRST EPSS",
+    );
   });
 });
 
-describe("recordSources", () => {
-  it("lists sources in record order, once each, without the EPSS and KEV feeds", () => {
-    const { sources } = recordSources([
-      { source: "VENDOR_ADVISORY" },
-      { source: "FIRST_EPSS" },
-      { source: "TA3" },
-      { source: "CISA_KEV" },
-      { source: "VENDOR_ADVISORY" },
-    ]);
-    expect(sources).toEqual(["VENDOR_ADVISORY", "TA3"]);
+describe("recordTypeText", () => {
+  it("gives the kind and source ID beside an integration's name", () => {
+    expect(
+      recordTypeText({
+        source: "VENDOR_ADVISORY",
+        sourceId: "GE-2020-004",
+        externalMapping: mapped("CISA CSAF"),
+      }),
+    ).toBe("Vendor advisory GE-2020-004");
   });
 
-  it("names each TA3 contributor once and skips records with no owner", () => {
-    const { ta3Contributors } = recordSources([
-      { source: "TA3", user: { name: "Ada" } },
-      { source: "TA3", user: null },
-      { source: "TA3", user: { name: "Ada" } },
-      { source: "TA3", user: { name: "Grace" } },
-      { source: "OTHER", user: { name: "Linus" } },
+  it("is null when the name already says it, and leaves a feed's CVE off", () => {
+    expect(
+      recordTypeText({ source: "CISA_KEV", sourceId: "CVE-2026-0001" }),
+    ).toBeNull();
+    expect(recordTypeText({ source: "AI", sourceId: null })).toBeNull();
+  });
+});
+
+describe("recordSourceBlocks", () => {
+  it("gives one block per record, without the EPSS and KEV feeds", () => {
+    const blocks = recordSourceBlocks([
+      {
+        id: "r1",
+        source: "VENDOR_ADVISORY",
+        externalMapping: mapped("CISA CSAF"),
+      },
+      { id: "r2", source: "FIRST_EPSS" },
+      { id: "r3", source: "TA3", user: { name: "Blueflow Service" } },
+      { id: "r4", source: "TA3", user: { name: "Blueflow Service" } },
+      { id: "r5", source: "AI" },
+      { id: "r6", source: "CISA_KEV" },
     ]);
-    expect(ta3Contributors).toEqual(["Ada", "Grace"]);
+    expect(blocks.map(({ name, kind }) => [name, kind])).toEqual([
+      ["CISA CSAF", "integration"],
+      ["Blueflow Service", "person"],
+      ["Blueflow Service", "person"],
+      ["AI crawler", "automation"],
+    ]);
   });
 });

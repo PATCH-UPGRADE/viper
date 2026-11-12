@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { ChevronDownIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -9,6 +8,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { type PlatformEnum, SyncStatusEnum } from "@/generated/prisma";
+import { relativeTime } from "@/lib/date-utils";
 import { initialsOf } from "@/lib/string-utils";
 import { plural } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
@@ -52,9 +52,6 @@ const LATEST_UPLOAD_WORDING: UploadWording = {
   uploaded: "Last uploaded",
   finishedWithErrors: "Last upload finished with errors",
 };
-
-const relativeTime = (date: Date) =>
-  formatDistanceToNow(date, { addSuffix: true });
 
 const startedAtOf = (upload: IntegrationListItem): Date | null =>
   upload.resourceSyncs[0]?.lastAttemptAt ?? null;

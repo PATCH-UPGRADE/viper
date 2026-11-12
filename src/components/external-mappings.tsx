@@ -1,11 +1,11 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { ExternalLinkIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { UrlBearingMapping } from "@/features/integrations/core/urls";
 import { PlatformEnum } from "@/generated/prisma";
+import { relativeTime } from "@/lib/date-utils";
 
 /**
  * The common shape of every `External*Mapping` select in the app.
@@ -19,6 +19,20 @@ export interface ExternalMappingLike extends UrlBearingMapping {
 const PLATFORM_TAGS: Partial<Record<PlatformEnum, string>> = {
   [PlatformEnum.CSV_UPLOAD]: "CSV",
 };
+
+/** The small tag shown after an integration's name, e.g. "CSV" for a CSV import. */
+export const platformTagOf = (platform?: PlatformEnum) =>
+  platform ? PLATFORM_TAGS[platform] : undefined;
+
+/** A mapping's links for a SourceList row: its page in the integration, then its upstream API. */
+export const mappingLinks = (
+  mapping: UrlBearingMapping | null | undefined,
+): { label: string; href: string }[] => [
+  ...(mapping?.webUrl ? [{ label: "Web", href: mapping.webUrl }] : []),
+  ...(mapping?.upstreamApi
+    ? [{ label: "API", href: mapping.upstreamApi }]
+    : []),
+];
 
 const MappingLink = ({ label, href }: { label: string; href: string }) => (
   <>
@@ -57,8 +71,7 @@ export const ExternalMappingList = ({
     <ul className="space-y-3">
       {mappings.map((mapping) => {
         const { webUrl, upstreamApi } = mapping;
-        const platform = mapping.integration.platform;
-        const platformTag = platform ? PLATFORM_TAGS[platform] : undefined;
+        const platformTag = platformTagOf(mapping.integration.platform);
 
         return (
           <li
@@ -71,8 +84,7 @@ export const ExternalMappingList = ({
             </span>
             {mapping.lastSynced && (
               <span className="text-xs text-muted-foreground">
-                Last synced{" "}
-                {formatDistanceToNow(mapping.lastSynced, { addSuffix: true })}
+                Last synced {relativeTime(mapping.lastSynced)}
               </span>
             )}
             {webUrl && <MappingLink label="Web" href={webUrl} />}

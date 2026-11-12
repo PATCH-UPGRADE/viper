@@ -73,6 +73,44 @@ export function stripMappings<L extends { sourceRecord: object }>(
   });
 }
 
+/** The id of each linked entity of one kind, after rejections, in link order. */
+export function linkedIds<
+  K extends SourceRecordMappingKind,
+  L extends { sourceRecord: Record<K, MappingRow<K>[]> },
+>(sourceLinks: L[], kind: K): string[] {
+  const key = SOURCE_RECORD_MAPPING_KEYS[kind];
+  return linked(sourceLinks, kind).map((row) => (row as MappingRow<K>)[key]);
+}
+
+/** `rows` in the order of `ids`. A `findMany` over `in` returns no order. */
+export function inOrder<T extends { id: string }>(
+  ids: string[],
+  rows: T[],
+): T[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [row] : [];
+  });
+}
+
+/**
+ * The mapping ids of every kind on a record. Cheap enough for any query, so a
+ * caller that needs the entities loads each one once by id afterwards, instead
+ * of once per record that names it.
+ */
+export const linkedIdsRecordSelect = {
+  vulnerabilities: { select: { vulnerabilityId: true, confidence: true } },
+  remediations: { select: { remediationId: true, confidence: true } },
+  deviceGroupMatchings: {
+    select: { deviceGroupMatchingId: true, confidence: true },
+  },
+} satisfies Prisma.SourceRecordSelect;
+
+export const linkedIdsSelect = {
+  select: { sourceRecord: { select: linkedIdsRecordSelect } },
+} satisfies Prisma.Notification$sourceLinksArgs;
+
 /** A mapping row that sits on a record which feeds this notification. */
 export const inNotification = (notificationId: string) => ({
   sourceRecord: { links: { some: { notificationId } } },

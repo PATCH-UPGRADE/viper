@@ -6,8 +6,11 @@
 -- the record of its earliest link. A notification with no link loses its
 -- mappings, and the count is raised as a NOTICE.
 
--- AlterEnum
+-- Everything below runs as one transaction, so a failure leaves the enum and
+-- the old tables in place.
 BEGIN;
+
+-- AlterEnum
 CREATE TYPE "MatchFeedbackTargetType_new" AS ENUM ('SourceRecordDeviceGroupMapping', 'SourceRecordAssetMapping', 'SourceRecordRemediationMapping', 'SourceRecordVulnerabilityMapping');
 ALTER TABLE "match_feedback" ALTER COLUMN "targetType" TYPE "MatchFeedbackTargetType_new" USING (
   CASE "targetType"::text
@@ -20,11 +23,6 @@ ALTER TABLE "match_feedback" ALTER COLUMN "targetType" TYPE "MatchFeedbackTarget
 ALTER TYPE "MatchFeedbackTargetType" RENAME TO "MatchFeedbackTargetType_old";
 ALTER TYPE "MatchFeedbackTargetType_new" RENAME TO "MatchFeedbackTargetType";
 DROP TYPE "public"."MatchFeedbackTargetType_old";
-COMMIT;
-
--- Everything below runs as one transaction, so a failed move leaves the old
--- tables in place.
-BEGIN;
 
 -- RenameTable: notification_attachment -> source_record_attachment, in place
 ALTER TABLE "notification_attachment" RENAME TO "source_record_attachment";
@@ -94,7 +92,7 @@ CREATE TEMP TABLE "notification_primary_source" ON COMMIT DROP AS
 SELECT DISTINCT ON ("notificationId") "notificationId", "sourceRecordId"
 FROM "source_link"
 WHERE "notificationId" IS NOT NULL
-ORDER BY "notificationId", ("sourceType" = 'Source') DESC, "createdAt" ASC;
+ORDER BY "notificationId", ("sourceType" = 'Source') DESC, "createdAt" ASC, "id" ASC;
 
 DO $$
 DECLARE

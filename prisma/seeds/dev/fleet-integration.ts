@@ -198,9 +198,13 @@ export async function seedFleetAdvisoryNotification() {
 
   // Rebuilt rather than upserted, as seedVendors does: a Notification has no
   // natural unique key, so a re-seed would stack a fresh advisory every run.
-  // The delete cascades its source record, which carries the mappings.
+  // Deleting the notification removes only its links, so the source record,
+  // which carries the mappings, is deleted by its own marker.
   await prisma.notification.deleteMany({
     where: fleetAdvisoryNotifications,
+  });
+  await prisma.sourceRecord.deleteMany({
+    where: { raw: { equals: FLEET_ADVISORY_RAW } },
   });
 
   await prisma.notification.create({

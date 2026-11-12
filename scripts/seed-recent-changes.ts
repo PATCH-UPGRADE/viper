@@ -20,8 +20,8 @@ import {
   TicketActivityType,
   TicketStatus,
 } from "@/generated/prisma";
+import { sourceContentHash } from "@/lib/source-hash";
 import prisma from "../src/lib/db";
-import { sourceContentHash } from "../src/lib/source-hash";
 
 const TAG = "[recent-changes-test]";
 const SEED_USER_EMAIL = "user@example.com";

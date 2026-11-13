@@ -198,7 +198,7 @@ export const overviewRouter = createTRPCRouter({
   }),
 
   /** Highest-priority top-level work orders. */
-  suggestedWorkOrders: protectedProcedure.query(async ({ ctx }) => {
+  suggestedWorkOrders: protectedProcedure.query(async () => {
     const tickets = await prisma.workOrderTicket.findMany({
       where: { isDraft: false, parentId: null },
       select: {
@@ -209,21 +209,14 @@ export const overviewRouter = createTRPCRouter({
         scheduledAt: true,
         updatedAt: true,
         assignee: { select: { id: true, name: true } },
-        // Scoped to the current user, so the row reflects whether *they*
-        // watch the ticket.
-        watchers: {
-          where: { userId: ctx.auth.user.id },
-          select: { userId: true },
-        },
         _count: { select: { assets: true } },
       },
       orderBy: ORDER_BY_URGENCY,
       take: OVERVIEW_LIMIT,
     });
 
-    return tickets.map(({ watchers, _count, ...ticket }) => ({
+    return tickets.map(({ _count, ...ticket }) => ({
       ...ticket,
-      isWatching: watchers.length > 0,
       assetCount: _count.assets,
     }));
   }),

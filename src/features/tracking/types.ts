@@ -43,11 +43,10 @@ export const ticketBaseInclude = {
     orderBy: { createdAt: "desc" as const },
     take: 1,
   },
-  // `watchers` and `seenBy` are replaced at the procedure level with a
-  // where: { userId } filter so each row reflects only the current user's
-  // watch/seen state. Including them here keeps the derived TS type consistent
-  // across call sites. `seenBy` drives the unread-comments indicator.
-  watchers: { select: { userId: true } },
+  // `seenBy` is replaced at the procedure level with a where: { userId }
+  // filter so each row reflects only the current user's seen state. Including
+  // it here keeps the derived TS type consistent across call sites. It drives
+  // the unread-comments indicator.
   seenBy: { select: { seenAt: true } },
   _count: {
     select: {
@@ -138,14 +137,10 @@ type ChildPayload = Prisma.WorkOrderTicketGetPayload<{
 
 export type LinkedPreviewItem = { id: string; label: string };
 
-export type TrackingTicketChildRow = Omit<
-  ChildPayload,
-  "watchers" | "seenBy"
-> & {
+export type TrackingTicketChildRow = Omit<ChildPayload, "seenBy"> & {
   linkedCount: number;
   commentCount: number;
   linkedPreview: LinkedPreviewItem[];
-  isWatching: boolean;
   hasUnreadComments: boolean;
 };
 
@@ -153,14 +148,10 @@ type ParentPayload = Prisma.WorkOrderTicketGetPayload<{
   include: typeof trackingTicketInclude;
 }>;
 
-export type TrackingTicketRow = Omit<
-  ParentPayload,
-  "children" | "watchers" | "seenBy"
-> & {
+export type TrackingTicketRow = Omit<ParentPayload, "children" | "seenBy"> & {
   linkedCount: number;
   commentCount: number;
   linkedPreview: LinkedPreviewItem[];
-  isWatching: boolean;
   hasUnreadComments: boolean;
   children: TrackingTicketChildRow[];
 };
@@ -182,12 +173,6 @@ export const ticketDetailInclude = {
   departments: {
     select: { id: true, name: true, color: true },
     orderBy: { name: "asc" as const },
-  },
-  descriptions: {
-    include: {
-      department: { select: { id: true, name: true, color: true } },
-    },
-    orderBy: { department: { name: "asc" as const } },
   },
   assignee: {
     select: {
@@ -277,8 +262,6 @@ export const ticketDetailInclude = {
     },
     orderBy: { createdAt: "asc" as const },
   },
-  // Replaced at the procedure level with a where: { userId } filter.
-  watchers: { select: { userId: true } },
   activities: {
     include: {
       user: {
@@ -353,15 +336,13 @@ export type RelatedTicketLink = {
   ticket: RelatedTicketRef;
 };
 
-// What clients receive from the detail endpoints: the per-user `watchers`
-// include is collapsed server-side into an `isWatching` boolean, and the plan
-// siblings and the two link sides into one `relatedTickets` list. The server
-// also adds the fields that a platform owns, from the ticket's mappings.
+// What clients receive from the detail endpoints: the plan siblings and the
+// two link sides are collapsed server-side into one `relatedTickets` list. The
+// server also adds the fields that a platform owns, from the ticket's mappings.
 export type TicketDetail = Omit<
   TicketDetailPayload,
-  "watchers" | "linksAsA" | "linksAsB" | "mitigationPlan"
+  "linksAsA" | "linksAsB" | "mitigationPlan"
 > & {
-  isWatching: boolean;
   relatedTickets: RelatedTicketLink[];
   mitigationPlan: { title: string } | null;
   lockedFields: LockedField[];
@@ -392,8 +373,6 @@ export const workOrderListInclude = {
     select: { id: true, displayId: true, severity: true },
   },
   remediations: { select: { id: true, description: true } },
-  // Replaced at the procedure level with a where: { userId } filter.
-  watchers: { select: { userId: true } },
 } satisfies Prisma.WorkOrderTicketInclude;
 
 export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
@@ -466,10 +445,6 @@ export const workOrderLlmDetailSelect = {
   notification: { select: { id: true, title: true } },
   body: true,
   submissionState: true,
-  descriptions: {
-    select: { body: true, department: { select: { name: true } } },
-    orderBy: { department: { name: "asc" as const } },
-  },
   children: {
     where: { ticket: null },
     select: { id: true, summary: true, status: true },
@@ -520,8 +495,8 @@ export const workOrderIntegrationItemSchema = z.object({
   // forms so one un-offset value can't reject the entire batch.
   scheduledAt: z.string().datetime({ offset: true, local: true }).nullish(),
   // Optional ingested-source metadata. When present, a NotificationSource is
-  // attached to the created ticket so it shows a source badge (by channel) and
-  // appears in the Suggested (triage) tab. `raw` holds the upstream record.
+  // attached to the created ticket so it shows a source badge (by channel).
+  // `raw` holds the upstream record.
   source: z
     .object({
       channel: z.enum(SourceChannel),
@@ -606,7 +581,6 @@ export const workOrderListItemSchema = z.object({
   assets: z.array(assetTicketItemSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   remediations: z.array(linkedRemediationSchema),
-  isWatching: z.boolean(),
 });
 
 export const paginatedWorkOrderListResponseSchema =
@@ -773,16 +747,6 @@ export const ticketActivitySchema = z.object({
   user: ticketActivityUserSchema,
 });
 
-const ticketDescriptionSchema = z.object({
-  id: z.string(),
-  ticketId: z.string(),
-  departmentId: z.string(),
-  body: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  department: departmentItemSchema,
-});
-
 export const workOrderDetailResponseSchema = z.object({
   id: z.string(),
   summary: z.string(),
@@ -815,7 +779,6 @@ export const workOrderDetailResponseSchema = z.object({
   mitigationPlanId: z.string().nullable(),
   notificationId: z.string().nullable(),
   departments: z.array(departmentItemSchema),
-  descriptions: z.array(ticketDescriptionSchema),
   assignee: detailAssigneeSchema.nullable(),
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,
@@ -826,7 +789,6 @@ export const workOrderDetailResponseSchema = z.object({
   remediations: z.array(detailLinkedRemediationSchema),
   issues: z.array(ticketIssueSchema),
   comments: z.array(ticketCommentResponseSchema),
-  isWatching: z.boolean(),
   activities: z.array(ticketActivitySchema),
   sourceLinks: z.array(ticketSourceSchema),
   externalMapping: ticketExternalMappingSchema.nullable(),

@@ -168,5 +168,10 @@ export const useSuspenseAsset = (id: string) => {
 // for utilization grid
 export const useAssetUtilization = (assetIds: string[]) => {
   const trpc = useTRPC();
-  return useQuery(trpc.assets.getUtilizationGrid.queryOptions({ assetIds }));
+  return useQuery(
+    trpc.assets.getUtilizationGrid.queryOptions(
+      { assetIds },
+      { enabled: assetIds.length > 0 },
+    ),
+  );
 };

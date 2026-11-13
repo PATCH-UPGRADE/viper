@@ -1,14 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import {
-  ActivityIcon,
-  ActivitySquareIcon,
-  ClockIcon,
-  MonitorIcon,
-  ShieldCheckIcon,
-  UserCheckIcon,
-} from "lucide-react";
+import { ActivityIcon, ClockIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import { DeviceQuestionAccordionItem } from "@/components/device-question-accordion-item";
@@ -33,46 +26,55 @@ type CardAsset = {
   product: { canonicalDisplayName: string; deviceTypeId: string | null } | null;
 };
 
-// TODO: Replace these stub questions with real data
+// Of the stub questions, only the timing one has data behind it. The card
+// also shows the device-guide item "How are these devices typically used in
+// hospitals?", which is built from the linked products, not from this list.
+// The other questions are kept here, commented out, until VIPER can answer
+// them from real data:
+//
+// {
+//   id: "technical",
+//   icon: MonitorIcon,
+//   question: "What technical systems are impacted by this work order?",
+//   answer:
+//     "A summary of the systems, services, and dependencies this work order affects will appear here.",
+// },
+// {
+//   id: "clinical",
+//   icon: ActivitySquareIcon,
+//   question: "How are clinical systems impacted by this work order?",
+//   answer:
+//     "A summary of the clinical impact, including any effect on patient-facing workflows during the change, will appear here.",
+// },
+// {
+//   id: "validation",
+//   icon: ShieldCheckIcon,
+//   question: "What post-completion validation is required?",
+//   answer:
+//     "The checks required to confirm the work is complete and the systems are healthy will appear here.",
+// },
+// {
+//   id: "approval",
+//   icon: UserCheckIcon,
+//   question: "Who do I need approval from to complete this work order?",
+//   answer:
+//     "The roles and stakeholders whose sign-off is required before this work proceeds will appear here.",
+// },
 const buildQuestions = (assetIds: string[]): StubQuestion[] => [
-  {
-    id: "technical",
-    icon: MonitorIcon,
-    question: "What technical systems are impacted by this work order?",
-    answer:
-      "A summary of the systems, services, and dependencies this work order affects will appear here.",
-  },
-  {
-    id: "clinical",
-    icon: ActivitySquareIcon,
-    question: "How are clinical systems impacted by this work order?",
-    answer:
-      "A summary of the clinical impact, including any effect on patient-facing workflows during the change, will appear here.",
-  },
-  {
-    id: "validation",
-    icon: ShieldCheckIcon,
-    question: "What post-completion validation is required?",
-    answer:
-      "The checks required to confirm the work is complete and the systems are healthy will appear here.",
-  },
-  {
-    id: "approval",
-    icon: UserCheckIcon,
-    question: "Who do I need approval from to complete this work order?",
-    answer:
-      "The roles and stakeholders whose sign-off is required before this work proceeds will appear here.",
-  },
   {
     id: "timing",
     icon: ClockIcon,
     question: "What are good times to complete this work order?",
-    answer:
-      assetIds.length > 0 ? (
+    answer: (
+      <div className="space-y-3">
+        <p className="text-muted-foreground">
+          Currently, VIPER surfaces asset utilization data when available to
+          suggest work order completion times to users. VIPER is exploring other
+          data sources to help suggest the best times to users.
+        </p>
         <AssetUtilizationAnswer assetIds={assetIds} />
-      ) : (
-        "Recommended maintenance windows that minimize disruption to the affected services will appear here."
-      ),
+      </div>
+    ),
   },
 ];
 

@@ -1480,8 +1480,8 @@ export const trackingRouter = createTRPCRouter({
                 scheduledAt: scheduled,
                 creator: { connect: { id: creatorId } },
                 // Attach an ingested-source record (created once with the
-                // ticket) so it shows a source badge and lands in the Suggested
-                // tab. Re-syncs take the update path and leave sources alone.
+                // ticket) so it shows a source badge. Re-syncs take the update
+                // path and leave sources alone.
                 ...(source
                   ? {
                       sourceLinks: {

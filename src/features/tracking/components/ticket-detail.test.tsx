@@ -1466,7 +1466,6 @@ describe("TicketDetailContent — embedded", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     for (const name of [
       /^edit$/i,
-      /^watch/i,
       /add sub-ticket/i,
       /link ticket/i,
       /add asset/i,

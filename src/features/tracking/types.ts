@@ -495,8 +495,8 @@ export const workOrderIntegrationItemSchema = z.object({
   // forms so one un-offset value can't reject the entire batch.
   scheduledAt: z.string().datetime({ offset: true, local: true }).nullish(),
   // Optional ingested-source metadata. When present, a NotificationSource is
-  // attached to the created ticket so it shows a source badge (by channel) and
-  // appears in the Suggested (triage) tab. `raw` holds the upstream record.
+  // attached to the created ticket so it shows a source badge (by channel).
+  // `raw` holds the upstream record.
   source: z
     .object({
       channel: z.enum(SourceChannel),

@@ -306,6 +306,11 @@ export async function applyDecisions(
     skipped: 0,
   };
 
+  // A record that a work order was extracted from links what it names, but it
+  // does not write the fields of a vulnerability, a remediation or an asset. A
+  // ticket reports work on a device, and is not a source for what those are.
+  const editsRecords = !owner.workOrderTicketId;
+
   const rejectedDeviceGroupMatchingIds = new Set(
     (
       await prisma.sourceRecordDeviceGroupMapping.findMany({
@@ -546,20 +551,23 @@ export async function applyDecisions(
           summary.skipped++;
           continue;
         }
+        const updates = decision.op === "update" && editsRecords;
         const data = cleanFields(decision.fields);
-        if (decision.op === "update" && data.description) {
+        if (updates && data.description) {
           await tx.vulnerability.update({
             where: { id: decision.targetId },
             data: { description: data.description },
           });
         }
-        pendingCvss.push({
-          vulnerabilityId: decision.targetId,
-          sourceRecordId: owner.sourceRecordId,
-          cvssScore: data.cvssScore,
-          cvssVector: data.cvssVector,
-        });
-        if (decision.op === "update") summary.updated++;
+        if (editsRecords) {
+          pendingCvss.push({
+            vulnerabilityId: decision.targetId,
+            sourceRecordId: owner.sourceRecordId,
+            cvssScore: data.cvssScore,
+            cvssVector: data.cvssVector,
+          });
+        }
+        if (updates) summary.updated++;
         else summary.linked++;
       } else if (decision.kind === "remediation") {
         if (
@@ -584,7 +592,7 @@ export async function applyDecisions(
           },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
-        if (decision.op === "update") {
+        if (decision.op === "update" && editsRecords) {
           const data = cleanFields(decision.fields);
           const targetId = decision.targetId;
           const entry = decision.extractedIndex
@@ -636,7 +644,7 @@ export async function applyDecisions(
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
         const data = cleanFields(decision.fields);
-        if (data.macAddress || data.serialNumber) {
+        if (editsRecords && (data.macAddress || data.serialNumber)) {
           await enrichAssetIdentifiers(decision.targetId, {
             macAddress: data.macAddress,
             serialNumber: data.serialNumber,

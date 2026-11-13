@@ -14,7 +14,10 @@ const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
       updateMany: vi.fn(),
       createMany: vi.fn(),
     },
-    vulnerability: { findUnique: vi.fn().mockResolvedValue(null) },
+    vulnerability: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      update: vi.fn(),
+    },
     deviceGroupMatching: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -543,6 +546,99 @@ describe("applyDecision - remediation impact", () => {
     expect(
       mockPrisma.sourceRecordRemediationMapping.upsert,
     ).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDecisions — a record extracted into a work order", () => {
+  const owner = { sourceRecordId: "src-1", workOrderTicketId: "wo-1" };
+
+  it("links a vulnerability but leaves its fields and CVSS alone", async () => {
+    mockPrisma.sourceRecordVulnerabilityMapping.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    const summary = await applyDecisions(
+      owner,
+      [
+        {
+          kind: "vulnerability",
+          op: "update",
+          targetId: "vuln-1",
+          confidence: "Matched",
+          reasonWhy: "same CVE",
+          fields: {
+            description: "A new description",
+            cvssScore: 8.2,
+            cvssVector: "CVSS:3.1/AV:N",
+          },
+        },
+      ],
+      {
+        ...candidates,
+        vulnerabilities: [
+          {
+            extracted: { cveId: "CVE-2026-0001" },
+            matches: [
+              {
+                id: "vuln-1",
+                displayId: "CVE-2026-0001",
+                description: null,
+                cvssScore: null,
+                cvssVector: null,
+              },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(summary).toMatchObject({ linked: 1, updated: 0 });
+    expect(
+      mockPrisma.sourceRecordVulnerabilityMapping.updateMany,
+    ).toHaveBeenCalled();
+    expect(mockPrisma.vulnerability.update).not.toHaveBeenCalled();
+    expect(recordInboxCvss).not.toHaveBeenCalled();
+  });
+
+  it("links a remediation but leaves its description and impact alone", async () => {
+    const summary = await applyDecisions(
+      owner,
+      [
+        {
+          kind: "remediation",
+          op: "update",
+          targetId: "rem-1",
+          extractedIndex: 1,
+          confidence: "Matched",
+          reasonWhy: "same update",
+          fields: { description: "A new description" },
+        },
+      ],
+      {
+        ...candidates,
+        remediations: [
+          {
+            extracted: {
+              description: "Bedside monitor software update",
+              impact: { requiresDowntime: true, impacts: [] },
+            },
+            matches: [
+              {
+                id: "rem-1",
+                linkedCveIds: [],
+                description: "update",
+                statedImpactFields: [],
+              },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(summary).toMatchObject({ linked: 1, updated: 0 });
+    expect(mockPrisma.sourceRecordRemediationMapping.upsert).toHaveBeenCalled();
+    expect(mockPrisma.remediation.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
   });
 });

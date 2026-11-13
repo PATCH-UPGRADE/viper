@@ -596,8 +596,6 @@ async function createWorkOrderTicket(
       parentId,
       creatorId: userId,
       assigneeId: userId,
-      // Creator + assignee auto-watch (both are `userId` here, so one row).
-      watchers: { create: [{ userId }] },
       // Stamp lastCommentAt for commented tickets, and the user's last-seen
       // before/after it to drive a realistic read/unread mix.
       lastCommentAt: ticket.comments?.length ? COMMENTED_AT : null,

@@ -32,22 +32,14 @@ const {
   mockOnSearchChange,
   mockRouterPush,
   mockUseRouter,
-  mockSetWatchingMutate,
-  mockUseSetWatching,
 } = vi.hoisted(() => {
   const mockSetParams = vi.fn();
   const mockOnSearchChange = vi.fn();
   const mockRouterPush = vi.fn();
-  const mockSetWatchingMutate = vi.fn();
   return {
     mockSetParams,
     mockOnSearchChange,
     mockRouterPush,
-    mockSetWatchingMutate,
-    mockUseSetWatching: vi.fn(() => ({
-      mutate: mockSetWatchingMutate,
-      isPending: false,
-    })),
     mockUseTrackingParams: vi.fn(() => [
       {
         search: "",
@@ -90,7 +82,6 @@ vi.mock("../hooks/use-tracking-params", () => ({
 
 vi.mock("../hooks/use-tracking", () => ({
   useSuspenseTrackingTickets: mockUseSuspenseTrackingTickets,
-  useSetWatching: mockUseSetWatching,
 }));
 
 vi.mock("@/hooks/use-entity-search", () => ({
@@ -222,7 +213,6 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
     remediations: 0,
     assets: 0,
   },
-  isWatching: false,
   hasUnreadComments: false,
   ...overrides,
 });
@@ -317,66 +307,6 @@ describe("TrackingList", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/tracking/parent-1");
   });
 
-  it("renders a 'not watching' indicator by default", () => {
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [sampleTicket({ isWatching: false })],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-    expect(
-      screen.getByLabelText(/not watching — click to watch/i),
-    ).toBeInTheDocument();
-  });
-
-  it("renders a 'watching' indicator when the user watches the ticket", () => {
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [sampleTicket({ isWatching: true })],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-    expect(
-      screen.getByLabelText(/watching — click to unwatch/i),
-    ).toBeInTheDocument();
-  });
-
-  it("toggles watch state when the indicator is clicked", async () => {
-    const user = userEvent.setup();
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [sampleTicket({ id: "ticket-1", isWatching: false })],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-    await user.click(screen.getByLabelText(/not watching — click to watch/i));
-
-    expect(mockSetWatchingMutate).toHaveBeenCalledWith({
-      ticketId: "ticket-1",
-      watching: true,
-    });
-    // Clicking the indicator must not navigate to the ticket.
-    expect(mockRouterPush).not.toHaveBeenCalled();
-  });
-
   it("shows a plain Comments cell when there are no unread comments", () => {
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
@@ -452,51 +382,6 @@ describe("TrackingList", () => {
     expect(screen.getByText("First child")).toBeInTheDocument();
     expect(screen.getByText("Middle child")).toBeInTheDocument();
     expect(screen.getByText("Last child")).toBeInTheDocument();
-  });
-
-  it("renders an independent watch indicator per row (parent and children)", async () => {
-    const user = userEvent.setup();
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [
-          sampleTicket({
-            id: "parent-1",
-            summary: "Parent ticket",
-            isWatching: true,
-            children: [
-              sampleTicket({
-                id: "child-1",
-                summary: "Child ticket",
-                isWatching: false,
-              }),
-            ],
-          }),
-        ],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-
-    // Parent (watching) is shown before expansion.
-    expect(
-      screen.getByLabelText(/watching — click to unwatch/i),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByLabelText(/expand nested data/i));
-
-    // After expanding, the child's own (not-watching) indicator appears
-    // independently of the parent's.
-    expect(
-      screen.getByLabelText(/watching — click to unwatch/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/not watching — click to watch/i),
-    ).toBeInTheDocument();
   });
 
   it("renders the parent comments cell as 'X (Y)' when child comments add to the total", () => {

@@ -43,14 +43,10 @@ export const SuggestedWorkOrdersCard = () => {
           <div className="flex items-center gap-2">
             <PriorityBadge priority={ticket.priority} />
             <StatusChip status={ticket.status} />
-            {ticket.isWatching && (
-              <span className="text-xs text-muted-foreground">· Watching</span>
-            )}
           </div>
           <p className="text-sm font-semibold">{ticket.summary}</p>
           <OverviewCardMeta
             parts={[
-              ticket.isWatching ? "You watch this" : null,
               scheduleLabel(ticket),
               ticket.assignee?.name ?? null,
               `${ticket.assetCount} ${ticket.assetCount === 1 ? "asset" : "assets"}`,

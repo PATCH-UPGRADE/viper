@@ -26,10 +26,6 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     ticketComment: {
       create: vi.fn(),
     },
-    ticketWatch: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-    },
     ticketSeen: {
       upsert: vi.fn(),
     },
@@ -162,7 +158,6 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   remediations: [],
   issues: [],
   comments: [],
-  watchers: [],
   activities: [],
   sourceLinks: [],
   externalMapping: null,
@@ -1107,182 +1102,9 @@ describe("trackingRouter.list", () => {
     await expect(caller.list(baseInput)).rejects.toThrow();
     expect(mockPrisma.workOrderTicket.findMany).not.toHaveBeenCalled();
   });
-
-  it("passes the watchers include filtered by the current user", async () => {
-    const caller = setup();
-    emptyResults();
-
-    await caller.list(baseInput);
-
-    const findManyArg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
-    expect(findManyArg.include.watchers).toEqual({
-      where: { userId: FAKE_USER_ID },
-      select: { userId: true },
-    });
-  });
-
-  it("flattens watchers into an isWatching field per item", async () => {
-    const caller = setup();
-    const baseItem = {
-      summary: "x",
-      status: "TO_DO",
-      category: "PATCH",
-      scheduledAt: null,
-      scheduledEndTime: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      parentId: null,
-      creatorId: "c1",
-      assigneeId: null,
-      sourceLabel: null,
-      departments: [],
-      assignee: null,
-      assets: [
-        {
-          asset: {
-            id: "a1",
-            hostname: null,
-            ip: null,
-            serialNumber: "63014",
-            role: "Computed Tomography (CT)",
-          },
-        },
-      ],
-      vulnerabilities: [],
-      advisories: [],
-      remediations: [],
-    };
-    mockPrisma.workOrderTicket.count.mockResolvedValue(2);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "t-watched", ...baseItem, watchers: [{ userId: FAKE_USER_ID }] },
-      { id: "t-unwatched", ...baseItem, watchers: [] },
-    ]);
-
-    const result = await caller.list(baseInput);
-
-    expect(result.items).toEqual([
-      expect.objectContaining({ id: "t-watched", isWatching: true }),
-      expect.objectContaining({ id: "t-unwatched", isWatching: false }),
-    ]);
-    // Raw `watchers` should not leak into the response.
-    expect(result.items[0]).not.toHaveProperty("watchers");
-  });
-});
-
-describe("trackingRouter.getOne", () => {
-  it("scopes watchers to the current user when fetching a ticket", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(makeTicketDetail());
-
-    await caller.getOne({ id: "t1" });
-
-    const arg = mockPrisma.workOrderTicket.findUnique.mock.calls[0][0];
-    expect(arg.include.watchers).toEqual({
-      where: { userId: FAKE_USER_ID },
-      select: { userId: true },
-    });
-    expect(arg.include.children.where).toEqual({ ticket: null });
-  });
-
-  it("collapses watchers into an isWatching boolean", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeTicketDetail({ watchers: [{ userId: FAKE_USER_ID }] }),
-    );
-
-    const result = await caller.getOne({ id: "t1" });
-
-    expect(result.isWatching).toBe(true);
-    expect(result).not.toHaveProperty("watchers");
-  });
 });
 
 describe("trackingRouter.getMany", () => {
-  it("scopes watchers to the current user on both parents and children", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.count.mockResolvedValue(0);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-
-    await caller.getMany({
-      page: 1,
-      pageSize: 5,
-      search: "",
-      sort: "",
-      lastUpdatedStartTime: "",
-      lastUpdatedEndTime: "",
-    });
-
-    const include =
-      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].include;
-    expect(include.watchers).toEqual({
-      where: { userId: FAKE_USER_ID },
-      select: { userId: true },
-    });
-    expect(include.seenBy).toEqual({
-      where: { userId: FAKE_USER_ID },
-      select: { seenAt: true },
-    });
-    expect(include.children.include.watchers).toEqual({
-      where: { userId: FAKE_USER_ID },
-      select: { userId: true },
-    });
-    expect(include.children.include.seenBy).toEqual({
-      where: { userId: FAKE_USER_ID },
-      select: { seenAt: true },
-    });
-    expect(include.children.where).toMatchObject({
-      isDraft: false,
-      ticket: null,
-    });
-  });
-
-  it("collapses watchers into isWatching on parents and children", async () => {
-    const caller = setup();
-    const baseTicket = {
-      _count: {
-        comments: 0,
-        issues: 0,
-        vulnerabilities: 0,
-        remediations: 0,
-        advisories: 0,
-        assets: 0,
-      },
-      vulnerabilities: [],
-      assets: [],
-      children: [],
-      watchers: [],
-      seenBy: [],
-      lastCommentAt: null,
-    };
-    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      {
-        id: "t1",
-        ...baseTicket,
-        watchers: [{ userId: FAKE_USER_ID }],
-        children: [{ id: "c1", ...baseTicket, watchers: [] }],
-      },
-    ]);
-
-    const result = await caller.getMany({
-      page: 1,
-      pageSize: 5,
-      search: "",
-      sort: "",
-      lastUpdatedStartTime: "",
-      lastUpdatedEndTime: "",
-    });
-
-    expect(result.items[0]).toMatchObject({ id: "t1", isWatching: true });
-    expect(result.items[0]).not.toHaveProperty("watchers");
-    expect(result.items[0]).not.toHaveProperty("seenBy");
-    expect(result.items[0].children[0]).toMatchObject({
-      id: "c1",
-      isWatching: false,
-    });
-    expect(result.items[0].children[0]).not.toHaveProperty("watchers");
-  });
-
   it("flags unread comments when the latest comment is newer than seenAt", async () => {
     const caller = setup();
     const base = {
@@ -1297,7 +1119,6 @@ describe("trackingRouter.getMany", () => {
       vulnerabilities: [],
       assets: [],
       children: [],
-      watchers: [],
     };
     mockPrisma.workOrderTicket.count.mockResolvedValue(2);
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
@@ -1748,50 +1569,6 @@ describe("trackingRouter.markSeen", () => {
 
     await expect(caller.markSeen({ ticketId: "t1" })).rejects.toThrow();
     expect(mockPrisma.ticketSeen.upsert).not.toHaveBeenCalled();
-  });
-});
-
-describe("trackingRouter.setWatching", () => {
-  it("upserts a TicketWatch row when watching is true", async () => {
-    const caller = setup();
-    mockPrisma.ticketWatch.upsert.mockResolvedValue({});
-
-    await caller.setWatching({ ticketId: "t1", watching: true });
-
-    expect(mockPrisma.ticketWatch.upsert).toHaveBeenCalledTimes(1);
-    const arg = mockPrisma.ticketWatch.upsert.mock.calls[0][0];
-    expect(arg.where).toEqual({
-      userId_ticketId: { userId: FAKE_USER_ID, ticketId: "t1" },
-    });
-    expect(arg.create).toMatchObject({
-      userId: FAKE_USER_ID,
-      ticketId: "t1",
-    });
-    expect(mockPrisma.ticketWatch.deleteMany).not.toHaveBeenCalled();
-  });
-
-  it("deletes the TicketWatch row when watching is false", async () => {
-    const caller = setup();
-    mockPrisma.ticketWatch.deleteMany.mockResolvedValue({ count: 1 });
-
-    await caller.setWatching({ ticketId: "t1", watching: false });
-
-    expect(mockPrisma.ticketWatch.deleteMany).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.ticketWatch.deleteMany.mock.calls[0][0]).toEqual({
-      where: { userId: FAKE_USER_ID, ticketId: "t1" },
-    });
-    expect(mockPrisma.ticketWatch.upsert).not.toHaveBeenCalled();
-  });
-
-  it("throws UNAUTHORIZED when not authenticated", async () => {
-    mockGetSession.mockResolvedValue(null);
-    // biome-ignore lint/suspicious/noExplicitAny: stub req
-    const caller = createCaller({ req: {} as any });
-
-    await expect(
-      caller.setWatching({ ticketId: "t1", watching: true }),
-    ).rejects.toThrow();
-    expect(mockPrisma.ticketWatch.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -2425,15 +2202,6 @@ describe("activity writes", () => {
         to: { id: "u2", name: "Bob" },
       },
     });
-
-    // The new assignee is auto-added as a watcher.
-    expect(mockPrisma.ticketWatch.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_ticketId: { userId: "u2", ticketId: "t1" },
-        },
-      }),
-    );
   });
 
   it("records department add/remove diffs", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeIcon, EyeOffIcon, PencilIcon, SlashIcon } from "lucide-react";
+import { PencilIcon, SlashIcon } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { Suspense, useEffect, useState } from "react";
 import {
@@ -24,7 +24,6 @@ import { CategoryColorProvider } from "@/features/tag-colors/context";
 import { cn } from "@/lib/utils";
 import {
   useMarkTicketSeen,
-  useSetWatching,
   useSuspenseTrackingTicket,
 } from "../../hooks/use-tracking";
 import { TicketActivityTimeline } from "./activity-timeline";
@@ -71,7 +70,6 @@ const TicketDetailBody = ({
 }) => {
   const { data } = useSuspenseTrackingTicket(id);
   const [isEditing, setIsEditing] = useState(false);
-  const setWatching = useSetWatching();
   const { mutate: markSeen } = useMarkTicketSeen();
   // Inside the dashboard's modal the tab stays local, so it can't overwrite
   // the dashboard's own ?tab= in the URL.
@@ -139,30 +137,6 @@ const TicketDetailBody = ({
             </h1>
             {!isEditing && !embedded && (
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={
-                    data.isWatching
-                      ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-950/60"
-                      : undefined
-                  }
-                  disabled={setWatching.isPending}
-                  aria-pressed={data.isWatching}
-                  onClick={() =>
-                    setWatching.mutate({
-                      ticketId: id,
-                      watching: !data.isWatching,
-                    })
-                  }
-                >
-                  {data.isWatching ? (
-                    <EyeIcon className="size-3.5" />
-                  ) : (
-                    <EyeOffIcon className="size-3.5" />
-                  )}
-                  {data.isWatching ? "Watching" : "Watch"}
-                </Button>
                 <Button
                   size="sm"
                   variant="outline"

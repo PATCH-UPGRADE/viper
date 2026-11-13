@@ -57,7 +57,6 @@ LINKED ENTITIES:
 - Prefer a linked CVE id or device name in the title over one read out of the prose; the linked form is the one the platform knows.
 
 UPSERT DECISION:
-- The EXISTING NOTIFICATIONS section lists the notifications that share a linked entity with this email. When nothing was linked, it lists every notification instead.
 - Return action "update" only when this email is clearly a follow-up or amendment to one of the provided existing notifications (same CVE IDs, same recall number, same product + version, explicit reference to a prior advisory)
 - Return action "create" for anything new or ambiguous
 - When action is "update", set notificationId to the id of the matching existing notification and set reasonWhy to a concise explanation of why this email was matched to that notification`;
@@ -79,13 +78,12 @@ export type ClassifyContext = {
 };
 
 /**
- * What the record links, and the notifications the email can update.
+ * What the record links, and every notification, newest first, as the ones
+ * the email can update.
  *
- * The candidates are the notifications whose records share a linked
- * vulnerability or device group, so the list does not grow with the database.
- * A record that links nothing has no such list, so it gets every notification,
- * newest first: a recall number or a plain reference to an earlier advisory
- * can still name one.
+ * The list is not narrowed to the notifications that share a link. Two emails
+ * about one recall can link different things, or nothing at all, and the
+ * earlier notification must still be in front of the model.
  */
 export async function classifyContext(
   sourceId: string,
@@ -96,7 +94,6 @@ export async function classifyContext(
       vulnerabilities: {
         where: notRejected,
         select: {
-          vulnerabilityId: true,
           confidence: true,
           vulnerability: { select: { displayId: true } },
         },
@@ -104,7 +101,6 @@ export async function classifyContext(
       deviceGroupMatchings: {
         where: notRejected,
         select: {
-          deviceGroupMatchingId: true,
           confidence: true,
           deviceGroupMatching: matchingLabelsInclude,
         },
@@ -112,42 +108,7 @@ export async function classifyContext(
     },
   });
 
-  const vulnerabilityIds = record.vulnerabilities.map((m) => m.vulnerabilityId);
-  const matchingIds = record.deviceGroupMatchings.map(
-    (m) => m.deviceGroupMatchingId,
-  );
-  const sharesALink =
-    vulnerabilityIds.length + matchingIds.length > 0
-      ? {
-          sourceLinks: {
-            some: {
-              sourceRecord: {
-                OR: [
-                  {
-                    vulnerabilities: {
-                      some: {
-                        vulnerabilityId: { in: vulnerabilityIds },
-                        ...notRejected,
-                      },
-                    },
-                  },
-                  {
-                    deviceGroupMatchings: {
-                      some: {
-                        deviceGroupMatchingId: { in: matchingIds },
-                        ...notRejected,
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-          },
-        }
-      : {};
-
   const existingNotifications = await prisma.notification.findMany({
-    where: sharesALink,
     select: { id: true, type: true, title: true, summary: true },
     orderBy: { createdAt: "desc" },
   });

@@ -17,14 +17,12 @@ const { notRejected } = await import("../types");
 const linkedRecord = {
   vulnerabilities: [
     {
-      vulnerabilityId: "vuln-1",
       confidence: "Matched",
       vulnerability: { displayId: "CVE-2026-0001" },
     },
   ],
   deviceGroupMatchings: [
     {
-      deviceGroupMatchingId: "dgm-1",
       confidence: "Matched",
       deviceGroupMatching: {
         versionRange: null,
@@ -43,52 +41,15 @@ beforeEach(() => {
 });
 
 describe("classifyContext", () => {
-  it("offers only the notifications that share a linked entity", async () => {
+  it("offers every notification, newest first", async () => {
     mockPrisma.sourceRecord.findUniqueOrThrow.mockResolvedValue(linkedRecord);
 
     await classifyContext("src-1");
 
     expect(mockPrisma.notification.findMany).toHaveBeenCalledWith({
-      where: {
-        sourceLinks: {
-          some: {
-            sourceRecord: {
-              OR: [
-                {
-                  vulnerabilities: {
-                    some: {
-                      vulnerabilityId: { in: ["vuln-1"] },
-                      ...notRejected,
-                    },
-                  },
-                },
-                {
-                  deviceGroupMatchings: {
-                    some: {
-                      deviceGroupMatchingId: { in: ["dgm-1"] },
-                      ...notRejected,
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      },
       select: { id: true, type: true, title: true, summary: true },
       orderBy: { createdAt: "desc" },
     });
-  });
-
-  it("offers every notification when the record links nothing", async () => {
-    mockPrisma.sourceRecord.findUniqueOrThrow.mockResolvedValue({
-      vulnerabilities: [],
-      deviceGroupMatchings: [],
-    });
-
-    await classifyContext("src-1");
-
-    expect(mockPrisma.notification.findMany.mock.calls[0][0].where).toEqual({});
   });
 
   it("leaves a rejected link out of the record's mappings", async () => {

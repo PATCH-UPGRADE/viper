@@ -58,7 +58,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     department: {
       findMany: vi.fn(),
     },
-    notificationVulnerabilityMapping: {
+    sourceRecordVulnerabilityMapping: {
       findMany: vi.fn(),
     },
     $queryRaw: vi.fn(),
@@ -118,7 +118,6 @@ vi.mock("@/inngest/client", () => ({
   inngest: { send: mockInngestSend },
 }));
 
-import { notRejected } from "@/features/inbox/types";
 import { createCallerFactory } from "@/trpc/init";
 import { ticketDetailInclude, workOrderListInclude } from "../types";
 import { trackingRouter } from "./routers";
@@ -1605,7 +1604,7 @@ describe("trackingRouter.getManyForLlm", () => {
 
   beforeEach(() => {
     mockPrisma.workOrderTicket.count.mockResolvedValue(1);
-    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([]);
+    mockPrisma.sourceRecordVulnerabilityMapping.findMany.mockResolvedValue([]);
   });
 
   it("excludes drafts, per-asset tickets, sub-tickets, and DONE by default", async () => {
@@ -1659,9 +1658,9 @@ describe("trackingRouter.getManyForLlm", () => {
   it("matches a notification directly, by plan, or by shared vulnerability", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([
-      { vulnerabilityId: "v1" },
-      { vulnerabilityId: "v2" },
+    mockPrisma.sourceRecordVulnerabilityMapping.findMany.mockResolvedValue([
+      { vulnerabilityId: "v1", confidence: "Matched" },
+      { vulnerabilityId: "v2", confidence: null },
     ]);
 
     await caller.getManyForLlm({ notificationId: "n1" });
@@ -1674,10 +1673,10 @@ describe("trackingRouter.getManyForLlm", () => {
       ],
     });
     expect(
-      mockPrisma.notificationVulnerabilityMapping.findMany,
+      mockPrisma.sourceRecordVulnerabilityMapping.findMany,
     ).toHaveBeenCalledWith({
-      where: { notificationId: "n1", ...notRejected },
-      select: { vulnerabilityId: true },
+      where: { sourceRecord: { links: { some: { notificationId: "n1" } } } },
+      select: { vulnerabilityId: true, confidence: true },
     });
   });
 

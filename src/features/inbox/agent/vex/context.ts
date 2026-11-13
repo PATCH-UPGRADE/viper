@@ -16,7 +16,7 @@ import {
   type NoteRow,
   renderNoteTarget,
 } from "@/lib/markdown";
-import { notRejected } from "../../types";
+import { linked } from "../../server/source-links";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 /** A baseline (device-group-matching-level) issue the agent may refine. */
@@ -54,31 +54,41 @@ export async function gatherVexContext(
     where: { id: notificationId },
     include: {
       sourceLinks: {
-        select: { sourceRecord: { select: { markdown: true, channel: true } } },
-      },
-      vulnerabilities: {
-        where: notRejected,
-        include: {
-          vulnerability: {
-            include: {
-              deviceGroupMatchings: {
+        select: {
+          sourceRecord: {
+            select: {
+              markdown: true,
+              channel: true,
+              vulnerabilities: {
                 include: {
-                  manufacturer: { select: { canonicalDisplayName: true } },
-                  product: { select: { canonicalDisplayName: true } },
-                  version: { select: { canonicalDisplayName: true } },
+                  vulnerability: {
+                    include: {
+                      deviceGroupMatchings: {
+                        include: {
+                          manufacturer: {
+                            select: { canonicalDisplayName: true },
+                          },
+                          product: { select: { canonicalDisplayName: true } },
+                          version: { select: { canonicalDisplayName: true } },
+                        },
+                      },
+                      issues: {
+                        where: { deviceGroupMatchingId: { not: null } },
+                      },
+                      records: { select: { metrics: true } },
+                      // TODO: continue testing, may need to include asset-level issues
+                      // here as well
+                    },
+                  },
                 },
               },
-              issues: { where: { deviceGroupMatchingId: { not: null } } },
-              records: { select: { metrics: true } },
-              // TODO: continue testing, may need to include asset-level issues
-              // here as well
+              remediations: {
+                include: {
+                  remediation: true,
+                },
+              },
             },
           },
-        },
-      },
-      remediations: {
-        include: {
-          remediation: true,
         },
       },
     },
@@ -86,12 +96,13 @@ export async function gatherVexContext(
 
   if (!notification) return null;
 
-  const vulnerabilities = notification.vulnerabilities.map(
+  const links = notification.sourceLinks;
+  const vulnerabilities = linked(links, "vulnerabilities").map(
     (m) => m.vulnerability,
   );
   if (vulnerabilities.length === 0) return null;
 
-  const remediations = notification.remediations.map((m) => m.remediation);
+  const remediations = linked(links, "remediations").map((m) => m.remediation);
 
   // All matchings referenced by the linked vulnerabilities.
   // NOTE: An Issue relates a device group matching to a vuln. We only grab

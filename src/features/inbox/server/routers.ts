@@ -30,11 +30,11 @@ import {
 } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
+  deviceGroupMappingInclude,
   fieldCorrectionInclude,
   type MatchingWithLabels,
   notificationDetailInclude,
   notificationInclude,
-  notRejected,
   type ResolvedDeviceGroupAsset,
   readReceiptSelect,
 } from "../types";
@@ -45,6 +45,12 @@ import {
   computeMatchingBuckets,
   type MatchingBucketGroup,
 } from "./affected-assets";
+import {
+  linked,
+  linkedMatchingIdentitySelect,
+  rejectLinkedMapping,
+  stripMappings,
+} from "./source-links";
 
 type MatchingIdentity = {
   manufacturerId: string;
@@ -70,7 +76,7 @@ type AffectedMatchingContext = {
     notesByVuln: Record<string, string>; // issue statusNotes
   }[];
   isNotificationLinked: boolean;
-  // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
+  // ^true if a source record of the notification maps this matching
 };
 
 export const NOTIFICATION_SORT_FIELDS = new Set([
@@ -290,13 +296,12 @@ export const notificationsRouter = createTRPCRouter({
       const items = await Promise.all(
         notifications.map(async (n) => ({
           ...n,
+          sourceLinks: stripMappings(n.sourceLinks),
           deviceGroupsMatchings: await Promise.all(
-            n.deviceGroupsMatchings
-              .filter((m) => m.confidence !== "Rejected")
-              .map(async (m) => ({
-                ...m,
-                assetCount: await resolvedAssetCount(m.deviceGroupMatching),
-              })),
+            linked(n.sourceLinks, "deviceGroupMatchings").map(async (m) => ({
+              ...m,
+              assetCount: await resolvedAssetCount(m.deviceGroupMatching),
+            })),
           ),
         })),
       );
@@ -336,12 +341,15 @@ export const notificationsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      const notifMatchings = notification.deviceGroupsMatchings.filter(
-        (m) => m.confidence !== "Rejected",
+      const notifMatchings = linked(
+        notification.sourceLinks,
+        "deviceGroupMatchings",
       );
-      const vulnIds = notification.vulnerabilities.map(
-        (v) => v.vulnerabilityId,
+      const vulnerabilities = linked(
+        notification.sourceLinks,
+        "vulnerabilities",
       );
+      const vulnIds = vulnerabilities.map((v) => v.vulnerabilityId);
 
       const contexts = await buildMatchingContexts(
         notifMatchings.map((m) => ({
@@ -394,7 +402,9 @@ export const notificationsRouter = createTRPCRouter({
 
       return {
         ...notification,
+        sourceLinks: stripMappings(notification.sourceLinks),
         deviceGroupsMatchings,
+        vulnerabilities,
         affectedAssets,
         fieldCorrections,
         readReceipts,
@@ -415,16 +425,15 @@ export const notificationsRouter = createTRPCRouter({
       const notification = await prisma.notification.findUnique({
         where: { id: notificationId },
         select: {
-          vulnerabilities: {
-            where: notRejected,
-            select: { vulnerabilityId: true },
-          },
-          deviceGroupsMatchings: {
+          sourceLinks: {
             select: {
-              id: true,
-              confidence: true,
-              deviceGroupMatching: {
-                include: { manufacturer: true, product: true, version: true },
+              sourceRecord: {
+                select: {
+                  vulnerabilities: {
+                    select: { vulnerabilityId: true, confidence: true },
+                  },
+                  deviceGroupMatchings: deviceGroupMappingInclude,
+                },
               },
             },
           },
@@ -435,10 +444,11 @@ export const notificationsRouter = createTRPCRouter({
       }
 
       const emptyMeta = buildPaginationMeta(input, 0);
-      const notifMatchings = notification.deviceGroupsMatchings.filter(
-        (m) => m.confidence !== "Rejected",
+      const notifMatchings = linked(
+        notification.sourceLinks,
+        "deviceGroupMatchings",
       );
-      const vulnIds = notification.vulnerabilities.map(
+      const vulnIds = linked(notification.sourceLinks, "vulnerabilities").map(
         (v) => v.vulnerabilityId,
       );
 
@@ -554,26 +564,13 @@ export const notificationsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const notification = await prisma.notification.findUnique({
         where: { id: input.notificationId },
-        select: {
-          deviceGroupsMatchings: {
-            select: {
-              confidence: true,
-              deviceGroupMatching: {
-                select: {
-                  manufacturerId: true,
-                  productId: true,
-                  versionId: true,
-                  versionRange: true,
-                },
-              },
-            },
-          },
-        },
+        select: { sourceLinks: linkedMatchingIdentitySelect },
       });
       if (!notification) throw new TRPCError({ code: "NOT_FOUND" });
-      const matchings = notification.deviceGroupsMatchings
-        .filter((m) => m.confidence !== "Rejected")
-        .map((m) => m.deviceGroupMatching);
+      const matchings = linked(
+        notification.sourceLinks,
+        "deviceGroupMatchings",
+      ).map((m) => m.deviceGroupMatching);
 
       if (matchings.length === 0) {
         return { assets: [], totalAssetCount: 0 };
@@ -612,23 +609,7 @@ export const notificationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const feedback = await prisma.$transaction(async (tx) => {
-        if (input.targetType === "NotificationDeviceGroupMapping") {
-          await tx.notificationDeviceGroupMapping.update({
-            where: {
-              id: input.targetId,
-              notificationId: input.notificationId,
-            },
-            data: { confidence: "Rejected" },
-          });
-        } else if (input.targetType === "NotificationVulnerabilityMapping") {
-          await tx.notificationVulnerabilityMapping.update({
-            where: {
-              id: input.targetId,
-              notificationId: input.notificationId,
-            },
-            data: { confidence: "Rejected" },
-          });
-        }
+        await rejectLinkedMapping(tx, input);
         return await tx.matchFeedback.create({
           data: {
             targetType: input.targetType,

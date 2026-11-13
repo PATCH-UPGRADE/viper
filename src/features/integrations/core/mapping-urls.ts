@@ -11,7 +11,7 @@ import { resolveUpstreamApi, resolveWebUrl } from "./urls";
  * are used by each field explicitly
  * If we did not use DMMF, that would be a problem, we wouldn't know what model
  * we're working with from field name alone. For example, two fields may be called `assets`,
- * but one may refer to `Asset[]`, the other `AssetTicket[]`, or `NotificationAssetMapping[]`
+ * but one may refer to `Asset[]`, the other `AssetTicket[]`, or `SourceRecordAssetMapping[]`
  *
  * For each model, see if we need to update the upstreamApiUrl /webUrl by keying on
  * RESOURCE_BY_MAPPING_MODEL. If we don't get anything (most fields are like this) we

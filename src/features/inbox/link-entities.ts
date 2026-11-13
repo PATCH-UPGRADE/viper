@@ -30,6 +30,10 @@ export const aiExtractAndMatch =
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
       }
       const candidates = await searchCandidates(extracted);
-      return matchAndLinkEntities({ notificationId }, extracted, candidates);
+      return matchAndLinkEntities(
+        { sourceRecordId: ctx.sourceId },
+        extracted,
+        candidates,
+      );
     });
   };

@@ -12,7 +12,7 @@ export async function GET(
   }
 
   const { attachmentId } = await params;
-  const attachment = await prisma.notificationAttachment.findUnique({
+  const attachment = await prisma.sourceRecordAttachment.findUnique({
     where: { id: attachmentId },
     select: { downloadUrl: true, filename: true, contentType: true },
   });

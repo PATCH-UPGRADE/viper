@@ -109,8 +109,8 @@ export async function fetchPdfAttachmentsFromResend(
 export async function fetchPdfAttachments(
   sourceId: string,
 ): Promise<Array<{ filename: string | null; base64: string }>> {
-  const attachments = await prisma.notificationAttachment.findMany({
-    where: { sourceId },
+  const attachments = await prisma.sourceRecordAttachment.findMany({
+    where: { sourceRecordId: sourceId },
     select: { downloadUrl: true, contentType: true, filename: true },
   });
 
@@ -145,7 +145,7 @@ export async function storeAttachmentBuffer(
 ): Promise<StoredAttachment> {
   const { createHash } = await import("node:crypto");
   const hash = createHash("md5").update(buffer).digest("hex");
-  const existing = await prisma.notificationAttachment.findFirst({
+  const existing = await prisma.sourceRecordAttachment.findFirst({
     where: { hash },
     select: { downloadUrl: true },
   });
@@ -204,10 +204,10 @@ export async function enrichVersionUdi(
 }
 
 /**
- * Keep a CVSS score the match step read out of a notification, as an INBOX record on the
- * vulnerability (one per notification). Skipped when a CVSS metric from any source, this
- * notification's own record included, already has the same score and vector (each compared only
- * when the notification gives it), so repeating a known value adds nothing and a re-run is a
+ * Keep a CVSS score the match step read out of a source record, as an INBOX record on the
+ * vulnerability (one per source record). Skipped when a CVSS metric from any source, this
+ * record's own INBOX record included, already has the same score and vector (each compared only
+ * when the source gives it), so repeating a known value adds nothing and a re-run is a
  * no-op. A different score or vector is written, and as the newest CVSS it becomes the one the
  * vulnerability shows.
  *
@@ -216,12 +216,12 @@ export async function enrichVersionUdi(
  */
 export async function recordInboxCvss({
   vulnerabilityId,
-  notificationId,
+  sourceRecordId,
   cvssScore,
   cvssVector,
 }: {
   vulnerabilityId: string;
-  notificationId: string;
+  sourceRecordId: string;
   cvssScore?: number | null;
   cvssVector?: string | null;
 }): Promise<void> {
@@ -239,7 +239,7 @@ export async function recordInboxCvss({
 
   await upsertSourceRecord(vulnerabilityId, {
     source: VulnerabilitySource.INBOX,
-    sourceId: notificationId,
+    sourceId: sourceRecordId,
     metrics: [
       {
         type: cvssMetricType(cvssVector),

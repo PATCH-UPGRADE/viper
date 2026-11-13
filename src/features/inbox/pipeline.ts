@@ -10,8 +10,8 @@ import { generateQuestionForNotification } from "./agent/question";
 import { triageNotification } from "./agent/triage";
 import { persistTriageResult } from "./agent/triage/persist";
 import { sortNotificationVulnerabilities } from "./agent/vex";
+import { notificationVulnerabilityIds } from "./server/source-links";
 import type { KnownNotificationFields } from "./source-adapter";
-import { notRejected } from "./types";
 
 /**
  * The slice of Inngest's `step` this pipeline uses.
@@ -37,7 +37,8 @@ export type LinkEntities = (
    * Every stage here guards on it rather than assuming the classifier ran.
    */
   notificationId: string | null,
-  ctx?: { sourceId: string; attachments?: PdfAttachment[] },
+  /** The record that named the entities. Every link lands on it. */
+  ctx: { sourceId: string; attachments?: PdfAttachment[] },
 ) => Promise<unknown>;
 
 export interface NotificationPipelineInput {
@@ -133,10 +134,8 @@ export async function runNotificationPipeline({
   // triage so priority/hospital-impact reasoning can reflect the results.
   const vexSummary = await step.run("sort-vulnerabilities", async () => {
     if (!notificationId) return { vexSkipped: true as const };
-    const vulnCount = await prisma.notificationVulnerabilityMapping.count({
-      where: { notificationId, ...notRejected },
-    });
-    if (vulnCount === 0) return { vexSkipped: true as const };
+    const vulnIds = await notificationVulnerabilityIds(notificationId);
+    if (vulnIds.length === 0) return { vexSkipped: true as const };
     return sortNotificationVulnerabilities(notificationId);
   });
 

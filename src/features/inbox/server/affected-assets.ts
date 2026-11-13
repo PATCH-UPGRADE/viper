@@ -45,7 +45,7 @@ export type ComputeMatchingBucketsInput = {
   overrides: { assetId: string; statusByVuln: Record<string, IssueStatus> }[];
   /** Total assets the matching resolves to. */
   totalAssetCount: number;
-  /** Whether the matching is linked to the notification via NotificationDeviceGroupMapping. */
+  /** Whether a source record of the notification maps this matching. */
   isNotificationLinked: boolean;
   unknownVersionAssetCount?: number;
 };

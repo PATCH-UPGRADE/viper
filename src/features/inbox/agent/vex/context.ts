@@ -16,7 +16,13 @@ import {
   type NoteRow,
   renderNoteTarget,
 } from "@/lib/markdown";
-import { linked } from "../../server/source-links";
+import {
+  linkedIds,
+  linkedIdsRecordSelect,
+  linkedIdsSelect,
+} from "../../server/source-links";
+import { matchingLabelsInclude } from "../../types";
+import { byIds } from "../../utils";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 /** A baseline (device-group-matching-level) issue the agent may refine. */
@@ -52,42 +58,12 @@ export async function gatherVexContext(
 ): Promise<VexContext | null> {
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
-    include: {
+    select: {
       sourceLinks: {
+        ...linkedIdsSelect,
         select: {
           sourceRecord: {
-            select: {
-              markdown: true,
-              channel: true,
-              vulnerabilities: {
-                include: {
-                  vulnerability: {
-                    include: {
-                      deviceGroupMatchings: {
-                        include: {
-                          manufacturer: {
-                            select: { canonicalDisplayName: true },
-                          },
-                          product: { select: { canonicalDisplayName: true } },
-                          version: { select: { canonicalDisplayName: true } },
-                        },
-                      },
-                      issues: {
-                        where: { deviceGroupMatchingId: { not: null } },
-                      },
-                      records: { select: { metrics: true } },
-                      // TODO: continue testing, may need to include asset-level issues
-                      // here as well
-                    },
-                  },
-                },
-              },
-              remediations: {
-                include: {
-                  remediation: true,
-                },
-              },
-            },
+            select: { markdown: true, channel: true, ...linkedIdsRecordSelect },
           },
         },
       },
@@ -97,12 +73,29 @@ export async function gatherVexContext(
   if (!notification) return null;
 
   const links = notification.sourceLinks;
-  const vulnerabilities = linked(links, "vulnerabilities").map(
-    (m) => m.vulnerability,
-  );
-  if (vulnerabilities.length === 0) return null;
+  const vulnerabilityIds = linkedIds(links, "vulnerabilities");
+  if (vulnerabilityIds.length === 0) return null;
 
-  const remediations = linked(links, "remediations").map((m) => m.remediation);
+  const [vulnerabilities, remediations] = await Promise.all([
+    byIds(vulnerabilityIds, (where) =>
+      prisma.vulnerability.findMany({
+        where,
+        include: {
+          deviceGroupMatchings: matchingLabelsInclude,
+          issues: { where: { deviceGroupMatchingId: { not: null } } },
+          records: { select: { metrics: true } },
+          // TODO: continue testing, may need to include asset-level issues
+          // here as well
+        },
+      }),
+    ),
+    byIds(linkedIds(links, "remediations"), (where) =>
+      prisma.remediation.findMany({
+        where,
+        select: { id: true, description: true, narrative: true },
+      }),
+    ),
+  ]);
 
   // All matchings referenced by the linked vulnerabilities.
   // NOTE: An Issue relates a device group matching to a vuln. We only grab

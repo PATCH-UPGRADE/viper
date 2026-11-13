@@ -33,12 +33,8 @@ const SOURCE_LABEL = "MedISAO";
  */
 export const linkAdvisoryEntities =
   (advisory: MedIsaoAdvisoryItem): LinkEntities =>
-  (step, notificationId, { sourceId }) =>
+  (step, { sourceId }) =>
     step.run("link-channel-entities", async () => {
-      if (!notificationId) {
-        return { linked: 0, updated: 0, created: 0, skipped: 0 };
-      }
-
       const deviceGroupMatchingId = await resolveMatchingId({
         manufacturer: advisory.manufacturer,
         product: advisory.product,

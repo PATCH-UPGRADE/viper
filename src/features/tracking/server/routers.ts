@@ -127,11 +127,7 @@ const createSearchFilter = (
     ? {
         OR: [
           { summary: { contains: search, mode: "insensitive" } },
-          {
-            descriptions: {
-              some: { body: { contains: search, mode: "insensitive" } },
-            },
-          },
+          { body: { contains: search, mode: "insensitive" } },
         ],
       }
     : {};
@@ -657,17 +653,6 @@ export const trackingRouter = createTRPCRouter({
           .array(z.string())
           .optional()
           .describe("Replaces the departments. An empty array clears them."),
-        descriptions: z
-          .array(
-            z.object({
-              departmentId: z.string(),
-              body: z.string().max(10_000),
-            }),
-          )
-          .optional()
-          .describe(
-            "Replaces the per-department descriptions. An entry with an empty body is dropped, and a removed department loses its description.",
-          ),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
         scheduledEndTime: z.coerce
@@ -690,7 +675,7 @@ export const trackingRouter = createTRPCRouter({
     })
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { id, departmentIds, descriptions, ...rest } = input;
+      const { id, departmentIds, ...rest } = input;
 
       const current = await prisma.workOrderTicket.findUnique({
         where: { id },
@@ -717,19 +702,6 @@ export const trackingRouter = createTRPCRouter({
 
         assertTimeRange(before, rest);
 
-        // Compute the post-update department set so we can scope description
-        // writes (and orphan cleanups) to currently-linked departments only.
-        const nextDepartmentIds = new Set(
-          departmentIds ?? before.departments.map((d) => d.id),
-        );
-
-        // Normalize `descriptions`: keep only non-empty bodies for departments
-        // that will still be on the ticket after this update.
-        const nextDescriptions = (descriptions ?? []).filter(
-          (d) =>
-            d.body.trim().length > 0 && nextDepartmentIds.has(d.departmentId),
-        );
-
         await tx.workOrderTicket.update({
           where: { id },
           data: {
@@ -740,66 +712,7 @@ export const trackingRouter = createTRPCRouter({
           },
         });
 
-        // Reconcile per-department descriptions when the caller sent the
-        // field, or when the department set shrank and may have orphaned
-        // descriptions. Either way, the desired state is `nextDescriptions`
-        // plus pre-existing rows for departments not touched in this update.
-        if (descriptions !== undefined || departmentIds !== undefined) {
-          const beforeByDept = new Map(
-            before.descriptions.map((d) => [d.departmentId, d.body]),
-          );
-          const desiredByDept = new Map<string, string>();
-          if (descriptions !== undefined) {
-            for (const d of nextDescriptions) {
-              desiredByDept.set(d.departmentId, d.body);
-            }
-          } else {
-            // departmentIds changed but descriptions wasn't passed: preserve
-            // existing descriptions for departments still on the ticket.
-            for (const [deptId, body] of beforeByDept) {
-              if (nextDepartmentIds.has(deptId)) {
-                desiredByDept.set(deptId, body);
-              }
-            }
-          }
-
-          const toDelete: string[] = [];
-          for (const [deptId] of beforeByDept) {
-            if (!desiredByDept.has(deptId)) toDelete.push(deptId);
-          }
-          if (toDelete.length > 0) {
-            await tx.ticketDescription.deleteMany({
-              where: { ticketId: id, departmentId: { in: toDelete } },
-            });
-          }
-          for (const [deptId, body] of desiredByDept) {
-            if (beforeByDept.get(deptId) === body) continue;
-            await tx.ticketDescription.upsert({
-              where: {
-                ticketId_departmentId: { ticketId: id, departmentId: deptId },
-              },
-              create: { ticketId: id, departmentId: deptId, body },
-              update: { body },
-            });
-          }
-        }
-
-        // Build the canonical descriptions list the activity helper should
-        // diff against (so removed-department descriptions show up as
-        // cleared, even if the caller didn't pass `descriptions`).
-        const descriptionsForActivity =
-          descriptions !== undefined
-            ? nextDescriptions
-            : before.descriptions.filter((d) =>
-                nextDepartmentIds.has(d.departmentId),
-              );
-        await recordUpdateActivities(tx, id, ctx.auth.user.id, before, {
-          ...input,
-          descriptions:
-            descriptions !== undefined || departmentIds !== undefined
-              ? descriptionsForActivity
-              : undefined,
-        });
+        await recordUpdateActivities(tx, id, ctx.auth.user.id, before, input);
         if (rest.status === TicketStatus.DONE) {
           await cascadeDoneStatus(tx, id, ctx.auth.user.id);
         }

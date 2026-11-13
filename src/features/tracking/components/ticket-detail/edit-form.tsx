@@ -1,8 +1,7 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { priorityConfig } from "@/components/priority-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -21,7 +19,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { EditableWorkOrderField } from "@/features/integrations/core/types";
-import { getChipClass } from "@/features/tag-colors/palette";
 import {
   type LockedField,
   lockedFieldMessage,
@@ -51,9 +48,6 @@ type EditState = {
   category: TicketCategory;
   priority: Priority;
   departmentIds: string[];
-  // Keyed by departmentId so a department with no description yet still has a
-  // tab to type into.
-  descriptionsByDept: Record<string, string>;
   assigneeId: string;
   scheduledAt: string;
   scheduledEndTime: string;
@@ -66,9 +60,6 @@ const buildEditState = (data: TicketDetail): EditState => ({
   category: data.category,
   priority: data.priority,
   departmentIds: data.departments.map((d) => d.id),
-  descriptionsByDept: Object.fromEntries(
-    data.descriptions.map((d) => [d.departmentId, d.body]),
-  ),
   assigneeId: data.assignee?.id ?? UNASSIGNED,
   scheduledAt: toDateTimeLocal(data.scheduledAt),
   scheduledEndTime: toDateTimeLocal(data.scheduledEndTime),
@@ -137,13 +128,6 @@ const editStateFingerprint = (state: EditState) =>
     // Department order is incidental — toggling can re-order without semantic
     // change, so normalize before comparing.
     departmentIds: [...state.departmentIds].sort(),
-    // Only the descriptions whose departments are still on the ticket
-    // contribute to the saved state; ignore stragglers from removed depts.
-    descriptionsByDept: Object.fromEntries(
-      [...state.departmentIds]
-        .sort()
-        .map((id) => [id, (state.descriptionsByDept[id] ?? "").trim()]),
-    ),
   });
 
 export const TicketEditForm = ({
@@ -169,41 +153,6 @@ export const TicketEditForm = ({
   const isDirty = editStateFingerprint(form) !== editStateFingerprint(initial);
   useBeforeUnload(isDirty);
 
-  // Departments selected on the ticket — drives the description tabs. Look up
-  // names/colors from either the loaded department list or the original
-  // ticket payload so a tab still has a label even before the departments
-  // query resolves.
-  const departmentLookup = useMemo(() => {
-    const map = new Map<
-      string,
-      { id: string; name: string; color: string | null }
-    >();
-    for (const d of data.departments) map.set(d.id, d);
-    for (const d of departments ?? []) map.set(d.id, d);
-    return map;
-  }, [data.departments, departments]);
-
-  const selectedDepartments = form.departmentIds
-    .map((id) => departmentLookup.get(id))
-    .filter((d): d is { id: string; name: string; color: string | null } =>
-      Boolean(d),
-    );
-
-  // Control the description tabs so removing the active department falls back
-  // to a remaining one — an uncontrolled Tabs keeps the stale removed value and
-  // renders a blank panel.
-  const [activeDeptTab, setActiveDeptTab] = useState(
-    selectedDepartments[0]?.id,
-  );
-  useEffect(() => {
-    if (
-      selectedDepartments.length > 0 &&
-      !selectedDepartments.some((d) => d.id === activeDeptTab)
-    ) {
-      setActiveDeptTab(selectedDepartments[0].id);
-    }
-  }, [selectedDepartments, activeDeptTab]);
-
   const handleCancel = () => {
     if (
       isDirty &&
@@ -217,12 +166,6 @@ export const TicketEditForm = ({
   const handleSubmit = () => {
     const trimmedSummary = form.summary.trim();
     if (!trimmedSummary || endError) return;
-    const descriptions = form.departmentIds
-      .map((id) => ({
-        departmentId: id,
-        body: (form.descriptionsByDept[id] ?? "").trim(),
-      }))
-      .filter((d) => d.body.length > 0);
     // Send a platform-mapped field only when the user changed it. The form
     // rounds times to the minute and trims text, so an untouched value can
     // differ from the stored one and would be pushed to the platform, or
@@ -237,7 +180,6 @@ export const TicketEditForm = ({
         ...(changed("category") && { category: form.category }),
         ...(changed("priority") && { priority: form.priority }),
         departmentIds: form.departmentIds,
-        descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         ...(changed("scheduledAt") && {
           scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
@@ -441,53 +383,6 @@ export const TicketEditForm = ({
               placeholder="General description of this work order"
             />
           </LockedFieldTooltip>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label>Department descriptions</Label>
-          {selectedDepartments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Add a department above to write a department-specific description.
-            </p>
-          ) : (
-            <Tabs value={activeDeptTab} onValueChange={setActiveDeptTab}>
-              <TabsList variant="line">
-                {selectedDepartments.map((d) => (
-                  <TabsTrigger key={d.id} value={d.id}>
-                    <Badge variant="outline" className={getChipClass(d.color)}>
-                      {d.name}
-                    </Badge>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {selectedDepartments.map((d) => {
-                const inputId = `ticket-description-${d.id}`;
-                return (
-                  <TabsContent key={d.id} value={d.id} className="mt-3">
-                    <Label htmlFor={inputId} className="sr-only">
-                      {d.name} description
-                    </Label>
-                    <Textarea
-                      id={inputId}
-                      value={form.descriptionsByDept[d.id] ?? ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          descriptionsByDept: {
-                            ...f.descriptionsByDept,
-                            [d.id]: e.target.value,
-                          },
-                        }))
-                      }
-                      rows={6}
-                      maxLength={10_000}
-                      placeholder={`What does ${d.name} need to know about this ticket?`}
-                    />
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
-          )}
         </div>
       </div>
 

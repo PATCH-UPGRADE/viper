@@ -315,17 +315,6 @@ const makeTicket = (
     status: "TO_DO",
     category: "PATCH",
     departments: [{ id: "d-radio", name: "Radiology", color: "blue" }],
-    descriptions: [
-      {
-        id: "desc-1",
-        ticketId: "ticket-1",
-        departmentId: "d-radio",
-        body: "Initial Radiology description",
-        createdAt: new Date("2026-05-01T00:00:00Z"),
-        updatedAt: new Date("2026-05-01T00:00:00Z"),
-        department: { id: "d-radio", name: "Radiology", color: "blue" },
-      },
-    ],
     assignee: { id: "u1", name: "Alice", email: "alice@example.com" },
     scheduledAt: null,
     createdAt: new Date("2026-05-01T00:00:00Z"),
@@ -416,11 +405,6 @@ describe("TicketEditForm", () => {
     expect((screen.getByLabelText(/summary/i) as HTMLInputElement).value).toBe(
       "Initial summary",
     );
-    // Per-department description tab is labelled by its sr-only Label.
-    expect(
-      (screen.getByLabelText(/radiology description/i) as HTMLTextAreaElement)
-        .value,
-    ).toBe("Initial Radiology description");
     // The selected department appears as a chip inside the multi-select group
     expect(screen.getAllByText("Radiology").length).toBeGreaterThan(0);
   });
@@ -502,7 +486,7 @@ describe("TicketEditForm", () => {
     removeSpy.mockRestore();
   });
 
-  it("submits the edited payload, including multi-dept set and per-dept descriptions", async () => {
+  it("submits the edited payload, including the multi-dept set", async () => {
     const user = userEvent.setup();
     render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
 
@@ -537,11 +521,6 @@ describe("TicketEditForm", () => {
     ]) {
       expect(payload).not.toHaveProperty(field);
     }
-    // Only departments with non-empty bodies are sent. The newly-added Biomed
-    // tab has no body yet, so it should not appear in `descriptions`.
-    expect(payload.descriptions).toEqual([
-      { departmentId: "d-radio", body: "Initial Radiology description" },
-    ]);
   });
 
   describe("scheduled end", () => {
@@ -613,45 +592,6 @@ describe("TicketEditForm", () => {
     });
   });
 
-  it("drops a department's description from the payload when its textarea is cleared", async () => {
-    const user = userEvent.setup();
-    render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
-
-    const desc = screen.getByLabelText(/radiology description/i);
-    await user.clear(desc);
-
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
-
-    const [payload] = mockMutate.mock.calls[0];
-    expect(payload.descriptions).toEqual([]);
-  });
-
-  it("sends a new description for a freshly-added department once typed", async () => {
-    const user = userEvent.setup();
-    render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
-
-    // Add Biomed to the ticket
-    await user.click(screen.getByText(/1 selected/i));
-    await user.click(await screen.findByRole("option", { name: /biomed/i }));
-
-    // Switch to the Biomed tab and write something. The tab trigger contains
-    // a Badge with text "Biomed" — pick the tab role rather than the option
-    // we just clicked.
-    await user.click(screen.getByRole("tab", { name: /biomed/i }));
-    const biomedDesc = screen.getByLabelText(/biomed description/i);
-    await user.type(biomedDesc, "Biomed write-up");
-
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
-
-    const [payload] = mockMutate.mock.calls[0];
-    expect(payload.descriptions).toEqual(
-      expect.arrayContaining([
-        { departmentId: "d-radio", body: "Initial Radiology description" },
-        { departmentId: "d-biomed", body: "Biomed write-up" },
-      ]),
-    );
-  });
-
   it("sends empty departmentIds when all chips are removed", async () => {
     const user = userEvent.setup();
     render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
@@ -706,49 +646,6 @@ describe("TicketEditForm", () => {
 
     const [payload] = mockMutate.mock.calls[0];
     expect(payload.assigneeId).toBe("u2");
-  });
-
-  it("falls back to a remaining description tab when the active department is removed", async () => {
-    const user = userEvent.setup();
-    render(
-      <TicketEditForm
-        data={makeTicket({
-          departments: [
-            { id: "d-radio", name: "Radiology", color: "blue" },
-            { id: "d-it", name: "IT", color: "purple" },
-          ],
-          descriptions: [
-            {
-              id: "desc-radio",
-              ticketId: "ticket-1",
-              departmentId: "d-radio",
-              body: "Radiology body",
-              createdAt: new Date("2026-05-01T00:00:00Z"),
-              updatedAt: new Date("2026-05-01T00:00:00Z"),
-              department: { id: "d-radio", name: "Radiology", color: "blue" },
-            },
-            {
-              id: "desc-it",
-              ticketId: "ticket-1",
-              departmentId: "d-it",
-              body: "IT body",
-              createdAt: new Date("2026-05-01T00:00:00Z"),
-              updatedAt: new Date("2026-05-01T00:00:00Z"),
-              department: { id: "d-it", name: "IT", color: "purple" },
-            },
-          ],
-        })}
-        onCancel={() => {}}
-      />,
-    );
-
-    // Radiology is the active tab, so its textarea is visible.
-    expect(screen.getByDisplayValue("Radiology body")).toBeInTheDocument();
-
-    // Remove the active department; the tab must fall back to IT.
-    await user.click(screen.getByRole("button", { name: /remove radiology/i }));
-
-    expect(screen.getByDisplayValue("IT body")).toBeInTheDocument();
   });
 });
 
@@ -1167,26 +1064,6 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
     { id: "d-radio", name: "Radiology", color: "blue" },
     { id: "d-it", name: "IT", color: "purple" },
   ],
-  descriptions: [
-    {
-      id: "desc-radio",
-      ticketId: "ticket-1",
-      departmentId: "d-radio",
-      body: "Roll out firmware update v3.2 to all ICU units.",
-      createdAt: new Date("2026-05-01T00:00:00Z"),
-      updatedAt: new Date("2026-05-01T00:00:00Z"),
-      department: { id: "d-radio", name: "Radiology", color: "blue" },
-    },
-    {
-      id: "desc-it",
-      ticketId: "ticket-1",
-      departmentId: "d-it",
-      body: "Coordinate network maintenance window with NOC.",
-      createdAt: new Date("2026-05-01T00:00:00Z"),
-      updatedAt: new Date("2026-05-01T00:00:00Z"),
-      department: { id: "d-it", name: "IT", color: "purple" },
-    },
-  ],
   assignee: { id: "u2", name: "Bob", email: "bob@example.com" },
   scheduledAt: new Date("2026-06-15T14:30:00Z"),
   createdAt: new Date("2026-05-01T00:00:00Z"),
@@ -1201,7 +1078,7 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   comments: [],
   creator: { id: "u1", name: "Alice", email: "alice@example.com" },
   sourceLabel: null,
-  body: null,
+  body: "Roll out firmware update v3.2 to all ICU units.",
   priority: "Unsorted",
   parentId: null,
   creatorId: "u1",
@@ -1234,30 +1111,18 @@ const renderDetail = (
 };
 
 describe("TicketDetailContent — view mode", () => {
-  it("renders the summary headline and the active department's description body", () => {
+  it("renders the summary headline and the description body", () => {
     renderDetail();
     expect(
       screen.getByRole("heading", { name: /patch icu monitors/i }),
     ).toBeInTheDocument();
-    // The first tab is active by default and shows the Radiology description.
     expect(
       screen.getByText(/roll out firmware update v3\.2/i),
     ).toBeInTheDocument();
   });
 
-  it("switches description body when another department tab is clicked", async () => {
-    const user = userEvent.setup();
-    renderDetail();
-
-    await user.click(screen.getByRole("tab", { name: /^it$/i }));
-
-    expect(
-      screen.getByText(/coordinate network maintenance window/i),
-    ).toBeInTheDocument();
-  });
-
-  it("renders nothing in the descriptions area when there are no descriptions", () => {
-    renderDetail({ descriptions: [] });
+  it("renders no description card when the ticket has no body", () => {
+    renderDetail({ body: null });
     expect(
       screen.queryByText(/roll out firmware update/i),
     ).not.toBeInTheDocument();
@@ -1272,8 +1137,6 @@ describe("TicketDetailContent — view mode", () => {
 
   it("renders a badge for every linked department", () => {
     renderDetail();
-    // The department names appear in both the metadata grid and the
-    // description-tab strip, so multiple matches are expected.
     expect(screen.getAllByText("Radiology").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IT").length).toBeGreaterThan(0);
   });
@@ -1552,7 +1415,6 @@ describe("TicketDetailContent — embedded", () => {
     const user = userEvent.setup();
     renderDetail(
       {
-        descriptions: [],
         body: "See [the advisory](https://example.test/advisory)",
         children: [
           { id: "child-1", summary: "Patch ICU room 301", status: "TO_DO" },

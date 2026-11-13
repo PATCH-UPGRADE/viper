@@ -174,12 +174,6 @@ export const ticketDetailInclude = {
     select: { id: true, name: true, color: true },
     orderBy: { name: "asc" as const },
   },
-  descriptions: {
-    include: {
-      department: { select: { id: true, name: true, color: true } },
-    },
-    orderBy: { department: { name: "asc" as const } },
-  },
   assignee: {
     select: {
       id: true,
@@ -451,10 +445,6 @@ export const workOrderLlmDetailSelect = {
   notification: { select: { id: true, title: true } },
   body: true,
   submissionState: true,
-  descriptions: {
-    select: { body: true, department: { select: { name: true } } },
-    orderBy: { department: { name: "asc" as const } },
-  },
   children: {
     where: { ticket: null },
     select: { id: true, summary: true, status: true },
@@ -757,16 +747,6 @@ export const ticketActivitySchema = z.object({
   user: ticketActivityUserSchema,
 });
 
-const ticketDescriptionSchema = z.object({
-  id: z.string(),
-  ticketId: z.string(),
-  departmentId: z.string(),
-  body: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  department: departmentItemSchema,
-});
-
 export const workOrderDetailResponseSchema = z.object({
   id: z.string(),
   summary: z.string(),
@@ -799,7 +779,6 @@ export const workOrderDetailResponseSchema = z.object({
   mitigationPlanId: z.string().nullable(),
   notificationId: z.string().nullable(),
   departments: z.array(departmentItemSchema),
-  descriptions: z.array(ticketDescriptionSchema),
   assignee: detailAssigneeSchema.nullable(),
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,

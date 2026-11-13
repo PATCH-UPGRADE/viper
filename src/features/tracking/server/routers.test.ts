@@ -33,10 +33,6 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
       create: vi.fn(),
       createMany: vi.fn(),
     },
-    ticketDescription: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-    },
     asset: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -147,7 +143,6 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   mitigationPlanId: null,
   notificationId: null,
   departments: [],
-  descriptions: [],
   assignee: null,
   creator: { id: FAKE_USER_ID, name: "Test User", email: "test@example.com" },
   parent: null,
@@ -239,7 +234,6 @@ const makeUpdateBefore = (overrides: Record<string, any> = {}): any => ({
   assigneeId: null,
   assignee: null,
   departments: [],
-  descriptions: [],
   ...overrides,
 });
 
@@ -465,121 +459,6 @@ describe("trackingRouter.update", () => {
     const caller = setup();
     await expect(caller.update({ id: "t1", summary: "   " })).rejects.toThrow();
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
-  });
-
-  it("upserts a description for a department that's on the ticket", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeUpdateBefore({
-        departments: [{ id: "d1", name: "Biomed", color: null }],
-      }),
-    );
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
-
-    await caller.update({
-      id: "t1",
-      descriptions: [{ departmentId: "d1", body: "New Biomed write-up" }],
-    });
-
-    expect(mockPrisma.ticketDescription.upsert).toHaveBeenCalledTimes(1);
-    const arg = mockPrisma.ticketDescription.upsert.mock.calls[0][0];
-    expect(arg.where).toEqual({
-      ticketId_departmentId: { ticketId: "t1", departmentId: "d1" },
-    });
-    expect(arg.create).toEqual({
-      ticketId: "t1",
-      departmentId: "d1",
-      body: "New Biomed write-up",
-    });
-    expect(arg.update).toEqual({ body: "New Biomed write-up" });
-  });
-
-  it("ignores descriptions targeting departments not on the ticket", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(makeUpdateBefore());
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
-
-    await caller.update({
-      id: "t1",
-      descriptions: [{ departmentId: "d-not-on-ticket", body: "anything" }],
-    });
-
-    expect(mockPrisma.ticketDescription.upsert).not.toHaveBeenCalled();
-  });
-
-  it("drops a description when its body is empty/whitespace", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeUpdateBefore({
-        departments: [{ id: "d1", name: "Biomed", color: null }],
-        descriptions: [{ departmentId: "d1", body: "Old body" }],
-      }),
-    );
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
-
-    await caller.update({
-      id: "t1",
-      descriptions: [{ departmentId: "d1", body: "   " }],
-    });
-
-    expect(mockPrisma.ticketDescription.deleteMany).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.ticketDescription.deleteMany.mock.calls[0][0]).toEqual({
-      where: { ticketId: "t1", departmentId: { in: ["d1"] } },
-    });
-    expect(mockPrisma.ticketDescription.upsert).not.toHaveBeenCalled();
-  });
-
-  it("removes descriptions for departments dropped from the ticket", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeUpdateBefore({
-        departments: [
-          { id: "d-keep", name: "Keep", color: null },
-          { id: "d-drop", name: "Drop", color: null },
-        ],
-        descriptions: [
-          { departmentId: "d-keep", body: "Keep me" },
-          { departmentId: "d-drop", body: "Bye" },
-        ],
-      }),
-    );
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
-
-    await caller.update({ id: "t1", departmentIds: ["d-keep"] });
-
-    expect(mockPrisma.ticketDescription.deleteMany).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.ticketDescription.deleteMany.mock.calls[0][0]).toEqual({
-      where: { ticketId: "t1", departmentId: { in: ["d-drop"] } },
-    });
-  });
-
-  it("writes a DESCRIPTION_CHANGED activity scoped to the department that changed", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeUpdateBefore({
-        departments: [{ id: "d1", name: "Biomed", color: null }],
-        descriptions: [{ departmentId: "d1", body: "Old body" }],
-      }),
-    );
-    mockPrisma.department.findMany.mockResolvedValueOnce([
-      { id: "d1", name: "Biomed", color: "green" },
-    ]);
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
-
-    await caller.update({
-      id: "t1",
-      descriptions: [{ departmentId: "d1", body: "New body" }],
-    });
-
-    const [arg] = mockPrisma.ticketActivity.createMany.mock.calls[0];
-    expect(arg.data[0]).toMatchObject({
-      type: "DESCRIPTION_CHANGED",
-      data: {
-        department: { id: "d1", name: "Biomed", color: "green" },
-        from: "Old body",
-        to: "New body",
-      },
-    });
   });
 
   it("throws UNAUTHORIZED when not authenticated", async () => {
@@ -1075,7 +954,7 @@ describe("trackingRouter.list", () => {
     expect(result.totalPages).toBe(5);
   });
 
-  it("applies a fuzzy search filter on summary and per-department descriptions", async () => {
+  it("applies a fuzzy search filter on summary and body", async () => {
     const caller = setup();
     emptyResults();
 
@@ -1085,11 +964,7 @@ describe("trackingRouter.list", () => {
     expect(findManyArg.where.AND).toContainEqual({
       OR: [
         { summary: { contains: "ICU", mode: "insensitive" } },
-        {
-          descriptions: {
-            some: { body: { contains: "ICU", mode: "insensitive" } },
-          },
-        },
+        { body: { contains: "ICU", mode: "insensitive" } },
       ],
     });
   });

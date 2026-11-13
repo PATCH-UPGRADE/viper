@@ -37,7 +37,6 @@ const {
   const mockOnSearchChange = vi.fn();
   const mockRouterPush = vi.fn();
   return {
-    mockSetParams,
     mockOnSearchChange,
     mockRouterPush,
     mockUseTrackingParams: vi.fn(() => [

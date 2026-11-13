@@ -471,9 +471,6 @@ async function createWorkOrderTicket(
   userId: string,
   parentId: string | null,
 ) {
-  // Normalize single-dept and multi-dept shapes to one ordered list. The
-  // first entry is the "primary" department, used as the fallback target
-  // for the default `description` field.
   const departmentNames = Array.isArray(ticket.department)
     ? ticket.department
     : [ticket.department];

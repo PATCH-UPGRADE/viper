@@ -136,16 +136,14 @@ const TicketDetailBody = ({
               {data.summary}
             </h1>
             {!isEditing && !embedded && (
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <PencilIcon className="size-3.5" />
-                  Edit
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+              >
+                <PencilIcon className="size-3.5" />
+                Edit
+              </Button>
             )}
           </div>
         </div>

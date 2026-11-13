@@ -72,13 +72,7 @@ const buildQuestions = (assetIds: string[]): StubQuestion[] => [
           suggest work order completion times to users. VIPER is exploring other
           data sources to help suggest the best times to users.
         </p>
-        {assetIds.length > 0 ? (
-          <AssetUtilizationAnswer assetIds={assetIds} />
-        ) : (
-          <p className="text-muted-foreground">
-            No utilization data found for this record.
-          </p>
-        )}
+        <AssetUtilizationAnswer assetIds={assetIds} />
       </div>
     ),
   },

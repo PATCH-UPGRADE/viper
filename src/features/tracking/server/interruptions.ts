@@ -428,7 +428,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     pastReschedules: ticket.rescheduleRequests.filter(
       (r) => r.status !== RescheduleStatus.PENDING,
     ),
-    why: workOrder.body ?? null,
+    why: workOrder.body,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,
       name: getAssetDisplayName(asset),

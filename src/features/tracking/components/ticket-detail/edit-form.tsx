@@ -380,7 +380,7 @@ export const TicketEditForm = ({
               disabled={!!locks.description}
               rows={6}
               maxLength={50_000}
-              placeholder="General description of this work order"
+              placeholder="Description of this work order"
             />
           </LockedFieldTooltip>
         </div>

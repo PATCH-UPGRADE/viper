@@ -272,7 +272,7 @@ const orderTicketPair = (
 
 // getMany rows additionally carry the current user's `seenBy` so we can derive
 // the unread-comments indicator.
-const rowStateFor = (userId: string) =>
+const seenByFor = (userId: string) =>
   ({
     seenBy: { where: { userId }, select: { seenAt: true } },
   }) satisfies Prisma.WorkOrderTicketInclude;
@@ -291,7 +291,7 @@ const hasUnread = (
 // Collapse the per-user `seenBy` array into the boolean the table renders.
 // `lastCommentAt` is passed explicitly so parents can use a value rolled up
 // across their children.
-const withRowFlags = <T extends { seenBy: { seenAt: Date }[] }>(
+const withUnreadFlag = <T extends { seenBy: { seenAt: Date }[] }>(
   row: T,
   lastCommentAt: Date | null,
 ): Omit<T, "seenBy"> & { hasUnreadComments: boolean } => {
@@ -325,16 +325,16 @@ export const trackingRouter = createTRPCRouter({
       const totalCount = await prisma.workOrderTicket.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
-      const rowState = rowStateFor(ctx.auth.user.id);
+      const seenBy = seenByFor(ctx.auth.user.id);
       const tickets = await prisma.workOrderTicket.findMany({
         skip: meta.skip,
         take: meta.take,
         where,
         include: {
           ...ticketBaseInclude,
-          ...rowState,
+          ...seenBy,
           children: {
-            include: { ...ticketBaseInclude, ...rowState },
+            include: { ...ticketBaseInclude, ...seenBy },
             // Asset sub-tickets are listed on the parent's Linked Assets tab.
             where: { isDraft: false, ticket: null },
             orderBy: { createdAt: "asc" },
@@ -345,7 +345,7 @@ export const trackingRouter = createTRPCRouter({
 
       const items = tickets.map((t) => {
         const children = t.children.map((c) =>
-          withRowFlags(
+          withUnreadFlag(
             {
               ...c,
               linkedCount: ticketLinkedCount(c._count),
@@ -385,7 +385,7 @@ export const trackingRouter = createTRPCRouter({
           ? new Date(Math.max(...commentTimes.map((d) => d.getTime())))
           : null;
 
-        return withRowFlags(
+        return withUnreadFlag(
           {
             ...t,
             children,

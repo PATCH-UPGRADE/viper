@@ -406,7 +406,7 @@ describe("TicketEditForm", () => {
       "Initial summary",
     );
     // The selected department appears as a chip inside the multi-select group
-    expect(screen.getAllByText("Radiology").length).toBeGreaterThan(0);
+    expect(screen.getByText("Radiology")).toBeInTheDocument();
   });
 
   it("calls onCancel directly when the form is clean", async () => {
@@ -1123,6 +1123,7 @@ describe("TicketDetailContent — view mode", () => {
 
   it("renders no description card when the ticket has no body", () => {
     renderDetail({ body: null });
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
     expect(
       screen.queryByText(/roll out firmware update/i),
     ).not.toBeInTheDocument();
@@ -1137,8 +1138,8 @@ describe("TicketDetailContent — view mode", () => {
 
   it("renders a badge for every linked department", () => {
     renderDetail();
-    expect(screen.getAllByText("Radiology").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("IT").length).toBeGreaterThan(0);
+    expect(screen.getByText("Radiology")).toBeInTheDocument();
+    expect(screen.getByText("IT")).toBeInTheDocument();
   });
 
   it("renders a parent breadcrumb link when the ticket has a parent", () => {

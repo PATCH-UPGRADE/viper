@@ -12,7 +12,6 @@ type SampleTicket = {
   description?: string;
   status: TicketStatus;
   category: TicketCategory;
-  // Single department or an ordered list.
   department: string | string[];
   // When set, the seed creates a linked NotificationSource on this channel
   // (the ticket renders as ingested). Omitted ⇒ manually created.
@@ -481,11 +480,6 @@ async function createWorkOrderTicket(
   const departments = await prisma.department.findMany({
     where: { name: { in: departmentNames } },
   });
-  // Preserve the seed-declared order.
-  const departmentsByName = new Map(departments.map((d) => [d.name, d]));
-  const orderedDepartments = departmentNames
-    .map((n) => departmentsByName.get(n))
-    .filter((d): d is (typeof departments)[number] => Boolean(d));
 
   const linkedVulns = ticket.linkedCveIds?.length
     ? await prisma.vulnerability.findMany({
@@ -554,7 +548,7 @@ async function createWorkOrderTicket(
           }
         : undefined,
       departments: {
-        connect: orderedDepartments.map((d) => ({ id: d.id })),
+        connect: departments.map((d) => ({ id: d.id })),
       },
       parentId,
       creatorId: userId,

@@ -796,54 +796,6 @@ describe("trackingRouter.update — Done cascade", () => {
   });
 });
 
-describe("trackingRouter.getMany — my-department tab", () => {
-  const emptyResults = () => {
-    mockPrisma.workOrderTicket.count.mockResolvedValue(0);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-  };
-
-  it("filters tickets by the user's department via m2m `some`", async () => {
-    const caller = setup();
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
-    emptyResults();
-
-    await caller.getMany({
-      tab: "my-department",
-      page: 1,
-      pageSize: 5,
-      search: "",
-      sort: "",
-      lastUpdatedStartTime: "",
-      lastUpdatedEndTime: "",
-    });
-
-    const where = mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where;
-    // AND[0] parentId, AND[1] isDraft filter, AND[2] tab filter, AND[3] search
-    expect(where.AND[2]).toEqual({
-      departments: { some: { id: "dept-A" } },
-    });
-  });
-
-  it("returns a no-match filter when the user has no department", async () => {
-    const caller = setup();
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: null });
-    emptyResults();
-
-    await caller.getMany({
-      tab: "my-department",
-      page: 1,
-      pageSize: 5,
-      search: "",
-      sort: "",
-      lastUpdatedStartTime: "",
-      lastUpdatedEndTime: "",
-    });
-
-    const where = mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where;
-    expect(where.AND[2]).toEqual({ id: "__no_department__" });
-  });
-});
-
 describe("trackingRouter.getOne", () => {
   it("returns the ticket when found", async () => {
     const caller = setup();
@@ -1252,7 +1204,6 @@ describe("trackingRouter.getMany", () => {
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
 
     await caller.getMany({
-      tab: "suggested",
       page: 1,
       pageSize: 5,
       search: "",
@@ -1314,7 +1265,6 @@ describe("trackingRouter.getMany", () => {
     ]);
 
     const result = await caller.getMany({
-      tab: "suggested",
       page: 1,
       pageSize: 5,
       search: "",
@@ -1366,7 +1316,6 @@ describe("trackingRouter.getMany", () => {
     ]);
 
     const result = await caller.getMany({
-      tab: "suggested",
       page: 1,
       pageSize: 5,
       search: "",
@@ -1848,7 +1797,6 @@ describe("trackingRouter.setWatching", () => {
 
 describe("trackingRouter sort param", () => {
   const baseGetManyInput = {
-    tab: "suggested" as const,
     page: 1,
     pageSize: 5,
     search: "",

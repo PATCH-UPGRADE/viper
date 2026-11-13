@@ -27,7 +27,6 @@ beforeAll(() => {
 
 const {
   mockUseTrackingParams,
-  mockSetParams,
   mockUseSuspenseTrackingTickets,
   mockUseEntitySearch,
   mockOnSearchChange,
@@ -51,7 +50,6 @@ const {
     })),
     mockUseTrackingParams: vi.fn(() => [
       {
-        tab: "suggested",
         search: "",
         page: 1,
         pageSize: 5,
@@ -123,7 +121,6 @@ import {
   TrackingList,
   TrackingLoading,
   TrackingSearch,
-  TrackingTabsNav,
 } from "./tracking";
 
 beforeEach(() => {
@@ -165,51 +162,6 @@ describe("TrackingContainer", () => {
       screen.getByRole("heading", { name: /work orders/i }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("child")).toHaveTextContent("payload");
-  });
-});
-
-describe("TrackingTabsNav", () => {
-  it("renders all four tabs", () => {
-    render(<TrackingTabsNav />);
-    expect(screen.getByRole("tab", { name: /suggested/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("tab", { name: /my department/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("tab", { name: /requires approval/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /^all$/i })).toBeInTheDocument();
-  });
-
-  it("marks the active tab from URL state", () => {
-    mockUseTrackingParams.mockReturnValueOnce([
-      {
-        tab: "requires-approval",
-        search: "",
-        page: 1,
-        pageSize: 5,
-        sort: "",
-        lastUpdatedStartTime: "",
-        lastUpdatedEndTime: "",
-      },
-      mockSetParams,
-    ]);
-
-    render(<TrackingTabsNav />);
-    const tab = screen.getByRole("tab", { name: /requires approval/i });
-    expect(tab).toHaveAttribute("data-state", "active");
-  });
-
-  it("calls setParams with the picked tab and resets page to 1", async () => {
-    const user = userEvent.setup();
-    render(<TrackingTabsNav />);
-
-    await user.click(screen.getByRole("tab", { name: /my department/i }));
-
-    expect(mockSetParams).toHaveBeenCalledWith({
-      tab: "my-department",
-      page: 1,
-    });
   });
 });
 

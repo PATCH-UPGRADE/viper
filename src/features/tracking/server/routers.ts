@@ -42,7 +42,6 @@ import {
   protectedProcedure,
 } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import { TRACKING_TABS } from "../params";
 import {
   dedupeOtherAssetWorkOrders,
   integrationWorkOrderInputSchema,
@@ -120,10 +119,6 @@ async function assertNoTicketCycle(
     ancestorId = requireExistence(ancestor, "Parent ticket").parentId;
   }
 }
-
-const trackingInputSchema = paginationInputSchema.extend({
-  tab: z.enum(TRACKING_TABS).default("suggested"),
-});
 
 const createSearchFilter = (
   search: string,
@@ -348,44 +343,14 @@ const RESCHEDULE_STATUS = {
 
 export const trackingRouter = createTRPCRouter({
   getMany: protectedProcedure
-    .input(trackingInputSchema)
+    .input(paginationInputSchema)
     .query(async ({ input, ctx }) => {
-      const { search, tab } = input;
-
-      // Build the parent-row filter and a separate "child match" filter that
-      // determines which children are returned inside each parent's expander.
-      let parentTabWhere: Prisma.WorkOrderTicketWhereInput = {};
-      let childTabWhere: Prisma.WorkOrderTicketWhereInput = { ticket: null };
-
-      if (tab === "requires-approval") {
-        const status = TicketStatus.REQUIRES_APPROVAL;
-        childTabWhere = { ...childTabWhere, status };
-        parentTabWhere = {
-          OR: [{ status }, { children: { some: { status } } }],
-        };
-      } else if (tab === "suggested") {
-        // "Suggested" surfaces auto-ingested tickets — those with a source
-        // artifact (email/integration) rather than a user creating it by hand.
-        const ingested = { sourceLinks: { some: {} } };
-        childTabWhere = { ...childTabWhere, ...ingested };
-        parentTabWhere = {
-          OR: [ingested, { children: { some: ingested } }],
-        };
-      } else if (tab === "my-department") {
-        const me = await prisma.user.findUnique({
-          where: { id: ctx.auth.user.id },
-          select: { departmentId: true },
-        });
-        parentTabWhere = me?.departmentId
-          ? { departments: { some: { id: me.departmentId } } }
-          : { id: "__no_department__" };
-      }
+      const { search } = input;
 
       const where: Prisma.WorkOrderTicketWhereInput = {
         AND: [
           { parentId: null },
           { isDraft: false },
-          parentTabWhere,
           createSearchFilter(search),
         ],
       };
@@ -403,7 +368,8 @@ export const trackingRouter = createTRPCRouter({
           ...rowState,
           children: {
             include: { ...ticketBaseInclude, ...rowState },
-            where: { isDraft: false, ...childTabWhere },
+            // Asset sub-tickets are listed on the parent's Linked Assets tab.
+            where: { isDraft: false, ticket: null },
             orderBy: { createdAt: "asc" },
           },
         },

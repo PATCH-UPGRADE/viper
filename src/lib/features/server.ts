@@ -33,7 +33,7 @@ export function getFeatures(): Features {
   if (!cached) {
     const features = resolveFeatures(getFeatureList());
     const on = FEATURE_KEYS.filter((key) => features[key]);
-    console.info(`[features] ${getDeploymentName()}: ${on.join(", ")}`);
+    console.info(`[features] ${getDeploymentName()}: ${on.join(", ") || "none"}`);
     cached = features;
   }
   return cached;

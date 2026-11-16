@@ -183,59 +183,6 @@ export const useMarkTicketSeen = () => {
   );
 };
 
-export const useSetWatching = () => {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return useMutation(
-    trpc.tracking.setWatching.mutationOptions({
-      // Optimistically flip the watch state on every cached tracking list that
-      // contains this ticket (top-level or nested) plus its detail view. The
-      // server response lands afterwards, and `onSettled` reconciles on error.
-      onMutate: async ({ ticketId, watching }) => {
-        const listFilter = trpc.tracking.getMany.queryFilter();
-        const detailFilter = trpc.tracking.getOne.queryFilter({ id: ticketId });
-        await Promise.all([
-          queryClient.cancelQueries(listFilter),
-          queryClient.cancelQueries(detailFilter),
-        ]);
-        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape varies
-        queryClient.setQueriesData<any>(listFilter, (old: any) => {
-          if (!old?.items) return old;
-          const flip = (row: { id: string }) =>
-            row.id === ticketId ? { ...row, isWatching: watching } : row;
-          return {
-            ...old,
-            items: old.items.map(
-              // biome-ignore lint/suspicious/noExplicitAny: nested row shape
-              (item: any) => {
-                const flipped = flip(item);
-                if (!item.children) return flipped;
-                return {
-                  ...flipped,
-                  children: item.children.map(flip),
-                };
-              },
-            ),
-          };
-        });
-        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape varies
-        queryClient.setQueriesData<any>(detailFilter, (old: any) =>
-          old ? { ...old, isWatching: watching } : old,
-        );
-      },
-      onError: (error) => {
-        toast.error(`Failed to update watch state: ${error.message}`);
-      },
-      onSettled: (_data, _error, { ticketId }) => {
-        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
-        queryClient.invalidateQueries(
-          trpc.tracking.getOne.queryFilter({ id: ticketId }),
-        );
-      },
-    }),
-  );
-};
-
 export const useAttachableChildren = (parentId: string) => {
   const trpc = useTRPC();
   return useQuery(

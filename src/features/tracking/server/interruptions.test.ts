@@ -50,7 +50,6 @@ describe("interruptions scope", () => {
     seenBy: [],
     departments: [],
     assets: [],
-    descriptions: [],
     rescheduleRequests: [],
     ...overrides,
   });

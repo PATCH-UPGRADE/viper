@@ -4,8 +4,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import {
   BoxIcon,
-  EyeIcon,
-  EyeOffIcon,
   type LucideIcon,
   MailIcon,
   MessageSquareIcon,
@@ -20,7 +18,6 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { type SourceChannel, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-import { useSetWatching } from "../hooks/use-tracking";
 import type { TrackingTicketChildRow } from "../types";
 import {
   CategoryChip,
@@ -48,44 +45,6 @@ const formatShortDate = (date: Date | string | null | undefined) => {
 };
 
 const COMPLETED_STATUSES: TicketStatus[] = [TicketStatus.DONE];
-
-const WatchToggle = ({
-  ticketId,
-  isWatching,
-}: {
-  ticketId: string;
-  isWatching: boolean;
-}) => {
-  const setWatching = useSetWatching();
-  const label = isWatching
-    ? "Watching — click to unwatch"
-    : "Not watching — click to watch";
-  const Icon = isWatching ? EyeIcon : EyeOffIcon;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          aria-pressed={isWatching}
-          disabled={setWatching.isPending}
-          onClick={(e) => {
-            // Don't let the click bubble up and open/navigate the row.
-            e.stopPropagation();
-            setWatching.mutate({ ticketId, watching: !isWatching });
-          }}
-          className={cn(
-            "shrink-0 rounded-sm p-0.5 transition-colors hover:text-foreground",
-            isWatching ? "text-blue-500" : "text-muted-foreground/50",
-          )}
-        >
-          <Icon className="size-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-};
 
 export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
   {
@@ -134,10 +93,6 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
                   </span>
                 );
               })()}
-            <WatchToggle
-              ticketId={row.original.id}
-              isWatching={row.original.isWatching}
-            />
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="truncate font-medium">

@@ -132,6 +132,12 @@ export function UtilizationLegend() {
   );
 }
 
+const NoUtilizationData = () => (
+  <p className="text-sm text-muted-foreground">
+    No utilization data found for this record.
+  </p>
+);
+
 export function UtilizationGridList({
   data,
   isPending,
@@ -163,11 +169,7 @@ export function UtilizationGridList({
   }
 
   if (assetsWithUtilization && assetsWithUtilization.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No utilization data found for this record.
-      </p>
-    );
+    return <NoUtilizationData />;
   }
 
   return (
@@ -191,5 +193,7 @@ export function UtilizationGridList({
 }
 
 export function AssetUtilizationAnswer({ assetIds }: { assetIds: string[] }) {
-  return <UtilizationGridList {...useAssetUtilization(assetIds)} />;
+  const query = useAssetUtilization(assetIds);
+  if (assetIds.length === 0) return <NoUtilizationData />;
+  return <UtilizationGridList {...query} />;
 }

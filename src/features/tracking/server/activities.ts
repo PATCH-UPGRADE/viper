@@ -34,10 +34,7 @@ type BeforeTicket = {
   assigneeId: string | null;
   assignee: AssigneeSnapshot;
   departments: DepartmentSnapshot[];
-  descriptions: { departmentId: string; body: string }[];
 };
-
-export type DescriptionInput = { departmentId: string; body: string };
 
 type UpdateInput = {
   summary?: string;
@@ -46,7 +43,6 @@ type UpdateInput = {
   category?: TicketCategory;
   priority?: Priority;
   departmentIds?: string[];
-  descriptions?: DescriptionInput[];
   assigneeId?: string | null;
   scheduledAt?: Date | null;
   scheduledEndTime?: Date | null;
@@ -75,9 +71,6 @@ export async function snapshotBeforeUpdate(
       departments: {
         select: { id: true, name: true, color: true },
         orderBy: { name: "asc" },
-      },
-      descriptions: {
-        select: { departmentId: true, body: true },
       },
     },
   });
@@ -109,42 +102,8 @@ export async function recordUpdateActivities(
   ) {
     rows.push({
       type: "DESCRIPTION_CHANGED",
-      data: { department: null, from: before.body, to: input.body ?? null },
+      data: { from: before.body, to: input.body ?? null },
     });
-  }
-  if (input.descriptions !== undefined) {
-    const beforeMap = new Map(
-      before.descriptions.map((d) => [d.departmentId, d.body]),
-    );
-    const afterMap = new Map(
-      input.descriptions.map((d) => [d.departmentId, d.body]),
-    );
-    const changedDeptIds = new Set<string>();
-    for (const [deptId, body] of afterMap) {
-      if (beforeMap.get(deptId) !== body) changedDeptIds.add(deptId);
-    }
-    for (const [deptId] of beforeMap) {
-      if (!afterMap.has(deptId)) changedDeptIds.add(deptId);
-    }
-    if (changedDeptIds.size > 0) {
-      const depts = await tx.department.findMany({
-        where: { id: { in: [...changedDeptIds] } },
-        select: { id: true, name: true, color: true },
-      });
-      const deptById = new Map(depts.map((d) => [d.id, d]));
-      for (const deptId of changedDeptIds) {
-        const dept = deptById.get(deptId);
-        if (!dept) continue;
-        rows.push({
-          type: "DESCRIPTION_CHANGED",
-          data: {
-            department: dept,
-            from: beforeMap.get(deptId) ?? null,
-            to: afterMap.get(deptId) ?? null,
-          },
-        });
-      }
-    }
   }
   if (input.status !== undefined && input.status !== before.status) {
     rows.push({

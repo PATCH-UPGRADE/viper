@@ -284,7 +284,6 @@ const workOrderFields = (departmentId: string, id: string) =>
     body: true,
     scheduledAt: true,
     departments: { select: { id: true, name: true } },
-    descriptions: { where: { departmentId }, select: { body: true } },
     // Only this department's readers; other departments' users stay hidden.
     seenBy: {
       where: { user: { departmentId } },
@@ -429,7 +428,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     pastReschedules: ticket.rescheduleRequests.filter(
       (r) => r.status !== RescheduleStatus.PENDING,
     ),
-    why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
+    why: workOrder.body,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,
       name: getAssetDisplayName(asset),

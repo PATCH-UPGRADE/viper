@@ -213,26 +213,13 @@ const renderActivity = (a: Activity): React.ReactNode => {
     case "SUMMARY_CHANGED":
       return "edited the summary";
     case "DESCRIPTION_CHANGED": {
-      const dept = data.department as
-        | { id: string; name: string; color: string | null }
-        | null
-        | undefined;
       const action =
         !data.from && data.to
           ? "added"
           : data.from && !data.to
             ? "removed"
             : "edited";
-      // No department → the general/original description.
-      if (!dept) return <>{action} the description</>;
-      return (
-        <>
-          {action} the description for{" "}
-          <Badge variant="outline" className={getChipClass(dept.color)}>
-            {dept.name}
-          </Badge>
-        </>
-      );
+      return <>{action} the description</>;
     }
     case "CHILD_ATTACHED":
       return (

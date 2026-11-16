@@ -84,17 +84,17 @@ async function prepareRemediationNotification(
           },
         },
       });
-      await tx.notificationVulnerabilityMapping.createMany({
+      await tx.sourceRecordVulnerabilityMapping.createMany({
         data: vulnerabilities.map((v) => ({
-          notificationId: notification.id,
+          sourceRecordId: source.id,
           vulnerabilityId: v.id,
           confidence: "Matched" as const,
           reasonWhy: "Vulnerability declared by the TA4 remediation.",
         })),
       });
-      await tx.notificationRemediationMapping.create({
+      await tx.sourceRecordRemediationMapping.create({
         data: {
-          notificationId: notification.id,
+          sourceRecordId: source.id,
           remediationId,
           confidence: "Matched",
           reasonWhy: "Source remediation for this update.",

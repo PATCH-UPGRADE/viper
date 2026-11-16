@@ -572,7 +572,7 @@ export async function findVulnerabilitiesMatchingDevices(
   return [...vulns.values()];
 }
 
-const matchingIdentitySelect = {
+export const matchingIdentitySelect = {
   id: true,
   manufacturerId: true,
   productId: true,

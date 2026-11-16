@@ -33,7 +33,7 @@ const SOURCE_LABEL = "MedISAO";
  */
 export const linkAdvisoryEntities =
   (advisory: MedIsaoAdvisoryItem): LinkEntities =>
-  (step, notificationId) =>
+  (step, notificationId, { sourceId }) =>
     step.run("link-channel-entities", async () => {
       if (!notificationId) {
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
@@ -50,17 +50,17 @@ export const linkAdvisoryEntities =
         advisory.product ? ` ${advisory.product}` : ""
       } channel.`;
 
-      await prisma.notificationDeviceGroupMapping.upsert({
+      await prisma.sourceRecordDeviceGroupMapping.upsert({
         where: {
-          notificationId_deviceGroupMatchingId: {
-            notificationId,
+          sourceRecordId_deviceGroupMatchingId: {
+            sourceRecordId: sourceId,
             deviceGroupMatchingId,
           },
         },
         // "Matched" and not "Confirmed": confidence records how the link was
         // made, and no human has looked at it.
         create: {
-          notificationId,
+          sourceRecordId: sourceId,
           deviceGroupMatchingId,
           confidence: "Matched",
           reasonWhy,
@@ -75,18 +75,18 @@ export const linkAdvisoryEntities =
 
       if (ids.size > 0) {
         // Keeps a confidence that a human set: only a NeedsReview link is raised to Matched.
-        await prisma.notificationVulnerabilityMapping.createMany({
+        await prisma.sourceRecordVulnerabilityMapping.createMany({
           data: [...ids].map(([name, vulnerabilityId]) => ({
-            notificationId,
+            sourceRecordId: sourceId,
             vulnerabilityId,
             confidence: "Matched" as const,
             reasonWhy: `MedISAO lists ${name} on this advisory.`,
           })),
           skipDuplicates: true,
         });
-        await prisma.notificationVulnerabilityMapping.updateMany({
+        await prisma.sourceRecordVulnerabilityMapping.updateMany({
           where: {
-            notificationId,
+            sourceRecordId: sourceId,
             vulnerabilityId: { in: [...ids.values()] },
             confidence: "NeedsReview",
           },

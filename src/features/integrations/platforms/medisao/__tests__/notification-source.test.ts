@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const prismaMock = {
-  notificationDeviceGroupMapping: { upsert: vi.fn() },
-  notificationVulnerabilityMapping: {
+  sourceRecordDeviceGroupMapping: { upsert: vi.fn() },
+  sourceRecordVulnerabilityMapping: {
     createMany: vi.fn(),
     updateMany: vi.fn(),
   },
@@ -105,12 +105,12 @@ describe("the advisory linker", () => {
     });
   });
 
-  it("links the device group and says why", async () => {
+  it("links the device group to the source record and says why", async () => {
     await link(RAW, "notif-1");
 
-    const [args] = prismaMock.notificationDeviceGroupMapping.upsert.mock.calls;
+    const [args] = prismaMock.sourceRecordDeviceGroupMapping.upsert.mock.calls;
     expect(args[0].create).toMatchObject({
-      notificationId: "notif-1",
+      sourceRecordId: "source-1",
       deviceGroupMatchingId: "matching-1",
       confidence: "Matched",
     });
@@ -120,7 +120,7 @@ describe("the advisory linker", () => {
   it("never claims a human confirmed the link", async () => {
     await link(RAW, "notif-1");
 
-    const [args] = prismaMock.notificationDeviceGroupMapping.upsert.mock.calls;
+    const [args] = prismaMock.sourceRecordDeviceGroupMapping.upsert.mock.calls;
     expect(args[0].create.confidence).not.toBe("Confirmed");
   });
 
@@ -140,7 +140,7 @@ describe("the advisory linker", () => {
       }),
     );
     const [[{ data: links, skipDuplicates }]] =
-      prismaMock.notificationVulnerabilityMapping.createMany.mock.calls;
+      prismaMock.sourceRecordVulnerabilityMapping.createMany.mock.calls;
     expect(skipDuplicates).toBe(true);
     expect(
       links
@@ -158,10 +158,10 @@ describe("the advisory linker", () => {
     await link(RAW, "notif-1");
 
     expect(
-      prismaMock.notificationVulnerabilityMapping.updateMany,
+      prismaMock.sourceRecordVulnerabilityMapping.updateMany,
     ).toHaveBeenCalledWith({
       where: {
-        notificationId: "notif-1",
+        sourceRecordId: "source-1",
         vulnerabilityId: { in: expect.arrayContaining(["vuln-1"]) },
         confidence: "NeedsReview",
       },
@@ -175,10 +175,10 @@ describe("the advisory linker", () => {
       "notif-1",
     );
 
-    expect(prismaMock.notificationDeviceGroupMapping.upsert).toHaveBeenCalled();
+    expect(prismaMock.sourceRecordDeviceGroupMapping.upsert).toHaveBeenCalled();
     expect(createVulnerabilityRecord).not.toHaveBeenCalled();
     expect(
-      prismaMock.notificationVulnerabilityMapping.createMany,
+      prismaMock.sourceRecordVulnerabilityMapping.createMany,
     ).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ linked: 1, created: 0 });
   });
@@ -188,7 +188,7 @@ describe("the advisory linker", () => {
 
     expect(resolveMatchingId).not.toHaveBeenCalled();
     expect(
-      prismaMock.notificationDeviceGroupMapping.upsert,
+      prismaMock.sourceRecordDeviceGroupMapping.upsert,
     ).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ linked: 0, skipped: 0 });
   });

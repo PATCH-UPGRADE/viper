@@ -349,7 +349,7 @@ The affected application does not encrypt passwords properly. This could allow a
 - CVSS v3.1 Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N
 - CWE-261: Weak Encoding for Password`;
 
-  await prisma.sourceRecord.create({
+  const source = await prisma.sourceRecord.create({
     data: {
       channel: SourceChannel.Email,
       tlp: Tlp.WHITE,
@@ -364,9 +364,9 @@ The affected application does not encrypt passwords properly. This could allow a
     },
   });
 
-  await prisma.notificationVulnerabilityMapping.create({
+  await prisma.sourceRecordVulnerabilityMapping.create({
     data: {
-      notificationId: notification.id,
+      sourceRecordId: source.id,
       vulnerabilityId: vulnerability.id,
       confidence: ConfidenceLevel.Confirmed,
       reasonWhy:
@@ -374,9 +374,9 @@ The affected application does not encrypt passwords properly. This could allow a
     },
   });
 
-  await prisma.notificationDeviceGroupMapping.create({
+  await prisma.sourceRecordDeviceGroupMapping.create({
     data: {
-      notificationId: notification.id,
+      sourceRecordId: source.id,
       deviceGroupMatchingId: matching.id,
       confidence: ConfidenceLevel.Confirmed,
       reasonWhy:
@@ -384,9 +384,9 @@ The affected application does not encrypt passwords properly. This could allow a
     },
   });
 
-  await prisma.notificationRemediationMapping.create({
+  await prisma.sourceRecordRemediationMapping.create({
     data: {
-      notificationId: notification.id,
+      sourceRecordId: source.id,
       remediationId: remediation.id,
       confidence: ConfidenceLevel.Confirmed,
       reasonWhy:
@@ -770,7 +770,7 @@ The application deserialises untrusted data without sufficient validations that 
 - If possible, block ports 32912/tcp and 32914/tcp on an external firewall.
 - Product-specific fixes are available; contact your local Siemens Healthineers service representative.`;
 
-  await prisma.sourceRecord.create({
+  const source = await prisma.sourceRecord.create({
     data: {
       channel: SourceChannel.Email,
       tlp: Tlp.WHITE,
@@ -785,9 +785,9 @@ The application deserialises untrusted data without sufficient validations that 
     },
   });
 
-  await prisma.notificationVulnerabilityMapping.create({
+  await prisma.sourceRecordVulnerabilityMapping.create({
     data: {
-      notificationId: notification.id,
+      sourceRecordId: source.id,
       vulnerabilityId: vulnerability.id,
       confidence: ConfidenceLevel.Confirmed,
       reasonWhy:
@@ -797,9 +797,9 @@ The application deserialises untrusted data without sufficient validations that 
 
   await Promise.all(
     matchings.map((matching) =>
-      prisma.notificationDeviceGroupMapping.create({
+      prisma.sourceRecordDeviceGroupMapping.create({
         data: {
-          notificationId: notification.id,
+          sourceRecordId: source.id,
           deviceGroupMatchingId: matching.id,
           confidence: ConfidenceLevel.Confirmed,
           reasonWhy:
@@ -865,26 +865,37 @@ async function seedQuestion() {
   for (const { product, audience, expect } of QUESTION_CASES) {
     const canonicalName = product.trim().toLowerCase();
 
-    const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
+    const row = await prisma.sourceRecordDeviceGroupMapping.findFirst({
       where: {
-        notificationId: { not: null },
+        sourceRecord: { links: { some: { notificationId: { not: null } } } },
         deviceGroupMatching: { product: { canonicalName } },
       },
-
       select: {
-        notificationId: true,
         deviceGroupMatchingId: true,
-        notification: { select: { title: true } },
+        sourceRecord: {
+          select: {
+            links: {
+              where: { notificationId: { not: null } },
+              select: {
+                notificationId: true,
+                notification: { select: { title: true } },
+              },
+              take: 1,
+            },
+          },
+        },
       },
     });
+    const link = row?.sourceRecord.links[0];
+    const notificationId = link?.notificationId;
 
-    if (!mapping?.notificationId) {
+    if (!row || !notificationId) {
       console.log(`No notification mapping found for ${product}`);
       continue;
     }
 
     const issue = await prisma.issue.findFirst({
-      where: { deviceGroupMatchingId: mapping?.deviceGroupMatchingId },
+      where: { deviceGroupMatchingId: row.deviceGroupMatchingId },
       select: { id: true },
     });
 
@@ -897,7 +908,7 @@ async function seedQuestion() {
       data: {
         issueId: issue.id,
         audience,
-        notificationId: mapping.notificationId,
+        notificationId,
         title: `Which ${product} version is running on our units?`,
         reasonWhy: `The advisory lists affected ${product} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
         suggestedAnswers: [
@@ -912,7 +923,7 @@ async function seedQuestion() {
       data: {
         issueId: issue.id,
         audience,
-        notificationId: mapping.notificationId,
+        notificationId,
         title: `Are the ${product} units reachable from the clinical VLAN?`,
         reasonWhy: `Exposure depends on segmentation, which the advisory cannot tell us.`,
         status: "UNSURE",

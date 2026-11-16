@@ -25,10 +25,10 @@ beforeEach(() => {
 });
 
 describe("recordInboxCvss", () => {
-  it("keeps the score as an INBOX record keyed by the notification", async () => {
+  it("keeps the score as an INBOX record keyed by the source record", async () => {
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
-      notificationId: "notif-1",
+      sourceRecordId: "src-1",
       cvssScore: 9.1,
       cvssVector:
         "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N",
@@ -36,7 +36,7 @@ describe("recordInboxCvss", () => {
 
     expect(upsertSourceRecord).toHaveBeenCalledWith("vuln-1", {
       source: "INBOX",
-      sourceId: "notif-1",
+      sourceId: "src-1",
       metrics: [
         {
           type: "CVSS_V4_0",
@@ -51,7 +51,7 @@ describe("recordInboxCvss", () => {
   it("assumes CVSS 3.1 for a score with no vector", async () => {
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
-      notificationId: "notif-1",
+      sourceRecordId: "src-1",
       cvssScore: 7.5,
     });
 
@@ -66,7 +66,7 @@ describe("recordInboxCvss", () => {
   it("writes nothing without a score or a vector", async () => {
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
-      notificationId: "notif-1",
+      sourceRecordId: "src-1",
       cvssScore: null,
     });
 
@@ -79,7 +79,7 @@ describe("recordInboxCvss", () => {
 
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
-      notificationId: "notif-1",
+      sourceRecordId: "src-1",
       cvssScore: 8.1,
       cvssVector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
     });
@@ -100,7 +100,7 @@ describe("recordInboxCvss", () => {
 
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
-      notificationId: "notif-1",
+      sourceRecordId: "src-1",
       cvssScore: 8.1,
     });
 
@@ -120,7 +120,7 @@ describe("recordInboxCvss", () => {
 
     await recordInboxCvss({
       vulnerabilityId: "vuln-1",
-      notificationId: "notif-1",
+      sourceRecordId: "src-1",
       cvssScore: 7.5,
     });
 
@@ -128,7 +128,7 @@ describe("recordInboxCvss", () => {
       "vuln-1",
       expect.objectContaining({
         source: "INBOX",
-        sourceId: "notif-1",
+        sourceId: "src-1",
         metrics: [{ type: "CVSS_V3_1", score: 7.5, vector: null }],
       }),
     );

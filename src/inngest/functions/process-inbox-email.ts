@@ -145,7 +145,7 @@ export const processInboxEmail = inngest.createFunction(
             const { createHash } = await import("node:crypto");
             const hashHex = createHash("md5").update(buffer).digest("hex");
 
-            const existing = await prisma.notificationAttachment.findFirst({
+            const existing = await prisma.sourceRecordAttachment.findFirst({
               where: { hash: hashHex },
               select: { downloadUrl: true },
             });
@@ -180,11 +180,11 @@ export const processInboxEmail = inngest.createFunction(
       },
     );
 
-    // 5. Persist NotificationSource + NotificationAttachment
+    // 5. Persist SourceRecord + SourceRecordAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
-      // await prisma.notificationSource.deleteMany({
-      //  where: { externalId: emailId },
+      // await prisma.sourceRecord.deleteMany({
+      //  where: { channel: "Email", externalId: emailId },
       // });
 
       try {
@@ -229,7 +229,8 @@ export const processInboxEmail = inngest.createFunction(
     if (!sourceId) return { skipped: true, reason: "duplicate", emailId };
 
     // 6w. Work-order path: extract fields, create the ticket linked to this
-    // email source, then tag matched device groups onto the ticket.
+    // email source, then link what the email names to the source record and
+    // tag its device groups onto the ticket.
     if (kind === "work_order") {
       const wo = await step.run("extract-work-order", () =>
         extractWorkOrder(
@@ -275,9 +276,9 @@ export const processInboxEmail = inngest.createFunction(
               departments: {
                 connect: departmentIds.map((id) => ({ id })),
               },
-              // Links the email NotificationSource to this ticket (sets its
-              // workOrderTicketId; notificationId stays null).
-              //sources: { connect: { id: sourceId } },
+              sourceLinks: {
+                create: { sourceRecordId: sourceId, sourceType: "Source" },
+              },
             },
           });
           return ticket.id;
@@ -304,7 +305,7 @@ export const processInboxEmail = inngest.createFunction(
           }
           const candidates = await searchCandidates(extracted);
           return matchAndLinkEntities(
-            { workOrderTicketId },
+            { sourceRecordId: sourceId, workOrderTicketId },
             extracted,
             candidates,
           );

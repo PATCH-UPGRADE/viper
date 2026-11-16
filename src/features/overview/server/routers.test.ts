@@ -35,6 +35,7 @@ const OWNED = {
 
 /** Matching that resolves to OWNED: same manufacturer + product, no version pin. */
 const ownedMatching = {
+  deviceGroupMatchingId: "dgm-owned",
   confidence: "Matched",
   deviceGroupMatching: {
     manufacturerId: "mfr-1",
@@ -46,6 +47,7 @@ const ownedMatching = {
 
 /** Matching for a manufacturer that owns nothing in the inventory. */
 const unownedMatching = {
+  deviceGroupMatchingId: "dgm-unowned",
   confidence: "Matched",
   deviceGroupMatching: {
     manufacturerId: "mfr-absent",
@@ -67,7 +69,7 @@ const notification = (
   type,
   priority: "High",
   createdAt: new Date(),
-  deviceGroupsMatchings: matchings,
+  sourceLinks: [{ sourceRecord: { deviceGroupMatchings: matchings } }],
 });
 
 describe("overview.recentUpdates", () => {

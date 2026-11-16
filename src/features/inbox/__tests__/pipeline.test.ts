@@ -7,7 +7,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     notification: { create: vi.fn(), update: vi.fn() },
     sourceRecord: { update: vi.fn() },
-    notificationVulnerabilityMapping: { count: vi.fn() },
+    sourceRecordVulnerabilityMapping: { findMany: vi.fn() },
     $transaction: vi.fn(async (fn) => fn(mockPrisma)),
   },
 }));
@@ -69,7 +69,7 @@ beforeEach(() => {
   });
   mockPrisma.notification.create.mockResolvedValue({ id: "notif-1" });
   mockPrisma.notification.update.mockResolvedValue({ id: "notif-1" });
-  mockPrisma.notificationVulnerabilityMapping.count.mockResolvedValue(0);
+  mockPrisma.sourceRecordVulnerabilityMapping.findMany.mockResolvedValue([]);
   mockTriage.mockResolvedValue({
     priority: "Monitor",
     priorityReasonWhy: "why",

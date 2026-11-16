@@ -1,7 +1,10 @@
 import "server-only";
 import { RECENT_UPDATES_WINDOW_MS } from "@/config/constants";
 import {
-  ConfidenceLevel,
+  linked,
+  linkedMatchingIdentitySelect,
+} from "@/features/inbox/server/source-links";
+import {
   NotificationType,
   TicketActivityType,
   type TicketStatus,
@@ -167,31 +170,19 @@ export const overviewRouter = createTRPCRouter({
         priority: true,
         createdAt: true,
         updatedAt: true,
-        deviceGroupsMatchings: {
-          select: {
-            confidence: true,
-            deviceGroupMatching: {
-              select: {
-                manufacturerId: true,
-                productId: true,
-                versionId: true,
-                versionRange: true,
-              },
-            },
-          },
-        },
+        sourceLinks: linkedMatchingIdentitySelect,
       },
       orderBy: ORDER_BY_URGENCY,
       take: OVERVIEW_LIMIT,
     });
 
     return Promise.all(
-      notifications.map(async ({ deviceGroupsMatchings, ...notification }) => ({
+      notifications.map(async ({ sourceLinks, ...notification }) => ({
         ...notification,
         assetCount: await notificationAssetCount(
-          deviceGroupsMatchings
-            .filter((m) => m.confidence !== ConfidenceLevel.Rejected)
-            .map((m) => m.deviceGroupMatching),
+          linked(sourceLinks, "deviceGroupMatchings").map(
+            (m) => m.deviceGroupMatching,
+          ),
         ),
       })),
     );
@@ -251,19 +242,7 @@ export const overviewRouter = createTRPCRouter({
             type: true,
             priority: true,
             createdAt: true,
-            deviceGroupsMatchings: {
-              select: {
-                confidence: true,
-                deviceGroupMatching: {
-                  select: {
-                    manufacturerId: true,
-                    productId: true,
-                    versionId: true,
-                    versionRange: true,
-                  },
-                },
-              },
-            },
+            sourceLinks: linkedMatchingIdentitySelect,
           },
           orderBy: [
             { priority: "asc" as const },
@@ -306,12 +285,12 @@ export const overviewRouter = createTRPCRouter({
       ]);
 
     const withAssets = notifications
-      .map(({ deviceGroupsMatchings, ...notification }) => ({
+      .map(({ sourceLinks, ...notification }) => ({
         ...notification,
         assetCount: inventoryAssetCount(
-          deviceGroupsMatchings
-            .filter((m) => m.confidence !== ConfidenceLevel.Rejected)
-            .map((m) => m.deviceGroupMatching),
+          linked(sourceLinks, "deviceGroupMatchings").map(
+            (m) => m.deviceGroupMatching,
+          ),
           inventory,
         ),
       }))

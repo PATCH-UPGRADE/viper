@@ -18,7 +18,7 @@ const {
       deleteMany: vi.fn(),
     },
     workOrderTicket: { deleteMany: vi.fn() },
-    notificationVulnerabilityMapping: { count: vi.fn() },
+    sourceRecordVulnerabilityMapping: { findMany: vi.fn() },
     vulnerability: { findMany: vi.fn() },
     remediation: { findMany: vi.fn() },
     deviceGroupMatching: { findMany: vi.fn() },
@@ -91,7 +91,9 @@ const createdWorkOrder = () => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.mitigationPlan.count.mockResolvedValue(0);
-  mockPrisma.notificationVulnerabilityMapping.count.mockResolvedValue(1);
+  mockPrisma.sourceRecordVulnerabilityMapping.findMany.mockResolvedValue([
+    { vulnerabilityId: "vuln-1", confidence: "Matched" },
+  ]);
   mockPrisma.mitigationPlan.deleteMany.mockResolvedValue({ count: 0 });
   mockPrisma.vulnerability.findMany.mockResolvedValue([]);
   mockPrisma.remediation.findMany.mockResolvedValue([]);
@@ -212,7 +214,7 @@ describe("persistMitigationPlans targeting", () => {
   );
 
   it("deletes unaccepted plans when no vulnerability link is left", async () => {
-    mockPrisma.notificationVulnerabilityMapping.count.mockResolvedValue(0);
+    mockPrisma.sourceRecordVulnerabilityMapping.findMany.mockResolvedValue([]);
 
     const result = await persistMitigationPlans("src-1", "notif-1");
 

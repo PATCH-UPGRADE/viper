@@ -16,7 +16,7 @@ const SOURCE_LABEL = `${SIEMENS_HEALTHINEERS.canonicalDisplayName} teamplay Flee
 
 export const linkAdvisoryVulnerabilities =
   (advisory: FleetAdvisoryItem): LinkEntities =>
-  (step, notificationId) =>
+  (step, notificationId, { sourceId }) =>
     step.run("link-advisory-vulnerabilities", async () => {
       const cveIds = [
         ...new Set(
@@ -33,9 +33,9 @@ export const linkAdvisoryVulnerabilities =
       const label =
         advisory.raw.advisoryId ?? `advisory ${advisory.externalId}`;
 
-      await prisma.notificationVulnerabilityMapping.createMany({
+      await prisma.sourceRecordVulnerabilityMapping.createMany({
         data: known.map((vulnerability) => ({
-          notificationId,
+          sourceRecordId: sourceId,
           vulnerabilityId: vulnerability.id,
           confidence: "Matched" as const,
           reasonWhy:
@@ -43,9 +43,9 @@ export const linkAdvisoryVulnerabilities =
         })),
         skipDuplicates: true,
       });
-      await prisma.notificationVulnerabilityMapping.updateMany({
+      await prisma.sourceRecordVulnerabilityMapping.updateMany({
         where: {
-          notificationId,
+          sourceRecordId: sourceId,
           vulnerabilityId: { in: known.map((v) => v.id) },
           confidence: "NeedsReview",
         },

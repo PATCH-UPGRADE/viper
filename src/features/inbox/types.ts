@@ -10,23 +10,58 @@ import {
 } from "@/generated/prisma";
 
 // `confidence` is nullable, and `{ not: "Rejected" }` alone also drops NULL rows.
+// Reads across a notification go through `linked` (server/source-links.ts)
+// instead. This is for a query scoped to one record, or a write that must
+// leave a rejected row alone.
 export const notRejected = {
   OR: [{ confidence: null }, { confidence: { not: "Rejected" } }],
-} satisfies Prisma.NotificationVulnerabilityMappingWhereInput;
+} satisfies Prisma.SourceRecordVulnerabilityMappingWhereInput;
 
-export const notificationInclude = {
-  deviceGroupsMatchings: {
-    include: {
-      deviceGroupMatching: {
-        include: {
-          manufacturer: true,
-          product: true,
-          version: true,
-        },
-      },
+/**
+ * The mapping relations a source record carries, each with the column that
+ * names its target. A notification collapses them across its records with
+ * `linked` (server/source-links.ts) and sends the collapsed lists, so the
+ * API drops them from each link.
+ */
+export const SOURCE_RECORD_MAPPING_KEYS = {
+  deviceGroupMatchings: "deviceGroupMatchingId",
+  vulnerabilities: "vulnerabilityId",
+  remediations: "remediationId",
+  assets: "assetId",
+} as const;
+
+export type SourceRecordMappingKind = keyof typeof SOURCE_RECORD_MAPPING_KEYS;
+
+/** A source link whose record carries no mapping rows. */
+export type WithoutMappings<L> = L extends { sourceRecord: infer S }
+  ? Omit<L, "sourceRecord"> & { sourceRecord: Omit<S, SourceRecordMappingKind> }
+  : L;
+
+const canonicalLabel = { select: { canonicalDisplayName: true } };
+
+// A matching with only the display names it resolves to, for a prompt or a
+// label. The UI payloads load the full vendor rows through
+// `deviceGroupMappingInclude` instead.
+export const matchingLabelsInclude = {
+  include: {
+    manufacturer: canonicalLabel,
+    product: canonicalLabel,
+    version: canonicalLabel,
+  },
+} satisfies Prisma.DeviceGroupMatchingDefaultArgs;
+
+// A device group mapping with the labels its matching resolves to.
+export const deviceGroupMappingInclude = {
+  include: {
+    deviceGroupMatching: {
+      include: { manufacturer: true, product: true, version: true },
     },
   },
+} satisfies Prisma.SourceRecord$deviceGroupMatchingsArgs;
+
+export const notificationInclude = {
   sourceLinks: {
+    orderBy: { createdAt: "asc" },
     select: {
       sourceRecord: {
         select: {
@@ -38,6 +73,7 @@ export const notificationInclude = {
           // An integration source has no sender to show, so the row it came
           // from supplies the name instead.
           mapping: externalMappingSelect,
+          deviceGroupMatchings: deviceGroupMappingInclude,
         },
       },
     },
@@ -51,11 +87,17 @@ type NotificationBasePayload = Prisma.NotificationGetPayload<{
   include: typeof notificationInclude;
 }>;
 
+type NotificationSourceRecord =
+  NotificationBasePayload["sourceLinks"][number]["sourceRecord"];
+
 export type NotificationWithRelations = Omit<
   NotificationBasePayload,
-  "deviceGroupsMatchings"
+  "sourceLinks"
 > & {
-  deviceGroupsMatchings: (NotificationBasePayload["deviceGroupsMatchings"][number] & {
+  sourceLinks: WithoutMappings<
+    NotificationBasePayload["sourceLinks"][number]
+  >[];
+  deviceGroupsMatchings: (NotificationSourceRecord["deviceGroupMatchings"][number] & {
     assetCount: number;
   })[];
 };
@@ -63,28 +105,8 @@ export type NotificationSource =
   NotificationWithRelations["sourceLinks"][number];
 
 export const notificationDetailInclude = {
-  deviceGroupsMatchings: {
-    include: {
-      deviceGroupMatching: {
-        include: {
-          manufacturer: true,
-          product: true,
-          version: true,
-        },
-      },
-    },
-  },
-  vulnerabilities: {
-    where: notRejected,
-    select: {
-      id: true,
-      vulnerabilityId: true,
-      vulnerability: {
-        select: { displayId: true, severity: true },
-      },
-    },
-  },
   sourceLinks: {
+    orderBy: { createdAt: "asc" },
     select: {
       sourceType: true,
       reasonWhy: true,
@@ -104,6 +126,17 @@ export const notificationDetailInclude = {
           // Urls are filled in by `mappingUrlExtension`; the integration id it
           // needs to do that is part of `externalMappingSelect`.
           mapping: externalMappingSelect,
+          deviceGroupMatchings: deviceGroupMappingInclude,
+          vulnerabilities: {
+            select: {
+              id: true,
+              vulnerabilityId: true,
+              confidence: true,
+              vulnerability: {
+                select: { displayId: true, severity: true },
+              },
+            },
+          },
         },
       },
     },
@@ -116,6 +149,9 @@ export const notificationDetailInclude = {
 type NotificationDetailBasePayload = Prisma.NotificationGetPayload<{
   include: typeof notificationDetailInclude;
 }>;
+
+type NotificationDetailSourceRecord =
+  NotificationDetailBasePayload["sourceLinks"][number]["sourceRecord"];
 
 export type ResolvedDeviceGroupAsset = {
   id: string;
@@ -133,7 +169,7 @@ export type ResolvedDeviceGroupAsset = {
 
 /** A device group matching with its resolved manufacturer/product/version labels. */
 export type MatchingWithLabels =
-  NotificationDetailBasePayload["deviceGroupsMatchings"][number]["deviceGroupMatching"];
+  NotificationDetailSourceRecord["deviceGroupMatchings"][number]["deviceGroupMatching"];
 
 /**
  * One device group matching in a triage bucket, with the number of assets that
@@ -177,11 +213,15 @@ export const readReceiptSelect = {
 
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
-  "deviceGroupsMatchings"
+  "sourceLinks"
 > & {
-  deviceGroupsMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
+  sourceLinks: WithoutMappings<
+    NotificationDetailBasePayload["sourceLinks"][number]
+  >[];
+  deviceGroupsMatchings: (NotificationDetailSourceRecord["deviceGroupMatchings"][number] & {
     assetCount: number;
   })[];
+  vulnerabilities: NotificationDetailSourceRecord["vulnerabilities"];
   affectedAssets: AffectedAssetsSummary;
   fieldCorrections: NotificationFieldCorrection[];
   readReceipts: ReadReceipt[];

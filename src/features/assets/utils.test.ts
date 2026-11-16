@@ -5,6 +5,7 @@ import {
   getAssetDisplayName,
   getAssetIdentifier,
   getAssetNameForAgent,
+  getAssetSourceBlocks,
   getAssetSources,
   getAssetTitle,
   securityRemediationsOf,
@@ -156,6 +157,38 @@ describe("getAssetSources", () => {
     expect(
       getAssetSources({ user: { name: "Seed User" }, externalMappings: [] }),
     ).toEqual(["Seed User"]);
+  });
+});
+
+describe("getAssetSourceBlocks", () => {
+  const mapping = (name: string, platform: PlatformEnum) => ({
+    integration: { name, platform },
+  });
+
+  it("shows the creator as a person, then each integration", () => {
+    const blocks = getAssetSourceBlocks({
+      user: { name: "Seed User" },
+      externalMappings: [
+        mapping("Blueflow", PlatformEnum.PARTNER),
+        mapping("CSV Assets Upload - Oct 1", PlatformEnum.CSV_UPLOAD),
+        mapping("CSV Assets Upload - Oct 2", PlatformEnum.CSV_UPLOAD),
+      ],
+    });
+    expect(blocks.map(({ name, kind }) => [name, kind])).toEqual([
+      ["Seed User", "person"],
+      ["Blueflow", "integration"],
+      ["CSV Upload", "integration"],
+    ]);
+  });
+
+  it("shows an integration once, as an integration, when its shadow user created the asset", () => {
+    const blocks = getAssetSourceBlocks({
+      user: { name: "Blueflow" },
+      externalMappings: [mapping("Blueflow", PlatformEnum.PARTNER)],
+    });
+    expect(blocks.map(({ name, kind }) => [name, kind])).toEqual([
+      ["Blueflow", "integration"],
+    ]);
   });
 });
 

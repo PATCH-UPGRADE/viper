@@ -1,9 +1,9 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 import { ClampedCell } from "@/components/ui/clamped-cell";
 import { SortableHeader } from "@/components/ui/data-table";
+import { relativeTime } from "@/lib/date-utils";
 import type { AssetResponse } from "../types";
 import { getAssetDeviceTypeLabel, getAssetSources } from "../utils";
 
@@ -35,7 +35,6 @@ export const columns: ColumnDef<AssetResponse>[] = [
     header: ({ column }) => (
       <SortableHeader header="Last Updated" column={column} />
     ),
-    cell: ({ row }) =>
-      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+    cell: ({ row }) => relativeTime(row.original.updatedAt),
   },
 ];

@@ -1,9 +1,9 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { InboxIcon } from "lucide-react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { NotificationTypeBadge } from "@/features/inbox/components/notification-type-badge";
+import { relativeTime } from "@/lib/date-utils";
 import { useSuspenseSuggestedNotifications } from "../hooks/use-overview";
 import {
   OverviewCard,
@@ -50,8 +50,8 @@ export const SuggestedInboxCard = () => {
           />
           <OverviewCardMeta
             parts={[
-              formatDistanceToNow(notification.createdAt, { addSuffix: true }),
-              `Updated ${formatDistanceToNow(notification.updatedAt, { addSuffix: true })}`,
+              relativeTime(notification.createdAt),
+              `Updated ${relativeTime(notification.updatedAt)}`,
             ]}
           />
         </OverviewCardRow>

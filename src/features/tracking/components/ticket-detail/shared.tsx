@@ -1,6 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
 import {
   BanIcon,
   CircleCheckIcon,
@@ -87,12 +86,6 @@ export const UnreadDot = () => (
     <span className="sr-only">Not opened by you</span>
   </span>
 );
-
-export const formatDate = (date: Date | string | null | undefined) => {
-  if (!date) return null;
-  const d = date instanceof Date ? date : new Date(date);
-  return format(d, "MMM d, yyyy");
-};
 
 export const CategoryChip = ({ category }: { category: TicketCategory }) => {
   const color = useCategoryColor(category);

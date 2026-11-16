@@ -1,12 +1,12 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { InfoIcon } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
+import { relativeTime } from "@/lib/date-utils";
 import {
   useAddRemediationInquiry,
   useRemediationInquiries,
@@ -130,9 +130,7 @@ export const MedIsaoRemediationInquiries = ({
                 <span className="flex items-center gap-2">
                   <span className="text-xs font-medium">You asked</span>
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(inquiry.createdAt), {
-                      addSuffix: true,
-                    })}
+                    {relativeTime(inquiry.createdAt)}
                   </span>
                   {inquiry.status && (
                     <Badge
@@ -152,9 +150,7 @@ export const MedIsaoRemediationInquiries = ({
                     <p className="text-xs text-muted-foreground">
                       The manufacturer answered
                       {inquiry.respondedAt &&
-                        ` ${formatDistanceToNow(new Date(inquiry.respondedAt), {
-                          addSuffix: true,
-                        })}`}
+                        ` ${relativeTime(inquiry.respondedAt)}`}
                     </p>
                     <p className="text-sm font-semibold wrap-anywhere">
                       {inquiry.response}

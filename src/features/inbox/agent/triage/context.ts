@@ -18,7 +18,9 @@ import {
   vulnerabilityToMarkdown,
   workflowClinicalSummary,
 } from "@/lib/markdown";
-import { notRejected } from "../../types";
+import { notificationLinkedIds } from "../../server/source-links";
+import { matchingLabelsInclude } from "../../types";
+import { byIds } from "../../utils";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
@@ -49,58 +51,9 @@ export async function gatherTriageContext(
   notificationId: string,
   opts: { includeIds?: boolean } = {},
 ): Promise<TriageContext> {
-  const notification = await prisma.notification.findUnique({
-    where: { id: notificationId },
-    include: {
-      deviceGroupsMatchings: {
-        include: {
-          deviceGroupMatching: {
-            include: { manufacturer: true, product: true, version: true },
-          },
-        },
-      },
-      vulnerabilities: {
-        where: notRejected,
-        include: {
-          vulnerability: {
-            include: {
-              deviceGroupMatchings: {
-                include: { manufacturer: true, product: true, version: true },
-              },
-              remediations: {
-                include: {
-                  deviceGroupMatchings: {
-                    include: {
-                      manufacturer: true,
-                      product: true,
-                      version: true,
-                    },
-                  },
-                  vulnerabilities: { select: { id: true, displayId: true } },
-                },
-              },
-              issues: true,
-              records: { select: { metrics: true } },
-            },
-          },
-        },
-      },
-      remediations: {
-        include: {
-          remediation: {
-            include: {
-              deviceGroupMatchings: {
-                include: { manufacturer: true, product: true, version: true },
-              },
-              vulnerabilities: { select: { id: true, displayId: true } },
-            },
-          },
-        },
-      },
-    },
-  });
+  const linked = await notificationLinkedIds(notificationId);
 
-  if (!notification) {
+  if (!linked) {
     return {
       notificationId,
       markdown: "",
@@ -110,30 +63,49 @@ export async function gatherTriageContext(
     };
   }
 
-  const vulnerabilities = notification.vulnerabilities.map(
-    (m) => m.vulnerability,
-  );
-  const remediationsById = new Map<
-    string,
-    (typeof notification.remediations)[number]["remediation"]
-  >();
-  for (const m of notification.remediations) {
-    if (m.confidence === "Rejected") continue;
-    remediationsById.set(m.remediation.id, m.remediation);
-  }
+  const remediationInclude = {
+    deviceGroupMatchings: matchingLabelsInclude,
+    vulnerabilities: { select: { id: true, displayId: true } },
+  };
+  const [vulnerabilities, linkedRemediations, linkedMatchings] =
+    await Promise.all([
+      byIds(linked.vulnerabilityIds, (where) =>
+        prisma.vulnerability.findMany({
+          where,
+          include: {
+            deviceGroupMatchings: matchingLabelsInclude,
+            remediations: { include: remediationInclude },
+            issues: {
+              select: {
+                status: true,
+                notAffectedJustification: true,
+                statusConfidence: true,
+                deviceGroupMatchingId: true,
+                assetId: true,
+              },
+            },
+            records: { select: { metrics: true } },
+          },
+        }),
+      ),
+      byIds(linked.remediationIds, (where) =>
+        prisma.remediation.findMany({ where, include: remediationInclude }),
+      ),
+      byIds(linked.deviceGroupMatchingIds, (where) =>
+        prisma.deviceGroupMatching.findMany({
+          where,
+          ...matchingLabelsInclude,
+        }),
+      ),
+    ]);
+
+  const remediationsById = new Map(linkedRemediations.map((r) => [r.id, r]));
   for (const v of vulnerabilities) {
     for (const r of v.remediations) remediationsById.set(r.id, r);
   }
   const remediations = [...remediationsById.values()];
 
-  const matchingsById = new Map<
-    string,
-    (typeof notification.deviceGroupsMatchings)[number]["deviceGroupMatching"]
-  >();
-  for (const m of notification.deviceGroupsMatchings) {
-    if (m.confidence === "Rejected") continue;
-    matchingsById.set(m.deviceGroupMatching.id, m.deviceGroupMatching);
-  }
+  const matchingsById = new Map(linkedMatchings.map((m) => [m.id, m]));
   for (const v of vulnerabilities) {
     for (const dgm of v.deviceGroupMatchings) matchingsById.set(dgm.id, dgm);
   }

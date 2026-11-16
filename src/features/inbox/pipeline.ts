@@ -10,8 +10,8 @@ import { generateQuestionForNotification } from "./agent/question";
 import { triageNotification } from "./agent/triage";
 import { persistTriageResult } from "./agent/triage/persist";
 import { sortNotificationVulnerabilities } from "./agent/vex";
+import { notificationVulnerabilityIds } from "./server/source-links";
 import type { KnownNotificationFields } from "./source-adapter";
-import { notRejected } from "./types";
 
 /**
  * The slice of Inngest's `step` this pipeline uses.
@@ -23,7 +23,7 @@ import { notRejected } from "./types";
 export type PipelineStep = Pick<GetStepTools<typeof inngest>, "run">;
 
 /**
- * Attach the entities a document refers to, once its Notification exists.
+ * Attach the entities a document refers to, on its source record.
  *
  * The caller owns this and its step ids, because how the links are found
  * differs by source. An email names its devices in prose and needs two LLM
@@ -32,12 +32,8 @@ export type PipelineStep = Pick<GetStepTools<typeof inngest>, "run">;
  */
 export type LinkEntities = (
   step: PipelineStep,
-  /**
-   * Nullable because `step.run` reports the classifier's optional id as null.
-   * Every stage here guards on it rather than assuming the classifier ran.
-   */
-  notificationId: string | null,
-  ctx?: { sourceId: string; attachments?: PdfAttachment[] },
+  /** The record that named the entities. Every link lands on it. */
+  ctx: { sourceId: string; attachments?: PdfAttachment[] },
 ) => Promise<unknown>;
 
 export interface NotificationPipelineInput {
@@ -68,6 +64,11 @@ export async function runNotificationPipeline({
   linkEntities,
   known,
 }: NotificationPipelineInput) {
+  // Links land on the source record, so they need no notification. They run
+  // first so the classifier sees what the record names when it writes the
+  // title and picks the notification to update.
+  const linkSummary = await linkEntities(step, { sourceId, attachments });
+
   const notificationId = await step.run("classify-notification", async () => {
     const result = await classifyNotification(sourceId, doc, attachments);
 
@@ -123,20 +124,13 @@ export async function runNotificationPipeline({
     });
   });
 
-  const linkSummary = await linkEntities(step, notificationId, {
-    sourceId,
-    attachments,
-  });
-
   // VEX sort: if the notification has linked vulnerabilities, sort each
   // baseline Issue into at-risk / possibly-at-risk / unaffected. Runs before
   // triage so priority/hospital-impact reasoning can reflect the results.
   const vexSummary = await step.run("sort-vulnerabilities", async () => {
     if (!notificationId) return { vexSkipped: true as const };
-    const vulnCount = await prisma.notificationVulnerabilityMapping.count({
-      where: { notificationId, ...notRejected },
-    });
-    if (vulnCount === 0) return { vexSkipped: true as const };
+    const vulnIds = await notificationVulnerabilityIds(notificationId);
+    if (vulnIds.length === 0) return { vexSkipped: true as const };
     return sortNotificationVulnerabilities(notificationId);
   });
 

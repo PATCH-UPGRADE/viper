@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const prismaMock = {
-  notificationDeviceGroupMapping: { upsert: vi.fn() },
-  notificationVulnerabilityMapping: {
+  sourceRecordDeviceGroupMapping: { upsert: vi.fn() },
+  sourceRecordVulnerabilityMapping: {
     createMany: vi.fn(),
     updateMany: vi.fn(),
   },
@@ -51,10 +51,10 @@ const RAW = {
 
 const step = { run: <T>(_id: string, fn: () => Promise<T>) => fn() };
 
-const link = (raw: unknown, notificationId: string | null) => {
+const link = (raw: unknown) => {
   // biome-ignore lint/suspicious/noExplicitAny: the step tools are stubbed
   const { linkEntities } = advisorySourceAdapter.prepare(raw) as any;
-  return linkEntities(step, notificationId, { sourceId: "source-1" });
+  return linkEntities(step, { sourceId: "source-1" });
 };
 
 beforeEach(() => {
@@ -95,7 +95,7 @@ describe("the advisory document", () => {
 
 describe("the advisory linker", () => {
   it("resolves the device from the channel, not from the prose", async () => {
-    await link(RAW, "notif-1");
+    await link(RAW);
 
     expect(resolveMatchingId).toHaveBeenCalledWith({
       manufacturer: "ViperMD",
@@ -105,12 +105,12 @@ describe("the advisory linker", () => {
     });
   });
 
-  it("links the device group and says why", async () => {
-    await link(RAW, "notif-1");
+  it("links the device group to the source record and says why", async () => {
+    await link(RAW);
 
-    const [args] = prismaMock.notificationDeviceGroupMapping.upsert.mock.calls;
+    const [args] = prismaMock.sourceRecordDeviceGroupMapping.upsert.mock.calls;
     expect(args[0].create).toMatchObject({
-      notificationId: "notif-1",
+      sourceRecordId: "source-1",
       deviceGroupMatchingId: "matching-1",
       confidence: "Matched",
     });
@@ -118,9 +118,9 @@ describe("the advisory linker", () => {
   });
 
   it("never claims a human confirmed the link", async () => {
-    await link(RAW, "notif-1");
+    await link(RAW);
 
-    const [args] = prismaMock.notificationDeviceGroupMapping.upsert.mock.calls;
+    const [args] = prismaMock.sourceRecordDeviceGroupMapping.upsert.mock.calls;
     expect(args[0].create.confidence).not.toBe("Confirmed");
   });
 
@@ -129,7 +129,7 @@ describe("the advisory linker", () => {
       heldRow("CVE-2026-0001", "vuln-1"),
     ]);
 
-    const summary = await link(RAW, "notif-1");
+    const summary = await link(RAW);
 
     expect(createVulnerabilityRecord).toHaveBeenCalledTimes(1);
     expect(createVulnerabilityRecord).toHaveBeenCalledWith(
@@ -140,7 +140,7 @@ describe("the advisory linker", () => {
       }),
     );
     const [[{ data: links, skipDuplicates }]] =
-      prismaMock.notificationVulnerabilityMapping.createMany.mock.calls;
+      prismaMock.sourceRecordVulnerabilityMapping.createMany.mock.calls;
     expect(skipDuplicates).toBe(true);
     expect(
       links
@@ -155,13 +155,13 @@ describe("the advisory linker", () => {
       heldRow("CVE-2026-0001", "vuln-1"),
     ]);
 
-    await link(RAW, "notif-1");
+    await link(RAW);
 
     expect(
-      prismaMock.notificationVulnerabilityMapping.updateMany,
+      prismaMock.sourceRecordVulnerabilityMapping.updateMany,
     ).toHaveBeenCalledWith({
       where: {
-        notificationId: "notif-1",
+        sourceRecordId: "source-1",
         vulnerabilityId: { in: expect.arrayContaining(["vuln-1"]) },
         confidence: "NeedsReview",
       },
@@ -170,26 +170,13 @@ describe("the advisory linker", () => {
   });
 
   it("links only the device when the advisory names no vulnerability", async () => {
-    const summary = await link(
-      { ...RAW, linked_vulnerabilities: [] },
-      "notif-1",
-    );
+    const summary = await link({ ...RAW, linked_vulnerabilities: [] });
 
-    expect(prismaMock.notificationDeviceGroupMapping.upsert).toHaveBeenCalled();
+    expect(prismaMock.sourceRecordDeviceGroupMapping.upsert).toHaveBeenCalled();
     expect(createVulnerabilityRecord).not.toHaveBeenCalled();
     expect(
-      prismaMock.notificationVulnerabilityMapping.createMany,
+      prismaMock.sourceRecordVulnerabilityMapping.createMany,
     ).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ linked: 1, created: 0 });
-  });
-
-  it("writes nothing when the classifier produced no notification", async () => {
-    const summary = await link(RAW, null);
-
-    expect(resolveMatchingId).not.toHaveBeenCalled();
-    expect(
-      prismaMock.notificationDeviceGroupMapping.upsert,
-    ).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ linked: 0, skipped: 0 });
   });
 });

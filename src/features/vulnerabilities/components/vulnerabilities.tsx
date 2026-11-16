@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { BugIcon, Clock, Eye, ShieldAlert, ShieldClose } from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import {
@@ -35,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Priority } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
+import { relativeTime } from "@/lib/date-utils";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import {
@@ -304,7 +304,7 @@ export const VulnerabilityItem = ({
         <div className="text-xs text-muted-foreground mt-1">
           {(data.description ?? "").substring(0, 100)}
           {(data.description ?? "").length > 100 ? "..." : ""} &bull; Updated{" "}
-          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {relativeTime(data.updatedAt)}
         </div>
       </div>
     </div>
@@ -332,10 +332,7 @@ export function VulnerabilityDrawer({
             Vulnerability
           </Badge>
           <span className="text-xs">
-            Updated{" "}
-            {formatDistanceToNow(vulnerability.updatedAt, {
-              addSuffix: true,
-            })}
+            Updated {relativeTime(vulnerability.updatedAt)}
           </span>
         </DrawerDescription>
       </DrawerHeader>

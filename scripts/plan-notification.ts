@@ -77,7 +77,11 @@ async function main() {
   const notification = await prisma.notification.findFirst({
     where: notificationId
       ? { id: notificationId }
-      : { sourceLinks: { some: {} }, vulnerabilities: { some: {} } },
+      : {
+          sourceLinks: {
+            some: { sourceRecord: { vulnerabilities: { some: {} } } },
+          },
+        },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

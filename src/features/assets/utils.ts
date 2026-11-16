@@ -1,6 +1,12 @@
 import { z } from "zod";
+import type { SourceBlock } from "@/components/sources";
 import { CSV_UPLOAD_DISPLAY_NAME } from "@/features/integrations/platforms/csv-upload/contract";
-import { IssueStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
+import {
+  IssueStatus,
+  PlatformEnum,
+  type Prisma,
+  type VersionStatus,
+} from "@/generated/prisma";
 import { isSecurityRelated } from "../remediations/release";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
@@ -117,19 +123,54 @@ export type AssetSourcesSource = {
 };
 
 /**
- * Where an asset came from: the user who created it, then each integration that
- * reports it. Every CSV import is its own integration, so each shows as "CSV
- * Upload". An integration's shadow user shares its name, so an asset an
- * integration created lists that integration once.
+ * Where an asset came from, as dashboard blocks: the user who created it as a person, then each
+ * integration that reports it. Every CSV import is its own integration, so each shows as one "CSV
+ * Upload". An integration's shadow user shares its name, so an asset an integration created lists
+ * that integration once, as an integration.
+ * TODO VW-600: build these from the data provenance models instead (every source that has written
+ * to the asset, not only its creator and current mappings)
  */
-export function getAssetSources(asset: AssetSourcesSource): string[] {
-  const integrations = asset.externalMappings.map(({ integration }) =>
-    integration.platform === PlatformEnum.CSV_UPLOAD
-      ? CSV_UPLOAD_DISPLAY_NAME
-      : integration.name,
+export function getAssetSourceBlocks(asset: AssetSourcesSource): SourceBlock[] {
+  const integrationBlocks: SourceBlock[] = [];
+  for (const { integration } of asset.externalMappings) {
+    const name =
+      integration.platform === PlatformEnum.CSV_UPLOAD
+        ? CSV_UPLOAD_DISPLAY_NAME
+        : integration.name;
+    if (integrationBlocks.some((block) => block.name === name)) continue;
+    integrationBlocks.push({
+      key: `integration:${name}`,
+      name,
+      kind: "integration",
+      typeLabel: "Integration",
+    });
+  }
+  const creatorIsIntegration = asset.externalMappings.some(
+    ({ integration }) => integration.name === asset.user.name,
   );
-  return [...new Set([asset.user.name, ...integrations])];
+  return creatorIsIntegration
+    ? integrationBlocks
+    : [
+        {
+          key: `user:${asset.user.name}`,
+          name: asset.user.name,
+          kind: "person",
+          typeLabel: "Created by",
+        },
+        ...integrationBlocks,
+      ];
 }
+
+/** getAssetSourceBlocks' names, e.g. for sorting or searching the Sources column. */
+export const getAssetSources = (asset: AssetSourcesSource): string[] =>
+  getAssetSourceBlocks(asset).map((block) => block.name);
+
+export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
+  UNKNOWN: "Unknown",
+  NOT_APPLICABLE: "Not applicable",
+  KNOWN: "Known",
+  UNSURE: "Unsure",
+};
 
 // One remediation can fix several of the asset's vulnerabilities, so count
 // distinct remediations, not a sum of per-vulnerability counts.

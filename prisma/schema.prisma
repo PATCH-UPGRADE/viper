@@ -441,7 +441,8 @@ model DeviceGroupMatching {
   remediations         Remediation[]                    @relation("RemediationMatchings")
   deviceArtifacts      DeviceArtifact[]                 @relation("DeviceArtifactMatchings")
   issues               Issue[]
-  notificationMappings NotificationDeviceGroupMapping[]
+  sourceRecordMappings SourceRecordDeviceGroupMapping[]
+  workOrderMappings    WorkOrderDeviceGroupMapping[]
   nodes                Node[]
 
   createdAt DateTime @default(now())
@@ -489,7 +490,7 @@ model Asset {
   issues               Issue[]
   externalMappings     ExternalAssetMapping[]
   assetTickets         AssetTicket[]
-  notificationMappings NotificationAssetMapping[]
+  sourceRecordMappings SourceRecordAssetMapping[]
   nodes                Node[]
   // who in the hospital, or outside of it, is responsible for managing this asset
   managedBy            ManagesRelationship[]      @relation("ManagedAssets")
@@ -745,7 +746,7 @@ model Vulnerability {
   remediations         Remediation[]                      @relation("RemediationVulnerabilities")
   issues               Issue[]
   workOrderTickets     WorkOrderTicket[]                  @relation("WorkOrderTicketVulns")
-  notificationMappings NotificationVulnerabilityMapping[]
+  sourceRecordMappings SourceRecordVulnerabilityMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1076,7 +1077,7 @@ model Remediation {
 
   issueRemediations    IssueRemediation[]
   workOrderTickets     WorkOrderTicket[]                @relation("WorkOrderTicketRemediations")
-  notificationMappings NotificationRemediationMapping[]
+  sourceRecordMappings SourceRecordRemediationMapping[]
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1104,8 +1105,6 @@ model Remediation {
   publishedAt DateTime? // when manufacturer released it
 
   externalMappings         ExternalRemediationMapping[]
-  // raw TA4 submissions that produced this remediation
-  sourceRecords            SourceRecord[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([userId])
@@ -1558,10 +1557,10 @@ model WorkOrderTicket {
 
   scheduledEndTime DateTime?
 
-  issues          Issue[]                          @relation("WorkOrderTicketIssues")
-  vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")
-  remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")
-  deviceGroups    NotificationDeviceGroupMapping[]
+  issues          Issue[]                       @relation("WorkOrderTicketIssues")
+  vulnerabilities Vulnerability[]               @relation("WorkOrderTicketVulns")
+  remediations    Remediation[]                 @relation("WorkOrderTicketRemediations")
+  deviceGroups    WorkOrderDeviceGroupMapping[]
 
   assets AssetTicket[] @relation("WorkOrderAssets")
   ticket AssetTicket?  @relation("WorkOrderAssetTicket")
@@ -1766,6 +1765,9 @@ enum SourceChannel {
   TA4 // POSTed to /api/v1/remediations
 }
 
+// On a source record mapping, a null confidence means the source stated the
+// entity itself, as a TA4 submission names its vulnerabilities, so no match
+// was made that a confidence could describe.
 enum ConfidenceLevel {
   NeedsReview // An LLM matched this but with low confidence
   Matched // An LLM matched this with high confidence
@@ -1791,16 +1793,15 @@ model Notification {
   priorityReasonWhy String?  @db.Text
   hospitalImpact    Json     @default("{}") // structured: { byline, impactStatement, careAreas, likelihood } — see hospitalImpactSchema
 
-  sourceLinks           SourceLink[]
-  reads                 NotificationRead[]
-  assets                NotificationAssetMapping[]
-  deviceGroupsMatchings NotificationDeviceGroupMapping[]
-  vulnerabilities       NotificationVulnerabilityMapping[]
-  remediations          NotificationRemediationMapping[]
-  matchFeedback         MatchFeedback[]
-  mitigationPlans       MitigationPlan[]
-  workOrderTickets      WorkOrderTicket[]
-  questions             Question[]
+  // What a notification is about lives on its source records: every linked
+  // asset, device group, vulnerability and remediation is reached through
+  // `sourceLinks`, so each record keeps what it contributed.
+  sourceLinks      SourceLink[]
+  reads            NotificationRead[]
+  matchFeedback    MatchFeedback[]
+  mitigationPlans  MitigationPlan[]
+  workOrderTickets WorkOrderTicket[]
+  questions        Question[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1872,17 +1873,20 @@ model SourceRecord {
 
   observedAt DateTime @default(now())
 
-  // A SourceRecord can optionally be a TA4 remediation: the raw submission,
-  // pointing at the Remediation it created.
-  remediationId String?
-  remediation   Remediation? @relation(fields: [remediationId], references: [id], onDelete: SetNull)
-
   links       SourceLink[] // what notifications / work orders this source feeds
-  attachments NotificationAttachment[]
+  attachments SourceRecordAttachment[]
+
+  // What this record names, as resolved by the pipeline (an LLM, a feed that
+  // states them, or a TA4 submission). A notification shows the union over its
+  // records; a Rejected row on any record hides that entity from the whole
+  // notification.
+  assets               SourceRecordAssetMapping[]
+  deviceGroupMatchings SourceRecordDeviceGroupMapping[]
+  vulnerabilities      SourceRecordVulnerabilityMapping[]
+  remediations         SourceRecordRemediationMapping[]
 
   @@unique([channel, externalId])
   @@index([mappingId, observedAt])
-  @@index([remediationId])
   @@map("source_record")
 }
 
@@ -1965,10 +1969,10 @@ model ExternalSourceRecordMapping {
   @@map("external_source_record_mappings")
 }
 
-model NotificationAttachment {
-  id       String       @id @default(cuid())
-  sourceId String
-  source   SourceRecord @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+model SourceRecordAttachment {
+  id             String       @id @default(cuid())
+  sourceRecordId String
+  sourceRecord   SourceRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
 
   filename    String?
   contentType String?
@@ -1978,9 +1982,9 @@ model NotificationAttachment {
 
   createdAt DateTime @default(now())
 
-  @@index([sourceId])
+  @@index([sourceRecordId])
   @@index([hash])
-  @@map("notification_attachment")
+  @@map("source_record_attachment")
 }
 
 model NotificationRead {
@@ -1995,70 +1999,87 @@ model NotificationRead {
   @@map("notification_read")
 }
 
-model NotificationAssetMapping {
+model SourceRecordAssetMapping {
   id             String           @id @default(cuid())
-  notificationId String
-  notification   Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  sourceRecordId String
+  sourceRecord   SourceRecord     @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
   assetId        String
   asset          Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
   reasonWhy      String?
 
-  @@unique([notificationId, assetId])
-  @@map("notification_asset_mapping")
+  @@unique([sourceRecordId, assetId])
+  @@index([assetId])
+  @@map("source_record_asset_mapping")
 }
 
-model NotificationDeviceGroupMapping {
+model SourceRecordDeviceGroupMapping {
   id                    String              @id @default(cuid())
-  // A mapping belongs to a Notification OR a WorkOrderTicket (exactly one).
-  notificationId        String?
-  notification          Notification?       @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  workOrderTicketId     String?
-  workOrderTicket       WorkOrderTicket?    @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
+  sourceRecordId        String
+  sourceRecord          SourceRecord        @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
   deviceGroupMatchingId String
   deviceGroupMatching   DeviceGroupMatching @relation(fields: [deviceGroupMatchingId], references: [id], onDelete: Cascade)
   confidence            ConfidenceLevel?
   reasonWhy             String?
 
-  @@unique([notificationId, deviceGroupMatchingId])
-  @@unique([workOrderTicketId, deviceGroupMatchingId], map: "ndg_mapping_workorder_devicegroupmatching_key")
-  @@index([workOrderTicketId])
-  @@map("notification_device_group_mapping")
+  @@unique([sourceRecordId, deviceGroupMatchingId])
+  @@index([deviceGroupMatchingId])
+  @@map("source_record_device_group_mapping")
 }
 
-model NotificationVulnerabilityMapping {
+model SourceRecordVulnerabilityMapping {
   id              String           @id @default(cuid())
-  notificationId  String
-  notification    Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  sourceRecordId  String
+  sourceRecord    SourceRecord     @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
   vulnerabilityId String
   vulnerability   Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
   confidence      ConfidenceLevel?
   reasonWhy       String?
 
-  @@unique([notificationId, vulnerabilityId])
-  @@map("notification_vulnerability_mapping")
+  @@unique([sourceRecordId, vulnerabilityId])
+  @@index([vulnerabilityId])
+  @@map("source_record_vulnerability_mapping")
 }
 
-model NotificationRemediationMapping {
+model SourceRecordRemediationMapping {
   id             String           @id @default(cuid())
-  notificationId String
-  notification   Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  sourceRecordId String
+  sourceRecord   SourceRecord     @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
   remediationId  String
   remediation    Remediation      @relation(fields: [remediationId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
   reasonWhy      String?
 
-  @@unique([notificationId, remediationId])
-  @@map("notification_remediation_mapping")
+  @@unique([sourceRecordId, remediationId])
+  @@index([remediationId])
+  @@map("source_record_remediation_mapping")
+}
+
+// The device groups a work order is about. Written by the mitigation agent for
+// its draft work orders and by the email path for a ticket it extracted. A
+// ticket's source records keep their own mappings. Code that shows a ticket's
+// device groups reads this table, never the source records.
+model WorkOrderDeviceGroupMapping {
+  id                    String              @id @default(cuid())
+  workOrderTicketId     String
+  workOrderTicket       WorkOrderTicket     @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
+  deviceGroupMatchingId String
+  deviceGroupMatching   DeviceGroupMatching @relation(fields: [deviceGroupMatchingId], references: [id], onDelete: Cascade)
+  confidence            ConfidenceLevel?
+  reasonWhy             String?
+
+  @@unique([workOrderTicketId, deviceGroupMatchingId])
+  @@index([deviceGroupMatchingId])
+  @@map("work_order_device_group_mapping")
 }
 
 // ─── Feedback ────────────────────────────────────────────────────────────
 
 enum MatchFeedbackTargetType {
-  NotificationDeviceGroupMapping
-  NotificationAssetMapping
-  NotificationRemediationMapping
-  NotificationVulnerabilityMapping
+  SourceRecordDeviceGroupMapping
+  SourceRecordAssetMapping
+  SourceRecordRemediationMapping
+  SourceRecordVulnerabilityMapping
 }
 
 enum MatchFeedbackCategory {

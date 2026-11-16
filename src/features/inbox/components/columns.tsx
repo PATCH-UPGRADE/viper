@@ -2,7 +2,6 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 import { MailIcon, RssIcon } from "lucide-react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +12,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Pill } from "@/components/ui/pill";
+import { relativeTime } from "@/lib/date-utils";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import type { NotificationWithRelations, RawEmailPayload } from "../types";
 import { NotificationTypeBadge } from "./notification-type-badge";
@@ -46,7 +46,7 @@ function SourceDisplay({
         <span className="truncate max-w-[200px]">{label}</span>
       </span>
       <span className="text-xs text-muted-foreground">
-        {formatDistanceToNow(source.observedAt, { addSuffix: true })}
+        {relativeTime(source.observedAt)}
       </span>
     </span>
   );
@@ -112,11 +112,9 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
           <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
             <NotificationTypeBadge type={type} />
             <span>•</span>
-            <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
+            <span>{relativeTime(createdAt)}</span>
             <span>•</span>
-            <span>
-              updated {formatDistanceToNow(updatedAt, { addSuffix: true })}
-            </span>
+            <span>updated {relativeTime(updatedAt)}</span>
           </div>
         </div>
       );
@@ -199,9 +197,7 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
                           </span>
                         </span>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {formatDistanceToNow(source.observedAt, {
-                            addSuffix: true,
-                          })}
+                          {relativeTime(source.observedAt)}
                         </span>
                       </div>
                     );

@@ -5,11 +5,11 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { relativeTime } from "@/lib/date-utils";
 import { useTRPC } from "@/trpc/client";
 
 export function ReportsSidebar() {
@@ -70,9 +70,7 @@ export function ReportsSidebar() {
                 {r.title || "Untitled report"}
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(r.updatedAt), {
-                  addSuffix: true,
-                })}
+                {relativeTime(r.updatedAt)}
               </span>
             </Link>
           ))

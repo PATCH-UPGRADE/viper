@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { BugIcon, ServerIcon, SlashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -39,6 +38,7 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
+import { formatDateWithAgo, relativeTime } from "@/lib/date-utils";
 import { deviceLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
@@ -312,9 +312,7 @@ export const AssetHeader = ({ assetId }: { assetId: string }) => {
           <ServerIcon className="size-3 mr-1" />
           Hospital Asset
         </Badge>
-        <span className="text-xs">
-          Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
-        </span>
+        <span className="text-xs">Updated {relativeTime(asset.updatedAt)}</span>
       </div>
     </div>
   );
@@ -403,10 +401,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                     Created
                   </div>
                   <div className="text-xs">
-                    {formatDistanceToNow(asset.createdAt, {
-                      addSuffix: true,
-                    })}{" "}
-                    ({new Date(asset.createdAt).toLocaleString()})
+                    {formatDateWithAgo(asset.createdAt)}
                   </div>
                 </div>
 
@@ -415,10 +410,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                     Last Updated
                   </div>
                   <div className="text-xs">
-                    {formatDistanceToNow(asset.updatedAt, {
-                      addSuffix: true,
-                    })}{" "}
-                    ({new Date(asset.updatedAt).toLocaleString()})
+                    {formatDateWithAgo(asset.updatedAt)}
                   </div>
                 </div>
 

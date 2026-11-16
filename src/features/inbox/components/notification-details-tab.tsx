@@ -314,7 +314,7 @@ export function NotificationDetailsTab({
                             label="Unlink this device group"
                             onClick={() =>
                               setRejecting({
-                                targetType: "NotificationDeviceGroupMapping",
+                                targetType: "SourceRecordDeviceGroupMapping",
                                 id: m.id,
                                 label: deviceGroupMatchingLabel(
                                   m.deviceGroupMatching,
@@ -399,7 +399,7 @@ export function NotificationDetailsTab({
                         label="Unlink this vulnerability"
                         onClick={() =>
                           setRejecting({
-                            targetType: "NotificationVulnerabilityMapping",
+                            targetType: "SourceRecordVulnerabilityMapping",
                             id: m.id,
                             label: m.vulnerability.displayId,
                             noun: "vulnerability",

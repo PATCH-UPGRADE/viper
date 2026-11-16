@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { DownloadIcon } from "lucide-react";
 import {
   EmptyView,
@@ -28,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatDateWithAgo, relativeTime } from "@/lib/date-utils";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import {
   useRemoveDeviceArtifact,
@@ -157,8 +157,7 @@ export const DeviceArtifactItem = ({
         <div className="text-xs text-muted-foreground mt-1">
           {deviceGroupMatchingsSummary(data.deviceGroupMatchings) ||
             "Unknown device"}{" "}
-          &bull; Updated{" "}
-          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          &bull; Updated {relativeTime(data.updatedAt)}
         </div>
       </div>
       <Button
@@ -196,10 +195,7 @@ function DeviceArtifactDrawer({
           <DrawerTitle>{deviceArtifact.role || "Device Artifact"}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <span className="text-xs">
-              Updated{" "}
-              {formatDistanceToNow(deviceArtifact.updatedAt, {
-                addSuffix: true,
-              })}
+              Updated {relativeTime(deviceArtifact.updatedAt)}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -245,10 +241,7 @@ function DeviceArtifactDrawer({
                   Created
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(deviceArtifact.createdAt, {
-                    addSuffix: true,
-                  })}{" "}
-                  ({new Date(deviceArtifact.createdAt).toLocaleString()})
+                  {formatDateWithAgo(deviceArtifact.createdAt)}
                 </div>
               </div>
 
@@ -257,10 +250,7 @@ function DeviceArtifactDrawer({
                   Last Updated
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(deviceArtifact.updatedAt, {
-                    addSuffix: true,
-                  })}{" "}
-                  ({new Date(deviceArtifact.updatedAt).toLocaleString()})
+                  {formatDateWithAgo(deviceArtifact.updatedAt)}
                 </div>
               </div>
 

@@ -5,8 +5,14 @@ vi.mock("server-only", () => ({}));
 
 const { mockPrisma, mockGetSession, mockRequestNoteAction } = vi.hoisted(() => {
   const prisma = {
-    notificationDeviceGroupMapping: { update: vi.fn() },
-    notificationVulnerabilityMapping: { update: vi.fn() },
+    sourceRecordDeviceGroupMapping: {
+      findFirstOrThrow: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    sourceRecordVulnerabilityMapping: {
+      findFirstOrThrow: vi.fn(),
+      updateMany: vi.fn(),
+    },
     matchFeedback: { create: vi.fn() },
     // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
     $transaction: vi.fn(async (cb: (tx: any) => Promise<unknown>) =>
@@ -34,6 +40,11 @@ import { notificationsRouter } from "../routers";
 
 const USER_ID = "user-test";
 
+// The mapping must sit on a record that feeds this notification.
+const inNotification = {
+  sourceRecord: { links: { some: { notificationId: "n-1" } } },
+};
+
 const setup = () => {
   mockGetSession.mockResolvedValue({
     user: { id: USER_ID, name: "Test User", email: "test@example.com" },
@@ -46,30 +57,42 @@ const setup = () => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.matchFeedback.create.mockResolvedValue({ id: "fb-1" });
+  mockPrisma.sourceRecordVulnerabilityMapping.findFirstOrThrow.mockResolvedValue(
+    { vulnerabilityId: "vuln-1" },
+  );
+  mockPrisma.sourceRecordDeviceGroupMapping.findFirstOrThrow.mockResolvedValue({
+    deviceGroupMatchingId: "dgm-1",
+  });
 });
 
 describe("markMatchIncorrect", () => {
-  it("rejects a vulnerability link and records the feedback", async () => {
+  it("rejects a vulnerability on every source of the notification and records the feedback", async () => {
     await setup().markMatchIncorrect({
-      targetType: "NotificationVulnerabilityMapping",
-      targetId: "nvm-1",
+      targetType: "SourceRecordVulnerabilityMapping",
+      targetId: "svm-1",
       notificationId: "n-1",
       comment: "Wrong product line",
     });
 
     expect(
-      mockPrisma.notificationVulnerabilityMapping.update,
+      mockPrisma.sourceRecordVulnerabilityMapping.findFirstOrThrow,
     ).toHaveBeenCalledWith({
-      where: { id: "nvm-1", notificationId: "n-1" },
+      where: { id: "svm-1", ...inNotification },
+      select: { vulnerabilityId: true },
+    });
+    expect(
+      mockPrisma.sourceRecordVulnerabilityMapping.updateMany,
+    ).toHaveBeenCalledWith({
+      where: { vulnerabilityId: "vuln-1", ...inNotification },
       data: { confidence: "Rejected" },
     });
     expect(
-      mockPrisma.notificationDeviceGroupMapping.update,
+      mockPrisma.sourceRecordDeviceGroupMapping.updateMany,
     ).not.toHaveBeenCalled();
     expect(mockPrisma.matchFeedback.create).toHaveBeenCalledWith({
       data: {
-        targetType: "NotificationVulnerabilityMapping",
-        targetId: "nvm-1",
+        targetType: "SourceRecordVulnerabilityMapping",
+        targetId: "svm-1",
         comment: "Wrong product line",
         userId: USER_ID,
         notificationId: "n-1",
@@ -81,22 +104,41 @@ describe("markMatchIncorrect", () => {
     );
   });
 
-  it("rejects a device group link", async () => {
+  it("rejects a device group on every source of the notification", async () => {
     await setup().markMatchIncorrect({
-      targetType: "NotificationDeviceGroupMapping",
-      targetId: "ndg-1",
+      targetType: "SourceRecordDeviceGroupMapping",
+      targetId: "sdg-1",
       notificationId: "n-1",
     });
 
     expect(
-      mockPrisma.notificationDeviceGroupMapping.update,
+      mockPrisma.sourceRecordDeviceGroupMapping.updateMany,
     ).toHaveBeenCalledWith({
-      where: { id: "ndg-1", notificationId: "n-1" },
+      where: { deviceGroupMatchingId: "dgm-1", ...inNotification },
       data: { confidence: "Rejected" },
     });
     expect(
-      mockPrisma.notificationVulnerabilityMapping.update,
+      mockPrisma.sourceRecordVulnerabilityMapping.updateMany,
     ).not.toHaveBeenCalled();
     expect(mockRequestNoteAction).not.toHaveBeenCalled();
+  });
+
+  it("refuses a mapping that belongs to another notification", async () => {
+    mockPrisma.sourceRecordVulnerabilityMapping.findFirstOrThrow.mockRejectedValue(
+      new Error("No SourceRecordVulnerabilityMapping found"),
+    );
+
+    await expect(
+      setup().markMatchIncorrect({
+        targetType: "SourceRecordVulnerabilityMapping",
+        targetId: "svm-other",
+        notificationId: "n-1",
+      }),
+    ).rejects.toThrow();
+
+    expect(
+      mockPrisma.sourceRecordVulnerabilityMapping.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(mockPrisma.matchFeedback.create).not.toHaveBeenCalled();
   });
 });

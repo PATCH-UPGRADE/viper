@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { ChevronDownIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
+import { relativeTime } from "@/lib/date-utils";
 import { cn, firstNameOf } from "@/lib/utils";
 import { useRegenerateDebrief, useSuspenseDebrief } from "../hooks/use-debrief";
 import { DebriefBulletText } from "./debrief-bullet";
@@ -107,7 +107,7 @@ export const DebriefCard = () => {
                 {[
                   `Personalized brief for ${firstNameOf(session?.user.name) ?? data.department.name}`,
                   data.generatedAt
-                    ? `generated ${formatDistanceToNow(data.generatedAt, { addSuffix: true })}`
+                    ? `generated ${relativeTime(data.generatedAt)}`
                     : null,
                   pending ? "refreshing…" : null,
                   !pending && data.lastRunFailed && hasBrief

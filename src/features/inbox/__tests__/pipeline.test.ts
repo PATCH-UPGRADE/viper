@@ -78,6 +78,39 @@ beforeEach(() => {
   mockMitigation.mockResolvedValue(null);
 });
 
+describe("the link step", () => {
+  it("runs on the record before the classifier, so the classifier sees the links", async () => {
+    const order: string[] = [];
+    const linkEntities = vi.fn(async () => {
+      order.push("link");
+      return { linked: 1 };
+    });
+    mockClassify.mockImplementation(async () => {
+      order.push("classify");
+      return {
+        action: "create",
+        type: "Advisory",
+        title: "An advisory",
+        summary: "a summary",
+        tlp: null,
+      };
+    });
+
+    await runNotificationPipeline({
+      step,
+      sourceId: "src-1",
+      doc,
+      linkEntities,
+    });
+
+    expect(order).toEqual(["link", "classify"]);
+    expect(linkEntities).toHaveBeenCalledWith(step, {
+      sourceId: "src-1",
+      attachments: undefined,
+    });
+  });
+});
+
 describe("a marking the source stated", () => {
   it("is stored, where the classifier read none", async () => {
     await run({ tlp: "CLEAR" });

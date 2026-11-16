@@ -9,7 +9,9 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
-import { linked } from "../../server/source-links";
+import { notificationLinkedIds } from "../../server/source-links";
+import { matchingLabelsInclude } from "../../types";
+import { byIds } from "../../utils";
 import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
@@ -163,52 +165,24 @@ async function gatherManagingVendors(
 export async function gatherQuestionContext(
   notificationId: string,
 ): Promise<QuestionContext | null> {
-  const notification = await prisma.notification.findUnique({
-    where: { id: notificationId },
-    include: {
-      sourceLinks: {
-        select: {
-          sourceRecord: {
-            select: {
-              vulnerabilities: {
-                include: {
-                  vulnerability: {
-                    include: {
-                      deviceGroupMatchings: {
-                        include: {
-                          manufacturer: {
-                            select: { canonicalDisplayName: true },
-                          },
-                          product: { select: { canonicalDisplayName: true } },
-                          version: { select: { canonicalDisplayName: true } },
-                        },
-                      },
-                      issues: {
-                        where: {
-                          deviceGroupMatchingId: { not: null },
-                          status: "UNDER_INVESTIGATION",
-                          questions: { none: { status: "PENDING" } },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
+  const linked = await notificationLinkedIds(notificationId);
+  if (!linked || linked.vulnerabilityIds.length === 0) return null;
+
+  const vulnerabilities = await byIds(linked.vulnerabilityIds, (where) =>
+    prisma.vulnerability.findMany({
+      where,
+      include: {
+        deviceGroupMatchings: matchingLabelsInclude,
+        issues: {
+          where: {
+            deviceGroupMatchingId: { not: null },
+            status: "UNDER_INVESTIGATION",
+            questions: { none: { status: "PENDING" } },
           },
         },
       },
-    },
-  });
-
-  if (!notification) return null;
-
-  const vulnerabilities = linked(
-    notification.sourceLinks,
-    "vulnerabilities",
-  ).map((m) => m.vulnerability);
-
-  if (vulnerabilities.length === 0) return null;
+    }),
+  );
 
   const matchingsById = new Map<string, MatchingWithRefs>();
   for (const v of vulnerabilities) {

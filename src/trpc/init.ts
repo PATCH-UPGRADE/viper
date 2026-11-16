@@ -2,7 +2,9 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { OpenApiMeta } from "trpc-to-openapi";
+import type { FeatureKey } from "@/config/features";
 import { getSession, verifyApiKey } from "@/lib/auth-utils";
+import { isEnabled } from "@/lib/features/server";
 import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 
 export const createTRPCContext = async (opts?: CreateNextContextOptions) => {
@@ -73,3 +75,14 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
     message: "Unauthorized",
   });
 });
+
+export const featureProcedure = (key: FeatureKey) =>
+  protectedProcedure.use(({ next }) => {
+    if (!isEnabled(key)) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Feature "${key}" is not enabled`,
+      });
+    }
+    return next();
+  });

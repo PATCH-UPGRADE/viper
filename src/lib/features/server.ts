@@ -43,10 +43,10 @@ export const isEnabled = (key: FeatureKey): boolean => getFeatures()[key];
 
 /** use for server pages and layouts, a disable feature's page is a 404 */
 export function requireFeature(key: FeatureKey): void {
-    if(!isEnabled(key)) notFound();
-};
+  if (!isEnabled(key)) notFound();
+}
 
 // for tests only: forget the cached flags
 export function resetFeaturesForTest(): void {
-    cached = undefined;
+  cached = undefined;
 }

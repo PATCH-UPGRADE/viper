@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "start:local": "VIPER_DEPLOYMENT=local VIPER_FEATURES=all next start", 
+    "start:local": "VIPER_DEPLOYMENT=local VIPER_FEATURES=all next start",
     "lint": "biome check --error-on-warnings",
     "format": "biome format --write",
     "inngest:dev": "inngest-cli dev",

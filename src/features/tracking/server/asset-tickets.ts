@@ -22,6 +22,21 @@ interface ParentFields {
   isDraft: boolean;
 }
 
+/**
+ * The parent columns a child copies. A caller that creates N children reads
+ * these once and passes them down.
+ */
+export const parentFieldsSelect = {
+  summary: true,
+  body: true,
+  category: true,
+  priority: true,
+  creatorId: true,
+  scheduledAt: true,
+  sourceLabel: true,
+  isDraft: true,
+} as const;
+
 export interface ExternalMappingInput {
   integrationId: string;
   externalId: string;
@@ -90,16 +105,7 @@ export async function createAssetTicket(
     params.parent ??
       tx.workOrderTicket.findUniqueOrThrow({
         where: { id: parentTicketId },
-        select: {
-          summary: true,
-          body: true,
-          category: true,
-          priority: true,
-          creatorId: true,
-          scheduledAt: true,
-          sourceLabel: true,
-          isDraft: true,
-        },
+        select: parentFieldsSelect,
       }),
     params.asset ??
       tx.asset.findUniqueOrThrow({
@@ -141,6 +147,37 @@ export async function createAssetTicket(
   return child.id;
 }
 
+/**
+ * One child ticket per asset, for a parent the caller already holds. An asset
+ * given as an id is read inside the transaction; one given with its labels is
+ * not. An asset listed twice gets one child.
+ */
+export async function createAssetTickets(
+  tx: TransactionClient,
+  params: {
+    parentTicketId: string;
+    parent: ParentFields;
+    assets: ReadonlyArray<string | (AssetNameSource & { id: string })>;
+    actorId: string;
+  },
+): Promise<void> {
+  const { parentTicketId, parent, actorId } = params;
+  const attachedAssetIds = new Set<string>();
+  for (const asset of params.assets) {
+    const assetId = typeof asset === "string" ? asset : asset.id;
+    if (attachedAssetIds.has(assetId)) continue;
+    attachedAssetIds.add(assetId);
+
+    await createAssetTicket(tx, {
+      parentTicketId,
+      assetId,
+      actorId,
+      parent,
+      asset: typeof asset === "string" ? undefined : asset,
+    });
+  }
+}
+
 // Given an array of DeviceGroupMatching ids, finds every asset whose device
 // group matches at least one of them and creates an AssetTicket for each,
 // parented to parentTicketId.
@@ -161,33 +198,10 @@ export async function attachMatchingAssets(
   // leaving this to createAssetTicket would re-read it for each asset.
   const parent = await tx.workOrderTicket.findUniqueOrThrow({
     where: { id: parentTicketId },
-    select: {
-      summary: true,
-      body: true,
-      category: true,
-      priority: true,
-      creatorId: true,
-      scheduledAt: true,
-      sourceLabel: true,
-      isDraft: true,
-    },
+    select: parentFieldsSelect,
   });
 
-  // Guards against creating the same asset's child ticket twice — findMany
-  // already returns each asset once, so this only matters if that changes.
-  const attachedAssetIds = new Set<string>();
-  for (const asset of assets) {
-    if (attachedAssetIds.has(asset.id)) continue;
-    attachedAssetIds.add(asset.id);
-
-    await createAssetTicket(tx, {
-      parentTicketId,
-      assetId: asset.id,
-      actorId,
-      parent,
-      asset,
-    });
-  }
+  await createAssetTickets(tx, { parentTicketId, parent, assets, actorId });
 }
 
 // Walks up the ticket's parent chain: if every child of the parent is now

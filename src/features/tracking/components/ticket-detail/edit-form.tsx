@@ -1,6 +1,11 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import {
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useState,
+} from "react";
 import { priorityConfig } from "@/components/priority-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,13 +28,9 @@ import {
   type LockedField,
   lockedFieldMessage,
 } from "@/features/work-orders/locked-fields";
-import type {
-  Priority,
-  TicketCategory,
-  TicketStatus,
-} from "@/generated/prisma";
+import { Priority, TicketCategory, TicketStatus } from "@/generated/prisma";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
-import { toDateTimeLocal } from "@/lib/date-utils";
+import { asDate, toDateTimeLocal } from "@/lib/date-utils";
 import {
   useAssignableUsers,
   useDepartments,
@@ -41,7 +42,7 @@ import { categoryLabels, TicketStatusSelectTrigger } from "./shared";
 
 const UNASSIGNED = "__unassigned__";
 
-type EditState = {
+export type TicketFormState = {
   summary: string;
   body: string;
   status: TicketStatus;
@@ -53,7 +54,19 @@ type EditState = {
   scheduledEndTime: string;
 };
 
-const buildEditState = (data: TicketDetail): EditState => ({
+export const emptyTicketFormState = (): TicketFormState => ({
+  summary: "",
+  body: "",
+  status: TicketStatus.TO_DO,
+  category: TicketCategory.OTHER,
+  priority: Priority.Unsorted,
+  departmentIds: [],
+  assigneeId: UNASSIGNED,
+  scheduledAt: "",
+  scheduledEndTime: "",
+});
+
+const buildEditState = (data: TicketDetail): TicketFormState => ({
   summary: data.summary,
   body: data.body ?? "",
   status: data.status,
@@ -66,7 +79,7 @@ const buildEditState = (data: TicketDetail): EditState => ({
 });
 
 // Moving the start moves the end by the same amount.
-const shiftEnd = (form: EditState, scheduledAt: string) =>
+const shiftEnd = (form: TicketFormState, scheduledAt: string) =>
   form.scheduledAt && form.scheduledEndTime && scheduledAt
     ? toDateTimeLocal(
         new Date(
@@ -77,7 +90,10 @@ const shiftEnd = (form: EditState, scheduledAt: string) =>
       )
     : form.scheduledEndTime;
 
-const endTimeError = ({ scheduledAt, scheduledEndTime }: EditState) => {
+export const endTimeError = ({
+  scheduledAt,
+  scheduledEndTime,
+}: TicketFormState) => {
   if (!scheduledEndTime) return null;
   if (!scheduledAt) return "Set a start time first";
   if (new Date(scheduledEndTime) <= new Date(scheduledAt)) {
@@ -122,7 +138,20 @@ const LockedFieldTooltip = ({
   );
 };
 
-const editStateFingerprint = (state: EditState) =>
+/** The form's values as the `create` and `update` mutations take them. */
+export const ticketFormInput = (form: TicketFormState) => ({
+  summary: form.summary.trim(),
+  body: form.body.trim() || null,
+  status: form.status,
+  category: form.category,
+  priority: form.priority,
+  departmentIds: form.departmentIds,
+  assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
+  scheduledAt: asDate(form.scheduledAt),
+  scheduledEndTime: asDate(form.scheduledEndTime),
+});
+
+export const ticketFormFingerprint = (state: TicketFormState) =>
   JSON.stringify({
     ...state,
     // Department order is incidental — toggling can re-order without semantic
@@ -130,78 +159,27 @@ const editStateFingerprint = (state: EditState) =>
     departmentIds: [...state.departmentIds].sort(),
   });
 
-export const TicketEditForm = ({
-  data,
-  onCancel,
+type TicketFieldLocks = Partial<Record<EditableWorkOrderField, LockedField>>;
+
+/**
+ * The editable fields of a ticket. The edit page and the create dialog both
+ * render these, so a field added here appears in both.
+ */
+export const TicketFormFields = ({
+  form,
+  setForm,
+  locks = {},
 }: {
-  data: TicketDetail;
-  onCancel: () => void;
+  form: TicketFormState;
+  setForm: Dispatch<SetStateAction<TicketFormState>>;
+  locks?: TicketFieldLocks;
 }) => {
-  // Snapshot the initial form state once so we can detect dirtiness against
-  // the values the user originally opened the editor with, not against
-  // whatever the latest server refetch produced.
-  const [initial] = useState(() => buildEditState(data));
-  const [form, setForm] = useState<EditState>(initial);
-  const update = useUpdateTicket(data.id);
-  const locks: Partial<Record<EditableWorkOrderField, LockedField>> =
-    Object.fromEntries(data.lockedFields.map((l) => [l.field, l]));
   const { data: users } = useAssignableUsers();
   const { data: departments } = useDepartments();
-
   const endError = endTimeError(form);
 
-  const isDirty = editStateFingerprint(form) !== editStateFingerprint(initial);
-  useBeforeUnload(isDirty);
-
-  const handleCancel = () => {
-    if (
-      isDirty &&
-      !window.confirm("Discard your unsaved changes to this ticket?")
-    ) {
-      return;
-    }
-    onCancel();
-  };
-
-  const handleSubmit = () => {
-    const trimmedSummary = form.summary.trim();
-    if (!trimmedSummary || endError) return;
-    // Send a platform-mapped field only when the user changed it. The form
-    // rounds times to the minute and trims text, so an untouched value can
-    // differ from the stored one and would be pushed to the platform, or
-    // refused as locked.
-    const changed = (field: keyof EditState) => form[field] !== initial[field];
-    update.mutate(
-      {
-        id: data.id,
-        ...(changed("summary") && { summary: trimmedSummary }),
-        ...(changed("body") && { body: form.body.trim() || null }),
-        ...(changed("status") && { status: form.status }),
-        ...(changed("category") && { category: form.category }),
-        ...(changed("priority") && { priority: form.priority }),
-        departmentIds: form.departmentIds,
-        assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
-        ...(changed("scheduledAt") && {
-          scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
-        }),
-        ...(changed("scheduledEndTime") && {
-          scheduledEndTime: form.scheduledEndTime
-            ? new Date(form.scheduledEndTime)
-            : null,
-        }),
-      },
-      { onSuccess: () => onCancel() },
-    );
-  };
-
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleSubmit();
-      }}
-      className="flex flex-col gap-4"
-    >
+    <>
       <div className="rounded-lg border bg-background p-4 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="ticket-summary">Summary</Label>
@@ -385,6 +363,80 @@ export const TicketEditForm = ({
           </LockedFieldTooltip>
         </div>
       </div>
+    </>
+  );
+};
+
+export const TicketEditForm = ({
+  data,
+  onCancel,
+}: {
+  data: TicketDetail;
+  onCancel: () => void;
+}) => {
+  // Snapshot the initial form state once so we can detect dirtiness against
+  // the values the user originally opened the editor with, not against
+  // whatever the latest server refetch produced.
+  const [initial] = useState(() => buildEditState(data));
+  const [form, setForm] = useState<TicketFormState>(initial);
+  const update = useUpdateTicket(data.id);
+  const locks: TicketFieldLocks = Object.fromEntries(
+    data.lockedFields.map((l) => [l.field, l]),
+  );
+
+  const endError = endTimeError(form);
+
+  const isDirty =
+    ticketFormFingerprint(form) !== ticketFormFingerprint(initial);
+  useBeforeUnload(isDirty);
+
+  const handleCancel = () => {
+    if (
+      isDirty &&
+      !window.confirm("Discard your unsaved changes to this ticket?")
+    ) {
+      return;
+    }
+    onCancel();
+  };
+
+  const handleSubmit = () => {
+    const values = ticketFormInput(form);
+    if (!values.summary || endError) return;
+    // Send a platform-mapped field only when the user changed it. The form
+    // rounds times to the minute and trims text, so an untouched value can
+    // differ from the stored one and would be pushed to the platform, or
+    // refused as locked.
+    const changed = (field: keyof TicketFormState) =>
+      form[field] !== initial[field];
+    update.mutate(
+      {
+        id: data.id,
+        ...(changed("summary") && { summary: values.summary }),
+        ...(changed("body") && { body: values.body }),
+        ...(changed("status") && { status: values.status }),
+        ...(changed("category") && { category: values.category }),
+        ...(changed("priority") && { priority: values.priority }),
+        departmentIds: values.departmentIds,
+        assigneeId: values.assigneeId,
+        ...(changed("scheduledAt") && { scheduledAt: values.scheduledAt }),
+        ...(changed("scheduledEndTime") && {
+          scheduledEndTime: values.scheduledEndTime,
+        }),
+      },
+      { onSuccess: () => onCancel() },
+    );
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit();
+      }}
+      className="flex flex-col gap-4"
+    >
+      <TicketFormFields form={form} setForm={setForm} locks={locks} />
 
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={update.isPending || !!endError}>

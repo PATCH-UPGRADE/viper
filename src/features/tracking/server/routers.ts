@@ -69,7 +69,12 @@ import {
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
-import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
+import {
+  cascadeDoneStatus,
+  createAssetTicket,
+  createAssetTickets,
+  parentFieldsSelect,
+} from "./asset-tickets";
 import {
   assertCanOpen,
   getInterruptionCalendar,
@@ -301,6 +306,33 @@ const withUnreadFlag = <T extends { seenBy: { seenAt: Date }[] }>(
 
 const badRequest = (message: string) =>
   new TRPCError({ code: "BAD_REQUEST", message });
+
+// Each linked asset costs three sequential queries inside the create
+// transaction: about 6 ms per asset on local Postgres, and tens of
+// milliseconds per query on hosted Postgres, so 50 assets can pass Prisma's
+// five-second default.
+const CREATE_TRANSACTION_TIMEOUT_MS = 20_000;
+
+// The fields a user edits on a ticket. `create` takes them whole, `update`
+// takes any subset.
+const ticketFieldsSchema = z.object({
+  summary: z.string().trim().min(1).max(255),
+  body: z.string().max(50_000).nullish(),
+  status: z.enum(TicketStatus),
+  category: z.enum(TicketCategory),
+  priority: z.enum(Priority),
+  departmentIds: z
+    .array(z.string())
+    .describe("Replaces the departments. An empty array clears them."),
+  assigneeId: z.string().nullish(),
+  scheduledAt: z.coerce.date().nullish(),
+  scheduledEndTime: z.coerce
+    .date()
+    .nullish()
+    .describe(
+      "Must be after scheduledAt. To clear scheduledAt, clear this too.",
+    ),
+});
 
 const RESCHEDULE_STATUS = {
   approve: "APPROVED",
@@ -632,29 +664,102 @@ export const trackingRouter = createTRPCRouter({
       });
     }),
 
-  update: protectedProcedure
+  create: protectedProcedure
     .input(
-      z.object({
-        id: z.string(),
-        summary: z.string().trim().min(1).max(255).optional(),
-        body: z.string().max(50_000).nullish(),
-        status: z.enum(TicketStatus).optional(),
-        category: z.enum(TicketCategory).optional(),
-        priority: z.enum(Priority).optional(),
-        departmentIds: z
+      ticketFieldsSchema.extend({
+        status: ticketFieldsSchema.shape.status.default(TicketStatus.TO_DO),
+        category: ticketFieldsSchema.shape.category.default(
+          TicketCategory.OTHER,
+        ),
+        priority: ticketFieldsSchema.shape.priority.default(Priority.Unsorted),
+        departmentIds: ticketFieldsSchema.shape.departmentIds.default([]),
+        assetIds: z
           .array(z.string())
-          .optional()
-          .describe("Replaces the departments. An empty array clears them."),
-        assigneeId: z.string().nullish(),
-        scheduledAt: z.coerce.date().nullish(),
-        scheduledEndTime: z.coerce
-          .date()
-          .nullish()
+          // The parent and its children are written one at a time in one
+          // interactive transaction, see CREATE_TRANSACTION_TIMEOUT_MS.
+          .max(50)
+          .default([])
           .describe(
-            "Must be after scheduledAt. To clear scheduledAt, clear this too.",
+            "Assets to link. Each one gets a dedicated child ticket, as attachAsset does.",
           ),
       }),
     )
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/work-orders",
+        tags: ["Work Orders"],
+        summary: "Create a work-order ticket",
+        description:
+          "Create a work-order ticket that VIPER tracks, with an optional set of linked assets. Returns the new ticket detail.",
+      },
+    })
+    .output(workOrderDetailResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { assetIds, departmentIds, ...fields } = input;
+      assertTimeRange({ scheduledAt: null, scheduledEndTime: null }, fields);
+
+      // Read before the transaction so the children do not each re-read their
+      // asset inside it, and so a missing asset is refused before any write.
+      const uniqueAssetIds = [...new Set(assetIds)];
+      const assets =
+        uniqueAssetIds.length > 0
+          ? await prisma.asset.findMany({
+              where: { id: { in: uniqueAssetIds } },
+              select: assetNameSelect,
+            })
+          : [];
+      if (assets.length !== uniqueAssetIds.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "An asset does not exist",
+        });
+      }
+
+      return prisma
+        .$transaction(
+          async (tx) => {
+            const parent = await tx.workOrderTicket.create({
+              data: {
+                ...fields,
+                body: fields.body?.trim() || null,
+                creatorId: ctx.auth.user.id,
+                departments: { connect: departmentIds.map((id) => ({ id })) },
+              },
+              select: { id: true, ...parentFieldsSelect },
+            });
+            await recordCreationActivity(tx, parent.id);
+
+            await createAssetTickets(tx, {
+              parentTicketId: parent.id,
+              parent,
+              assets,
+              actorId: ctx.auth.user.id,
+            });
+
+            const created = await tx.workOrderTicket.findUniqueOrThrow({
+              where: { id: parent.id },
+              include: ticketDetailInclude,
+            });
+            return toTicketDetail(created);
+          },
+          { timeout: CREATE_TRANSACTION_TIMEOUT_MS },
+        )
+        .catch((error) => {
+          // A missing department surfaces as a Prisma record-not-found, and a
+          // missing assignee as a foreign-key violation.
+          if (hasPrismaCode(error, "P2025") || hasPrismaCode(error, "P2003")) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "An assignee or department does not exist",
+            });
+          }
+          throw error;
+        });
+    }),
+
+  update: protectedProcedure
+    .input(ticketFieldsSchema.partial().extend({ id: z.string() }))
     .meta({
       openapi: {
         method: "PATCH",
@@ -1035,7 +1140,15 @@ export const trackingRouter = createTRPCRouter({
     }),
 
   listAttachableAssets: protectedProcedure
-    .input(z.object({ ticketId: z.string(), search: z.string().optional() }))
+    .input(
+      z.object({
+        ticketId: z
+          .string()
+          .optional()
+          .describe("Omit for a ticket that does not exist yet."),
+        search: z.string().optional(),
+      }),
+    )
     .query(async ({ input }) => {
       const insensitive = {
         contains: input.search,
@@ -1046,11 +1159,14 @@ export const trackingRouter = createTRPCRouter({
             OR: assetNameSearchTerms(insensitive),
           }
         : {};
-      // Only return assets not already attached to this ticket so the picker
-      // doesn't show duplicates of what's already in the table.
+      // With a ticket, leave out the assets it already has, so the picker does
+      // not repeat the linked assets table. Without one, every asset is a
+      // candidate.
       return prisma.asset.findMany({
         where: {
-          assetTickets: { none: { parentTicketId: input.ticketId } },
+          ...(input.ticketId && {
+            assetTickets: { none: { parentTicketId: input.ticketId } },
+          }),
           ...matchesSearch,
         },
         select: {
@@ -1401,7 +1517,7 @@ export const trackingRouter = createTRPCRouter({
           data: { isDraft: false },
         });
         try {
-          await recordCreationActivity(ticket.id);
+          await recordCreationActivity(prisma, ticket.id);
         } catch (error) {
           console.error("recordCreationActivity (approve) failed", error);
         }
@@ -1506,7 +1622,7 @@ export const trackingRouter = createTRPCRouter({
               artifactsData: undefined,
             };
           },
-          onItemCreated: (id) => recordCreationActivity(id),
+          onItemCreated: (id) => recordCreationActivity(prisma, id),
         },
         input,
         userId,

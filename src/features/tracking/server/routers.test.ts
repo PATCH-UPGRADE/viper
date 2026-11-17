@@ -257,6 +257,186 @@ beforeEach(() => {
   mockLockedFields.mockReturnValue([]);
 });
 
+describe("trackingRouter.create", () => {
+  const parentRow = {
+    id: "parent-1",
+    summary: "Replace pump",
+    body: "Swap the unit",
+    category: "MAINTENANCE",
+    priority: "High",
+    creatorId: FAKE_USER_ID,
+    scheduledAt: null,
+    sourceLabel: null,
+    isDraft: false,
+  };
+
+  // What recordCreationActivity reads back from the parent it just wrote.
+  const creationRow = {
+    creatorId: FAKE_USER_ID,
+    category: "MAINTENANCE",
+    priority: "High",
+    sourceLabel: null,
+    notification: null,
+    vulnerabilities: [],
+    externalMapping: null,
+  };
+
+  beforeEach(() => {
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(creationRow);
+    // Every requested asset exists unless a test says otherwise.
+    mockPrisma.asset.findMany.mockImplementation(
+      ({ where }: { where: { id: { in: string[] } } }) =>
+        Promise.resolve(
+          where.id.in.map((id) => ({
+            id,
+            hostname: `host-${id}`,
+            ip: null,
+            serialNumber: null,
+            product: null,
+          })),
+        ),
+    );
+  });
+
+  it("writes the parent for the current user, its creation activity, and one child per asset", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.create.mockResolvedValueOnce(parentRow);
+
+    await caller.create({
+      summary: "Replace pump",
+      body: "Swap the unit",
+      category: "MAINTENANCE",
+      priority: "High",
+      departmentIds: ["d1"],
+      assigneeId: "u2",
+      assetIds: ["a1", "a2", "a1"],
+    });
+
+    const [parentCall, ...childCalls] =
+      mockPrisma.workOrderTicket.create.mock.calls;
+    expect(parentCall[0].data).toMatchObject({
+      summary: "Replace pump",
+      body: "Swap the unit",
+      status: "TO_DO",
+      category: "MAINTENANCE",
+      priority: "High",
+      creatorId: FAKE_USER_ID,
+      assigneeId: "u2",
+      departments: { connect: [{ id: "d1" }] },
+    });
+
+    expect(mockPrisma.ticketActivity.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: "parent-1",
+        userId: FAKE_USER_ID,
+        type: "WORK_ORDER_CREATED",
+        data: {
+          source: null,
+          advisoryTitle: null,
+          displayId: null,
+          externalRecordId: null,
+          category: "MAINTENANCE",
+          priority: "High",
+        },
+      },
+    });
+
+    // A repeated asset id gets one child.
+    expect(childCalls).toHaveLength(2);
+    expect(childCalls.map((c) => c[0].data.ticket)).toEqual([
+      { create: { assetId: "a1", parentTicketId: "parent-1" } },
+      { create: { assetId: "a2", parentTicketId: "parent-1" } },
+    ]);
+    // The children copy the parent that was just written and the assets read
+    // up front, without re-reading either.
+    expect(childCalls[0][0].data).toMatchObject({
+      summary: "Replace pump — host-a1",
+      category: "MAINTENANCE",
+      priority: "High",
+      isDraft: false,
+      parent: { connect: { id: "parent-1" } },
+    });
+    expect(mockPrisma.asset.findMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.asset.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.findUniqueOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "parent-1" } }),
+    );
+  });
+
+  it("gives the transaction more than Prisma's five-second default", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.create.mockResolvedValueOnce(parentRow);
+
+    await caller.create({ summary: "Replace pump" });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: expect.any(Number),
+    });
+    // The mock's signature knows only the callback, so widen the call tuple.
+    const calls = mockPrisma.$transaction.mock.calls as unknown as [
+      unknown,
+      { timeout: number },
+    ][];
+    expect(calls[0][1].timeout).toBeGreaterThan(5_000);
+  });
+
+  it("defaults the status, category, priority and body", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.create.mockResolvedValueOnce(parentRow);
+
+    await caller.create({ summary: "Replace pump", body: "   " });
+
+    expect(
+      mockPrisma.workOrderTicket.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      status: "TO_DO",
+      category: "OTHER",
+      priority: "Unsorted",
+      body: null,
+      departments: { connect: [] },
+    });
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an end time that is not after the start time", async () => {
+    const caller = setup();
+
+    await expect(
+      caller.create({
+        summary: "Replace pump",
+        scheduledAt: new Date("2026-05-02T10:00:00Z"),
+        scheduledEndTime: new Date("2026-05-02T09:00:00Z"),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      caller.create({
+        summary: "Replace pump",
+        scheduledEndTime: new Date("2026-05-02T09:00:00Z"),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a missing asset before anything is written", async () => {
+    const caller = setup();
+    mockPrisma.asset.findMany.mockResolvedValueOnce([]);
+
+    await expect(
+      caller.create({ summary: "Replace pump", assetIds: ["missing"] }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("maps a missing department to BAD_REQUEST", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.create.mockRejectedValueOnce({ code: "P2025" });
+
+    await expect(
+      caller.create({ summary: "Replace pump", departmentIds: ["missing"] }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
 describe("trackingRouter.update", () => {
   it("passes summary straight through", async () => {
     const caller = setup();

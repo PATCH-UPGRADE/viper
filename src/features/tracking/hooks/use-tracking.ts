@@ -7,6 +7,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useTrackingParams } from "./use-tracking-params";
@@ -397,10 +398,48 @@ export const useUnlinkTicket = () => {
   );
 };
 
-export const useAttachableAssets = (ticketId: string, search: string) => {
+/** Without a `ticketId`, every asset is a candidate. */
+export const useAttachableAssets = (
+  ticketId: string | undefined,
+  search: string,
+  enabled = true,
+) => {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.tracking.listAttachableAssets.queryOptions({ ticketId, search }),
+  return useQuery({
+    ...trpc.tracking.listAttachableAssets.queryOptions({ ticketId, search }),
+    enabled,
+  });
+};
+
+export const useCreateTicket = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const invalidateInterruptions = useInvalidateInterruptions();
+  return useMutation(
+    trpc.tracking.create.mutationOptions({
+      onSuccess: (ticket) => {
+        invalidateInterruptions();
+        queryClient.invalidateQueries(
+          trpc.tracking.getManyByAssetId.queryFilter(),
+        );
+        queryClient.invalidateQueries(
+          trpc.tracking.getOtherAssetWorkOrders.queryFilter(),
+        );
+        toast.success("Work order created", {
+          description: ticket.summary,
+          // Long enough to reach the button. The default is four seconds.
+          duration: 8_000,
+          action: {
+            label: "View",
+            onClick: () => router.push(`/tracking/${ticket.id}`),
+          },
+        });
+      },
+      onError: (error) => {
+        toast.error(`Failed to create work order: ${error.message}`);
+      },
+    }),
   );
 };
 

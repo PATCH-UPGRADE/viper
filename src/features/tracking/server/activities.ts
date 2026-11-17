@@ -8,7 +8,7 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
-import prisma, { type TransactionClient } from "@/lib/db";
+import type { TransactionClient } from "@/lib/db";
 
 // Activity rows are intentionally lightweight: `type` is the discriminator,
 // `data` is a Json blob whose shape varies. We snapshot human-readable values
@@ -217,13 +217,17 @@ export async function recordUpdateActivities(
 /**
  * Records the WORK_ORDER_CREATED activity for a new ticket. Writes one row.
  * This function reads the creator, source, advisory, category, and priority
- * from the ticket, so the caller passes only the id. The activity belongs to
+ * from the ticket, so the caller passes no fields. The activity belongs to
  * the ticket creator. For an automation-sourced ticket, the creator is the
  * integration user, and the UI shows an "AI Agent" badge. Call this function
- * after the external mappings and sources exist.
+ * after the external mappings and sources exist. A caller outside a
+ * transaction passes the Prisma client as `tx`.
  */
-export async function recordCreationActivity(ticketId: string): Promise<void> {
-  const t = await prisma.workOrderTicket.findUnique({
+export async function recordCreationActivity(
+  tx: TransactionClient,
+  ticketId: string,
+): Promise<void> {
+  const t = await tx.workOrderTicket.findUnique({
     where: { id: ticketId },
     select: {
       creatorId: true,
@@ -243,7 +247,7 @@ export async function recordCreationActivity(ticketId: string): Promise<void> {
   if (!t) return;
 
   const mapping = t.externalMapping;
-  await prisma.ticketActivity.create({
+  await tx.ticketActivity.create({
     data: {
       ticketId,
       userId: t.creatorId,

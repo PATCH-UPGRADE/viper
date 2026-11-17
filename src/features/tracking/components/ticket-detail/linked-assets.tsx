@@ -1,35 +1,15 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  getAssetDeviceTypeLabel,
-  getAssetIdentifier,
-} from "@/features/assets/utils";
 import { getSwatchClass } from "@/features/tag-colors/palette";
 import { TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import {
   useAttachAsset,
-  useAttachableAssets,
   useDetachAsset,
   useSuspenseOtherAssetWorkOrders,
 } from "../../hooks/use-tracking";
+import { AssetPickerPopover } from "./asset-picker-popover";
 import { LinkedAssetsTable } from "./linked-assets-table";
 import { OtherAssetWorkOrdersCard } from "./other-asset-work-orders";
 import { countOtherWorkOrdersByAsset } from "./other-work-order-groups";
@@ -88,80 +68,16 @@ const AssetProgressStrip = ({
   );
 };
 
-const SEARCH_DEBOUNCE_MS = 500;
-
 const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
-  const [open, setOpen] = useState(false);
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const { data: candidates } = useAttachableAssets(ticketId, searchQuery);
   const attach = useAttachAsset(ticketId);
-
-  useEffect(() => {
-    const timer = setTimeout(
-      () => setSearchQuery(searchInput),
-      SEARCH_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="outline">
-          <PlusIcon className="size-3.5" />
-          Add asset
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-96" align="end">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search assets..."
-            value={searchInput}
-            onValueChange={setSearchInput}
-          />
-          <CommandList>
-            <CommandEmpty>No eligible assets found.</CommandEmpty>
-            <CommandGroup>
-              {(candidates ?? []).map((a) => {
-                const label = getAssetIdentifier(a);
-                const model = [
-                  a.manufacturer?.canonicalDisplayName,
-                  a.product?.canonicalDisplayName,
-                ]
-                  .filter(Boolean)
-                  .join(" ");
-                const sub = [getAssetDeviceTypeLabel(a), model]
-                  .filter(Boolean)
-                  .join(" · ");
-                return (
-                  <CommandItem
-                    key={a.id}
-                    value={a.id}
-                    onSelect={() => {
-                      attach.mutate(
-                        { ticketId, assetId: a.id },
-                        { onSuccess: () => setOpen(false) },
-                      );
-                    }}
-                    disabled={attach.isPending}
-                  >
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="truncate font-medium">{label}</span>
-                      {sub && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {sub}
-                        </span>
-                      )}
-                    </div>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <AssetPickerPopover
+      ticketId={ticketId}
+      pending={attach.isPending}
+      onSelect={(asset, close) =>
+        attach.mutate({ ticketId, assetId: asset.id }, { onSuccess: close })
+      }
+    />
   );
 };
 

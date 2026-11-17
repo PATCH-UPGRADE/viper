@@ -112,7 +112,10 @@ export const CreateWorkOrderButton = () => {
   };
 
   // Cancel, Escape, the overlay and the close button all pass through here.
+  // A close during the request would reset the form under a draft the user
+  // starts next, and the success handler would then clear that draft too.
   const requestClose = () => {
+    if (create.isPending) return;
     if (isDirty && !window.confirm(DISCARD_PROMPT)) return;
     close();
   };
@@ -152,8 +155,15 @@ export const CreateWorkOrderButton = () => {
           }}
           className="flex flex-col gap-4"
         >
-          <TicketFormFields form={form} setForm={setForm} />
-          <LinkedAssetsField assets={assets} setAssets={setAssets} />
+          {/* The request carries the values from submit time, so an edit
+              made while it runs would be lost on success. */}
+          <fieldset
+            disabled={create.isPending}
+            className="flex min-w-0 flex-col gap-4"
+          >
+            <TicketFormFields form={form} setForm={setForm} />
+            <LinkedAssetsField assets={assets} setAssets={setAssets} />
+          </fieldset>
           <DialogFooter>
             <Button
               type="button"

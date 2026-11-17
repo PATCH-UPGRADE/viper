@@ -74,6 +74,10 @@ import { CreateWorkOrderButton } from "./create-work-order-dialog";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUseCreateTicket.mockReturnValue({
+    mutate: mockCreateMutate,
+    isPending: false,
+  });
 });
 
 const openDialog = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -208,6 +212,25 @@ describe("CreateWorkOrderButton", () => {
     confirmSpy.mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: /cancel/i }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("locks the form and ignores a close while the create is pending", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockUseCreateTicket.mockReturnValue({
+      mutate: mockCreateMutate,
+      isPending: true,
+    });
+    await openDialog(user);
+
+    expect(screen.getByLabelText(/summary/i)).toBeDisabled();
+    expect(screen.getByRole("button", { name: /add asset/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /creating/i })).toBeDisabled();
+
+    await user.keyboard("{Escape}");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("refuses an end time before the start time", async () => {

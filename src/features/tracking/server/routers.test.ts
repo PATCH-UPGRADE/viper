@@ -363,6 +363,23 @@ describe("trackingRouter.create", () => {
     );
   });
 
+  it("gives the transaction more than Prisma's five-second default", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.create.mockResolvedValueOnce(parentRow);
+
+    await caller.create({ summary: "Replace pump" });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: expect.any(Number),
+    });
+    // The mock's signature knows only the callback, so widen the call tuple.
+    const calls = mockPrisma.$transaction.mock.calls as unknown as [
+      unknown,
+      { timeout: number },
+    ][];
+    expect(calls[0][1].timeout).toBeGreaterThan(5_000);
+  });
+
   it("defaults the status, category, priority and body", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.create.mockResolvedValueOnce(parentRow);

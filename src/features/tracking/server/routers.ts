@@ -306,6 +306,12 @@ const withUnreadFlag = <T extends { seenBy: { seenAt: Date }[] }>(
 const badRequest = (message: string) =>
   new TRPCError({ code: "BAD_REQUEST", message });
 
+// Each linked asset costs three sequential queries inside the create
+// transaction: about 6 ms per asset on local Postgres, and tens of
+// milliseconds per query on hosted Postgres, so 50 assets can pass Prisma's
+// five-second default.
+const CREATE_TRANSACTION_TIMEOUT_MS = 20_000;
+
 // The fields a user edits on a ticket. `create` takes them whole, `update`
 // takes any subset.
 const ticketFieldsSchema = z.object({
@@ -668,8 +674,8 @@ export const trackingRouter = createTRPCRouter({
         departmentIds: ticketFieldsSchema.shape.departmentIds.default([]),
         assetIds: z
           .array(z.string())
-          // The parent and its children are written in one interactive
-          // transaction. Prisma aborts it after five seconds by default.
+          // The parent and its children are written one at a time in one
+          // interactive transaction, see CREATE_TRANSACTION_TIMEOUT_MS.
           .max(50)
           .default([])
           .describe(
@@ -710,34 +716,37 @@ export const trackingRouter = createTRPCRouter({
       }
 
       return prisma
-        .$transaction(async (tx) => {
-          const parent = await tx.workOrderTicket.create({
-            data: {
-              ...fields,
-              body: fields.body?.trim() || null,
-              creatorId: ctx.auth.user.id,
-              departments: { connect: departmentIds.map((id) => ({ id })) },
-            },
-            select: { id: true, ...parentFieldsSelect },
-          });
-          await recordCreationActivity(tx, parent.id);
-
-          for (const asset of assets) {
-            await createAssetTicket(tx, {
-              parentTicketId: parent.id,
-              assetId: asset.id,
-              actorId: ctx.auth.user.id,
-              parent,
-              asset,
+        .$transaction(
+          async (tx) => {
+            const parent = await tx.workOrderTicket.create({
+              data: {
+                ...fields,
+                body: fields.body?.trim() || null,
+                creatorId: ctx.auth.user.id,
+                departments: { connect: departmentIds.map((id) => ({ id })) },
+              },
+              select: { id: true, ...parentFieldsSelect },
             });
-          }
+            await recordCreationActivity(tx, parent.id);
 
-          const created = await tx.workOrderTicket.findUniqueOrThrow({
-            where: { id: parent.id },
-            include: ticketDetailInclude,
-          });
-          return toTicketDetail(created);
-        })
+            for (const asset of assets) {
+              await createAssetTicket(tx, {
+                parentTicketId: parent.id,
+                assetId: asset.id,
+                actorId: ctx.auth.user.id,
+                parent,
+                asset,
+              });
+            }
+
+            const created = await tx.workOrderTicket.findUniqueOrThrow({
+              where: { id: parent.id },
+              include: ticketDetailInclude,
+            });
+            return toTicketDetail(created);
+          },
+          { timeout: CREATE_TRANSACTION_TIMEOUT_MS },
+        )
         .catch((error) => {
           // A missing department surfaces as a Prisma record-not-found, and a
           // missing assignee as a foreign-key violation.

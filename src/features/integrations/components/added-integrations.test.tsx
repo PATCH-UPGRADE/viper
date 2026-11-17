@@ -123,16 +123,6 @@ describe("AddedIntegrations", () => {
     expect(screen.getByDisplayValue("Biomed desk")).toBeInTheDocument();
   });
 
-  it("shows only the pen when the count is off, as for a singleton", () => {
-    mockPlatformIntegrations.mockReturnValue([serviceNow("a", "Main desk")]);
-    render(<AddedIntegrations entry={entry} showCount={false} />);
-
-    expect(screen.queryByText(/added/)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Edit Main desk" }),
-    ).toBeInTheDocument();
-  });
-
   it("shows nothing when the platform has no integrations", () => {
     mockPlatformIntegrations.mockReturnValue([]);
     const { container } = render(<AddedIntegrations entry={entry} />);

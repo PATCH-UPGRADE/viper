@@ -58,29 +58,19 @@ describe("SuggestedIntegrations", () => {
     expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
   });
 
-  it("disappears when the category chip leaves nothing to suggest", () => {
-    mockSuggestions.mockReturnValue([
-      { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
-    ]);
-    const { container } = render(
-      <SuggestedIntegrations
-        catalog={[fleet]}
-        filter={{ category: "Notifications", query: "" }}
-      />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("disappears when the search matches no suggestion", () => {
-    mockSuggestions.mockReturnValue([
-      { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
-    ]);
-    const { container } = render(
-      <SuggestedIntegrations
-        catalog={[fleet]}
-        filter={{ category: "all", query: "servicenow" }}
-      />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
+  it.each([
+    { category: "Notifications", query: "" },
+    { category: "all", query: "servicenow" },
+  ] as const)(
+    "disappears when the filter %o leaves nothing to suggest",
+    (filter) => {
+      mockSuggestions.mockReturnValue([
+        { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
+      ]);
+      const { container } = render(
+        <SuggestedIntegrations catalog={[fleet]} filter={filter} />,
+      );
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
 });

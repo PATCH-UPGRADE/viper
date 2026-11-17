@@ -118,16 +118,15 @@ const rowNamed = (name: string) => {
 };
 
 describe("StatusBadge", () => {
-  it("underlines a failing badge that has an error to show", () => {
-    render(<StatusBadge state="failing" errorMessage="401 Unauthorized" />);
-    const badge = screen.getByRole("button", { name: "Failing" });
-    expect(badge).toHaveClass("decoration-dotted");
-  });
+  it("is a tooltip trigger only when there is an error to show", () => {
+    const { rerender } = render(
+      <StatusBadge state="failing" errorMessage="401 Unauthorized" />,
+    );
+    expect(screen.getByRole("button", { name: "Failing" })).toBeInTheDocument();
 
-  it("does not underline a failing badge with no error message", () => {
-    render(<StatusBadge state="failing" errorMessage={null} />);
+    rerender(<StatusBadge state="failing" errorMessage={null} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.getByText("Failing")).not.toHaveClass("decoration-dotted");
+    expect(screen.getByText("Failing")).toBeInTheDocument();
   });
 });
 

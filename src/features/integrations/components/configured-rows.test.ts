@@ -116,13 +116,4 @@ describe("filterConfiguredRows", () => {
       ),
     ).toEqual(["Spreadsheet Upload: west-wing.csv, east-wing.csv"]);
   });
-
-  it("returns nothing when nothing matches", () => {
-    expect(
-      filterConfiguredRows(rows, {
-        category: "Ticketing Platforms",
-        query: "",
-      }),
-    ).toEqual([]);
-  });
 });

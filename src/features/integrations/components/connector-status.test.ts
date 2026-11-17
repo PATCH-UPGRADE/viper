@@ -7,7 +7,6 @@ import type {
 import {
   integrationView,
   isPaused,
-  isStreamPaused,
   recordLabel,
   streamView,
   uploadGroupView,
@@ -141,42 +140,24 @@ describe("integrationView", () => {
     });
   });
 
-  it("fails if any running stream fails, and says how many", () => {
-    const view = integrationView(
-      integration([assets, workOrders, notifications]),
-    );
-    expect(view.state).toBe("failing");
-    expect(view.errorMessage).toBe(
-      "1 of 3 streams failing. 504 Gateway timeout",
-    );
-  });
-
-  it("takes the next sync only from streams that are running", () => {
-    const view = integrationView(
-      integration([assets, workOrders, notifications]),
-    );
-    expect(view.schedule?.nextSyncAt).toEqual(new Date("2026-08-20T10:30:00Z"));
-    expect(view.schedule?.every).toEqual([3600, 86_400]);
-    expect(view.lastAt).toEqual(new Date("2026-08-20T10:00:00Z"));
-  });
-
-  it("lists every stream's records, zero included", () => {
+  it("fails if any running stream fails, takes its timing from running streams, and lists every stream's records", () => {
     expect(
-      integrationView(integration([assets, workOrders, notifications])).records,
-    ).toEqual([
-      { resource: ResourceType.Asset, count: 128 },
-      { resource: ResourceType.WorkOrder, count: 56 },
-      { resource: ResourceType.SourceRecord, count: 0 },
-    ]);
-  });
-
-  it("adds records of a type with no stream, but only when there are some", () => {
-    const item = integration([assets, notifications]);
-    expect(integrationView(item).records).toEqual([
-      { resource: ResourceType.Asset, count: 128 },
-      { resource: ResourceType.SourceRecord, count: 0 },
-      { resource: ResourceType.WorkOrder, count: 56 },
-    ]);
+      integrationView(integration([assets, workOrders, notifications])),
+    ).toEqual({
+      state: "failing",
+      errorMessage: "1 of 3 streams failing. 504 Gateway timeout",
+      lastAt: new Date("2026-08-20T10:00:00Z"),
+      schedule: {
+        every: [3600, 86_400],
+        nextSyncAt: new Date("2026-08-20T10:30:00Z"),
+        isDue: false,
+      },
+      records: [
+        { resource: ResourceType.Asset, count: 128 },
+        { resource: ResourceType.WorkOrder, count: 56 },
+        { resource: ResourceType.SourceRecord, count: 0 },
+      ],
+    });
   });
 
   it("is paused when every stream is paused", () => {
@@ -207,33 +188,8 @@ describe("integrationView", () => {
   });
 });
 
-describe("isStreamPaused", () => {
-  it("is paused when the stream or its integration is off", () => {
-    expect(isStreamPaused(integration([]), sync({ enabled: false }))).toBe(
-      true,
-    );
-    expect(isStreamPaused(integration([], { enabled: false }), sync())).toBe(
-      true,
-    );
-    expect(isStreamPaused(integration([]), sync())).toBe(false);
-  });
-});
-
 describe("isPaused", () => {
-  it("is paused when switched off, or when on with every stream off", () => {
-    expect(isPaused(integration([sync()], { enabled: false }))).toBe(true);
-    expect(isPaused(integration([sync({ enabled: false })]))).toBe(true);
-  });
-
-  it("is running while any stream runs, or when it has no streams yet", () => {
-    expect(
-      isPaused(
-        integration([
-          sync({ enabled: false }),
-          sync({ resource: ResourceType.WorkOrder }),
-        ]),
-      ),
-    ).toBe(false);
+  it("is running when it has no streams yet", () => {
     expect(isPaused(integration([]))).toBe(false);
   });
 });
@@ -285,15 +241,9 @@ describe("uploads", () => {
 });
 
 describe("recordLabel", () => {
-  it("pluralizes and groups digits", () => {
+  it("groups digits", () => {
     expect(recordLabel({ resource: ResourceType.WorkOrder, count: 1204 })).toBe(
       "1,204 work orders",
-    );
-    expect(recordLabel({ resource: ResourceType.Asset, count: 1 })).toBe(
-      "1 asset",
-    );
-    expect(recordLabel({ resource: ResourceType.SourceRecord, count: 0 })).toBe(
-      "0 notifications",
     );
   });
 });

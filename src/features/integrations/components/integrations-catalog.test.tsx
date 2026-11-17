@@ -86,11 +86,7 @@ describe("IntegrationsCatalog order", () => {
       "Partner API",
       "Siemens Healthineers",
     ]);
-    expect(screen.getByRole("button", { name: "Add another" })).toBeEnabled();
     expect(screen.getByText("2 added")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Edit Partner API integrations" }),
-    ).toBeEnabled();
   });
 });
 

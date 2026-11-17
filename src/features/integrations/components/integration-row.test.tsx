@@ -186,7 +186,9 @@ describe("pausing", () => {
     render(<StreamActionsMenu integration={integration} sync={sync} />);
 
     await user.click(screen.getByRole("button", { name: /open menu/i }));
-    await user.click(screen.getByRole("menuitem", { name: "Pause Sync" }));
+    const pause = screen.getByRole("menuitem", { name: "Pause Sync" });
+    expect(pause).not.toHaveTextContent("first");
+    await user.click(pause);
 
     expect(mutate).toHaveBeenCalledWith(
       { integrationId: "integration-1", resource: "Asset", enabled: false },
@@ -230,20 +232,5 @@ describe("pausing", () => {
     const resume = screen.getByRole("menuitem", { name: /^Resume Sync/ });
     expect(resume).toHaveAttribute("data-disabled");
     expect(resume).toHaveTextContent("Resume My Partner Feed first");
-  });
-
-  it("gives a stream no hint while its integration is running", async () => {
-    const user = userEvent.setup();
-    render(
-      <StreamActionsMenu
-        integration={integration}
-        sync={integration.resourceSyncs[0]}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: /open menu/i }));
-    expect(
-      screen.getByRole("menuitem", { name: "Pause Sync" }),
-    ).not.toHaveTextContent("first");
   });
 });

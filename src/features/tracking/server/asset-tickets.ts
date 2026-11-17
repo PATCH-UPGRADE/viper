@@ -150,7 +150,7 @@ export async function createAssetTicket(
 /**
  * One child ticket per asset, for a parent the caller already holds. An asset
  * given as an id is read inside the transaction; one given with its labels is
- * not. Duplicates are harmless: createAssetTicket returns the existing child.
+ * not. An asset listed twice gets one child.
  */
 export async function createAssetTickets(
   tx: TransactionClient,
@@ -162,10 +162,15 @@ export async function createAssetTickets(
   },
 ): Promise<void> {
   const { parentTicketId, parent, actorId } = params;
+  const attachedAssetIds = new Set<string>();
   for (const asset of params.assets) {
+    const assetId = typeof asset === "string" ? asset : asset.id;
+    if (attachedAssetIds.has(assetId)) continue;
+    attachedAssetIds.add(assetId);
+
     await createAssetTicket(tx, {
       parentTicketId,
-      assetId: typeof asset === "string" ? asset : asset.id,
+      assetId,
       actorId,
       parent,
       asset: typeof asset === "string" ? undefined : asset,

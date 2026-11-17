@@ -3,7 +3,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import ms from "ms";
 import { Fragment, useState } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -18,8 +17,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getChipClass } from "@/features/tag-colors/palette";
 import { relativeTime } from "@/lib/date-utils";
-import { initialsOf } from "@/lib/string-utils";
 import { cn, plural } from "@/lib/utils";
 import type {
   IntegrationListItem,
@@ -37,34 +36,18 @@ import {
   uploadView,
 } from "./connector-status";
 import { IntegrationActionsMenu, StreamActionsMenu } from "./integration-row";
+import { PlatformAvatar } from "./platform-avatar";
 
+/** Colors come from the shared chip palette, so these badges match tag chips elsewhere in the app. */
 const STATE_BADGES: Record<
   ConnectorState,
   { label: string; className: string }
 > = {
-  healthy: {
-    label: "Healthy",
-    className:
-      "border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  },
-  failing: {
-    label: "Failing",
-    className:
-      "border-transparent bg-destructive/10 text-destructive dark:bg-destructive/25",
-  },
-  paused: {
-    label: "Paused",
-    className: "border-transparent bg-muted text-muted-foreground",
-  },
-  unknown: {
-    label: "Unknown",
-    className: "border-transparent bg-muted text-muted-foreground",
-  },
-  importing: {
-    label: "Importing",
-    className:
-      "border-transparent bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  },
+  healthy: { label: "Healthy", className: getChipClass("emerald") },
+  failing: { label: "Failing", className: getChipClass("red") },
+  paused: { label: "Paused", className: getChipClass("zinc") },
+  unknown: { label: "Unknown", className: getChipClass("zinc") },
+  importing: { label: "Importing", className: getChipClass("sky") },
 };
 
 /** A failing badge with an error message underlines itself, like an <abbr>, and shows the message on hover or focus. */
@@ -185,11 +168,7 @@ const ParentRow = ({
     <TableCell className="max-w-0 min-w-56 pl-3">
       <div className="flex min-w-0 items-center gap-2">
         <ExpandButton name={title} expanded={expanded} onToggle={onToggle} />
-        <Avatar className="size-8 shrink-0 rounded-md border">
-          <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
-            {initialsOf(title)}
-          </AvatarFallback>
-        </Avatar>
+        <PlatformAvatar name={title} className="size-8" />
         <div className={cn("min-w-0", view.state === "paused" && "opacity-60")}>
           <div className="truncate font-semibold">{title}</div>
           <div className="truncate text-xs text-muted-foreground">
@@ -313,6 +292,8 @@ const UploadRows = ({
   </>
 );
 
+const HEAD_CLASS = "text-xs uppercase tracking-wide text-muted-foreground";
+
 const rowKey = (row: ConfiguredRow) =>
   row.kind === "uploads"
     ? `uploads:${row.catalogEntry.platform}`
@@ -337,18 +318,12 @@ export const ConfiguredIntegrationsTable = ({
       <Table>
         <TableHeader className="bg-muted/50">
           <TableRow className="hover:bg-transparent">
-            <TableHead className="w-full min-w-56 pl-11 text-xs uppercase tracking-wide text-muted-foreground">
+            <TableHead className={cn("w-full min-w-56 pl-11", HEAD_CLASS)}>
               Integration
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-              Status
-            </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-              Last sync
-            </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-              Records
-            </TableHead>
+            <TableHead className={HEAD_CLASS}>Status</TableHead>
+            <TableHead className={HEAD_CLASS}>Last sync</TableHead>
+            <TableHead className={HEAD_CLASS}>Records</TableHead>
             <TableHead className="w-10">
               <span className="sr-only">Actions</span>
             </TableHead>

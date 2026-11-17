@@ -24,7 +24,12 @@ const {
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
+    integrationResourceSync: {
+      count: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
     user: { create: vi.fn() },
     workOrderTicket: { count: vi.fn() },
     $executeRaw: vi.fn(),
@@ -213,6 +218,48 @@ describe("integrationsRouter enable controls", () => {
         data: { enabled: false },
       }),
     );
+  });
+
+  it("resumes every stream when resuming an integration whose streams are all paused", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.$transaction.mockImplementation((run) => run(mockPrisma));
+    mockPrisma.integrationResourceSync.count.mockResolvedValue(0);
+
+    await caller.setEnabled({ id: "integration-1", enabled: true });
+
+    expect(mockPrisma.integrationResourceSync.updateMany).toHaveBeenCalledWith({
+      where: { integrationId: "integration-1" },
+      data: { enabled: true },
+    });
+    expect(mockPrisma.integration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { enabled: true } }),
+    );
+  });
+
+  it("leaves paused streams paused when resuming an integration that still has one running", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.$transaction.mockImplementation((run) => run(mockPrisma));
+    mockPrisma.integrationResourceSync.count.mockResolvedValue(1);
+
+    await caller.setEnabled({ id: "integration-1", enabled: true });
+
+    expect(
+      mockPrisma.integrationResourceSync.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(mockPrisma.integration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { enabled: true } }),
+    );
+  });
+
+  it("does not touch streams when pausing", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+
+    await caller.setEnabled({ id: "integration-1", enabled: false });
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.integrationResourceSync.updateMany,
+    ).not.toHaveBeenCalled();
   });
 
   it("404s instead of 500ing when the integration doesn't exist", async () => {

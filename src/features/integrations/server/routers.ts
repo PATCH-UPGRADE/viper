@@ -260,10 +260,26 @@ export const integrationsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), enabled: z.boolean() }))
     .mutation(async ({ input }) => {
       await requireIntegration(input.id);
-      return prisma.integration.update({
+      const update = {
         where: { id: input.id },
         data: { enabled: input.enabled },
         omit: omitCredentials,
+      };
+      if (!input.enabled) return prisma.integration.update(update);
+
+      // An integration with every stream paused would stay paused after "Resume", so resuming
+      // it resumes all of its streams. If any stream is still on, the others keep their state.
+      return prisma.$transaction(async (tx) => {
+        const running = await tx.integrationResourceSync.count({
+          where: { integrationId: input.id, enabled: true },
+        });
+        if (running === 0) {
+          await tx.integrationResourceSync.updateMany({
+            where: { integrationId: input.id },
+            data: { enabled: true },
+          });
+        }
+        return tx.integration.update(update);
       });
     }),
 

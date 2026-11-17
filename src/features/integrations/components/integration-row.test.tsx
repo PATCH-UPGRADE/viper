@@ -194,7 +194,32 @@ describe("pausing", () => {
     );
   });
 
-  it("cannot resume a stream while its whole integration is paused", async () => {
+  it("offers Resume, not Pause, when the integration is on but every stream is off", async () => {
+    const mutate = vi.fn();
+    mockUseSetIntegrationEnabled.mockReturnValue({ mutate, isPending: false });
+    const everyStreamOff = {
+      ...integration,
+      resourceSyncs: integration.resourceSyncs.map((sync) => ({
+        ...sync,
+        enabled: false,
+      })),
+    };
+    const user = userEvent.setup();
+    render(<IntegrationActionsMenu integration={everyStreamOff} />);
+
+    await user.click(screen.getByRole("button", { name: /open menu/i }));
+    expect(
+      screen.queryByRole("menuitem", { name: "Pause Sync" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Resume Sync" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { id: "integration-1", enabled: true },
+      expect.anything(),
+    );
+  });
+
+  it("cannot resume a stream while its whole integration is paused, and says why", async () => {
     const user = userEvent.setup();
     const paused = { ...integration, enabled: false };
     render(
@@ -202,8 +227,23 @@ describe("pausing", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /open menu/i }));
+    const resume = screen.getByRole("menuitem", { name: /^Resume Sync/ });
+    expect(resume).toHaveAttribute("data-disabled");
+    expect(resume).toHaveTextContent("Resume My Partner Feed first");
+  });
+
+  it("gives a stream no hint while its integration is running", async () => {
+    const user = userEvent.setup();
+    render(
+      <StreamActionsMenu
+        integration={integration}
+        sync={integration.resourceSyncs[0]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /open menu/i }));
     expect(
-      screen.getByRole("menuitem", { name: "Resume Sync" }),
-    ).toHaveAttribute("data-disabled");
+      screen.getByRole("menuitem", { name: "Pause Sync" }),
+    ).not.toHaveTextContent("first");
   });
 });

@@ -7,6 +7,7 @@ import {
   PlusIcon,
   SearchIcon,
   TrashIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import type { PropsWithChildren } from "react";
@@ -122,22 +123,43 @@ interface EntitySearchProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Names the input for screen readers. Defaults to the placeholder. */
+  label?: string;
+  /** Shows an × button that empties the search while it has text. */
+  clearable?: boolean;
 }
 
 export const EntitySearch = ({
   value,
   onChange,
   placeholder = "Search",
+  label = placeholder,
+  clearable = false,
 }: EntitySearchProps) => {
+  const showClear = clearable && value !== "";
   return (
     <div className="relative w-full">
       <SearchIcon className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
       <Input
-        className="bg-background shadow-none border-border pl-8"
+        aria-label={label}
+        className={cn(
+          "bg-background shadow-none border-border pl-8",
+          clearable && "pr-8",
+        )}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {showClear && (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => onChange("")}
+          className="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+        >
+          <XIcon className="size-3.5" />
+        </button>
+      )}
     </div>
   );
 };

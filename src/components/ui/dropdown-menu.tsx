@@ -247,6 +247,8 @@ function DropdownMenuSubContent({
 
 export type MoreVerticalMenuItem = {
   label: string;
+  /** A second, muted line under the label, e.g. why the item is disabled. */
+  description?: string;
   href?: string;
   onClick?: (e: React.MouseEvent) => void;
   icon?: React.ReactNode;
@@ -373,7 +375,16 @@ function MoreVerticalDropdownMenu({
                     className={item.className}
                   >
                     {item.icon}
-                    {item.label}
+                    {item.description ? (
+                      <span className="flex flex-col">
+                        <span>{item.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.description}
+                        </span>
+                      </span>
+                    ) : (
+                      item.label
+                    )}
                   </DropdownMenuItem>
                 );
               })}

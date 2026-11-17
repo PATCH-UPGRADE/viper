@@ -1,14 +1,14 @@
 "use client";
 
-import { SearchIcon, XIcon } from "lucide-react";
 import { Suspense, useMemo, useState } from "react";
 import {
   EmptyView,
+  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
-import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { cn } from "@/lib/utils";
@@ -27,35 +27,6 @@ import {
 } from "./configured-rows";
 import { IntegrationsCatalog } from "./integrations-catalog";
 import { SuggestedIntegrations } from "./suggested-integrations";
-
-const ConnectorSearch = ({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) => (
-  <div className="relative w-full">
-    <SearchIcon className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-    <Input
-      aria-label="Search integrations"
-      className="bg-background shadow-none border-border pl-8 pr-8"
-      placeholder="Search configured and available integrations"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-    {value && (
-      <button
-        type="button"
-        aria-label="Clear search"
-        onClick={() => onChange("")}
-        className="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-      >
-        <XIcon className="size-3.5" />
-      </button>
-    )}
-  </div>
-);
 
 /** One chip per category, counting the configured rows in it. The counts ignore the search. */
 const FilterChips = ({
@@ -78,36 +49,27 @@ const FilterChips = ({
   ];
 
   return (
-    <fieldset className="flex flex-wrap gap-2">
-      <legend className="sr-only">Filter by category</legend>
-      {chips.map((chip) => {
-        const selected = value === chip.id;
-        return (
-          <button
-            key={chip.id}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => onChange(chip.id)}
-            className={cn(
-              "inline-flex h-8 items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors",
-              selected
-                ? "border-foreground bg-foreground text-background"
-                : "bg-background text-foreground hover:bg-accent",
-            )}
-          >
-            {chip.label}
-            <span
-              className={cn(
-                "text-xs tabular-nums",
-                selected ? "text-background/70" : "text-muted-foreground",
-              )}
-            >
-              {chip.count}
-            </span>
-          </button>
-        );
-      })}
-    </fieldset>
+    <ToggleGroup
+      type="single"
+      value={value}
+      // Radix emits "" when the selected chip is clicked again; keep the current filter.
+      onValueChange={(next) => next && onChange(next as CategoryFilter)}
+      aria-label="Filter by category"
+      className="w-auto flex-wrap gap-2"
+    >
+      {chips.map((chip) => (
+        <ToggleGroupItem
+          key={chip.id}
+          value={chip.id}
+          className="group h-8 flex-none rounded-full border bg-background px-3 text-foreground first:rounded-full last:rounded-full hover:bg-accent hover:text-foreground data-[state=on]:border-foreground data-[state=on]:bg-foreground data-[state=on]:text-background"
+        >
+          {chip.label}
+          <span className="text-xs tabular-nums text-muted-foreground group-data-[state=on]:text-background/70">
+            {chip.count}
+          </span>
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 };
 
@@ -157,7 +119,13 @@ export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-3">
-        <ConnectorSearch value={query} onChange={setQuery} />
+        <EntitySearch
+          value={query}
+          onChange={setQuery}
+          placeholder="Search configured and available integrations"
+          label="Search integrations"
+          clearable
+        />
         <FilterChips rows={rows} value={category} onChange={setCategory} />
       </div>
       <ConfiguredIntegrations rows={rows} filter={filter} />

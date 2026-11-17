@@ -36,7 +36,7 @@ export const SuggestedIntegrations = ({
         title="Suggested for you"
         description="Based on information we've collected about your hospital environment."
       />
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3">
+      <div className="card-grid gap-3">
         {cards.map(({ entry, reason }) => (
           <Card
             key={entry.platform}

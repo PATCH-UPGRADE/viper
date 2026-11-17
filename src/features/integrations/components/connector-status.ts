@@ -43,8 +43,36 @@ const recordCountFor = (
   resource: ResourceType,
 ): RecordCount => ({
   resource,
-  count: integration.recordCounts[resource] ?? 0,
+  count: integration.recordCounts[resource],
 });
+
+/**
+ * Every record an integration has brought in: its own records first (zero included, in the
+ * order given), then any other type it has records of. An integration can hold records of a
+ * type it has no stream for, for example after a stream was removed.
+ */
+const recordsOf = (
+  integration: IntegrationListItem,
+  ownResources: ResourceType[],
+): RecordCount[] => {
+  const own = ownResources.map((resource) =>
+    recordCountFor(integration, resource),
+  );
+  const others = (Object.keys(integration.recordCounts) as ResourceType[])
+    .filter((resource) => !ownResources.includes(resource))
+    .map((resource) => recordCountFor(integration, resource))
+    .filter(({ count }) => count > 0);
+  return [...own, ...others];
+};
+
+/**
+ * Whether an integration is paused as a whole: switched off, or with every stream switched off.
+ * The status badge and the Pause/Resume menu item both read this, so they cannot disagree.
+ */
+export const isPaused = (integration: IntegrationListItem): boolean =>
+  !integration.enabled ||
+  (integration.resourceSyncs.length > 0 &&
+    integration.resourceSyncs.every((sync) => !sync.enabled));
 
 /** "1,204 work orders", "1 asset", "0 notifications". */
 export const recordLabel = ({ resource, count }: RecordCount) =>
@@ -106,19 +134,24 @@ export const integrationView = (
   integration: IntegrationListItem,
 ): ConnectorView => {
   const syncs = integration.resourceSyncs;
-  if (syncs.length === 1) return streamView(integration, syncs[0]);
+  const records = recordsOf(
+    integration,
+    syncs.map((sync) => sync.resource),
+  );
+  if (syncs.length === 1) {
+    return { ...streamView(integration, syncs[0]), records };
+  }
 
   const streams = syncs.map((sync) => streamView(integration, sync));
   const running = streams.filter((stream) => stream.state !== "paused");
   const failing = running.filter((stream) => stream.state === "failing");
-  const state: ConnectorState =
-    !integration.enabled || (streams.length > 0 && running.length === 0)
-      ? "paused"
-      : failing.length > 0
-        ? "failing"
-        : running.some((stream) => stream.state === "healthy")
-          ? "healthy"
-          : "unknown";
+  const state: ConnectorState = isPaused(integration)
+    ? "paused"
+    : failing.length > 0
+      ? "failing"
+      : running.some((stream) => stream.state === "healthy")
+        ? "healthy"
+        : "unknown";
 
   const firstError = failing.find(
     (stream) => stream.errorMessage,
@@ -146,7 +179,7 @@ export const integrationView = (
         state !== "paused" &&
         running.some((stream) => stream.schedule?.isDue ?? false),
     },
-    records: streams.flatMap((stream) => stream.records),
+    records,
   };
 };
 
@@ -159,7 +192,7 @@ export const uploadView = (upload: IntegrationListItem): ConnectorView => {
       errorMessage: null,
       lastAt: null,
       schedule: null,
-      records: [],
+      records: recordsOf(upload, []),
     };
   }
   const state: ConnectorState =
@@ -173,7 +206,7 @@ export const uploadView = (upload: IntegrationListItem): ConnectorView => {
     errorMessage: state === "failing" ? sync.errorMessage : null,
     lastAt: sync.lastAttemptAt,
     schedule: null,
-    records: [recordCountFor(upload, sync.resource)],
+    records: recordsOf(upload, [sync.resource]),
   };
 };
 

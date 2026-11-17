@@ -121,7 +121,8 @@ hook and never branches on the platform. If a hook throws, core reports the erro
 shows the other suggestions.
 
 Set `definition.singleton: true` if a hospital needs only one Integration of the platform. The
-`create` procedure rejects a second one with `CONFLICT`, and the catalog disables its "Add" button.
+`create` procedure rejects a second one with `CONFLICT`, and the catalog shows a disabled "Added"
+button once one exists. A platform without `singleton` shows "Add another" and how many it has.
 
 Set `definition.unscheduled: true` for a platform whose records arrive only when someone imports
 them (CSV Upload). The cron never schedules its resource rows, "Sync Now" refuses it with

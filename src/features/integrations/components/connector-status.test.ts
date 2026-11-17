@@ -6,6 +6,7 @@ import type {
 } from "../types";
 import {
   integrationView,
+  isPaused,
   recordLabel,
   streamView,
   uploadGroupView,
@@ -128,9 +129,15 @@ describe("integrationView", () => {
     nextSyncAt: new Date("2026-08-20T10:05:00Z"),
   });
 
-  it("is one stream's view when there is only one", () => {
+  it("is one stream's view when there is only one, plus records of types it has no stream for", () => {
     const item = integration([assets]);
-    expect(integrationView(item)).toEqual(streamView(item, assets));
+    expect(integrationView(item)).toEqual({
+      ...streamView(item, assets),
+      records: [
+        { resource: ResourceType.Asset, count: 128 },
+        { resource: ResourceType.WorkOrder, count: 56 },
+      ],
+    });
   });
 
   it("fails if any running stream fails, and says how many", () => {
@@ -162,6 +169,15 @@ describe("integrationView", () => {
     ]);
   });
 
+  it("adds records of a type with no stream, but only when there are some", () => {
+    const item = integration([assets, notifications]);
+    expect(integrationView(item).records).toEqual([
+      { resource: ResourceType.Asset, count: 128 },
+      { resource: ResourceType.SourceRecord, count: 0 },
+      { resource: ResourceType.WorkOrder, count: 56 },
+    ]);
+  });
+
   it("is paused when every stream is paused", () => {
     const view = integrationView(
       integration([
@@ -187,6 +203,25 @@ describe("integrationView", () => {
         integration([neverRan, { ...neverRan, resource: "Asset" }]),
       ).state,
     ).toBe("unknown");
+  });
+});
+
+describe("isPaused", () => {
+  it("is paused when switched off, or when on with every stream off", () => {
+    expect(isPaused(integration([sync()], { enabled: false }))).toBe(true);
+    expect(isPaused(integration([sync({ enabled: false })]))).toBe(true);
+  });
+
+  it("is running while any stream runs, or when it has no streams yet", () => {
+    expect(
+      isPaused(
+        integration([
+          sync({ enabled: false }),
+          sync({ resource: ResourceType.WorkOrder }),
+        ]),
+      ),
+    ).toBe(false);
+    expect(isPaused(integration([]))).toBe(false);
   });
 });
 

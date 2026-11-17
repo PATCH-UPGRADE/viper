@@ -1,9 +1,7 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { initialsOf } from "@/lib/string-utils";
 import type { CatalogEntry } from "../core/catalog";
 import { useAddedPlatformCounts } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
@@ -14,6 +12,7 @@ import {
 } from "./configured-rows";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
 import { PLATFORM_ADD_OVERRIDES } from "./platform-add-overrides";
+import { PlatformAvatar } from "./platform-avatar";
 
 const SECTION_SUBTITLES: Record<Category, string> = {
   "Hospital Inventory": "Bring your asset inventory into VIPER.",
@@ -51,11 +50,7 @@ const PlatformCard = ({
     <Card className="p-0 gap-0 overflow-hidden">
       {/* Grows to fill the card, so every card in a row puts its divider and button at the same height. */}
       <div className="flex flex-1 items-center gap-3 p-4">
-        <Avatar className="size-9 shrink-0 rounded-md border">
-          <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
-            {initialsOf(entry.displayName)}
-          </AvatarFallback>
-        </Avatar>
+        <PlatformAvatar name={entry.displayName} />
         <div className="min-w-0">
           <CardTitle>{entry.displayName}</CardTitle>
           <CardDescription>{entry.description}</CardDescription>
@@ -97,7 +92,7 @@ const CategorySection = ({
         title={category}
         description={SECTION_SUBTITLES[category]}
       />
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3">
+      <div className="card-grid gap-3">
         {entries.map((entry) => (
           <PlatformCard
             key={entry.platform}

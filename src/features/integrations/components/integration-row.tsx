@@ -31,7 +31,7 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import { streamName } from "./connector-status";
+import { isPaused, streamName } from "./connector-status";
 import { IntegrationFormDialog } from "./create-integration-dialog";
 
 const INTEGRATION_MENU_LABELS = {
@@ -49,17 +49,25 @@ const UPLOAD_MENU_LABELS = {
 const pauseItem = ({
   paused,
   disabled,
+  description,
   onToggle,
 }: {
   paused: boolean;
   disabled: boolean;
+  description?: string;
   onToggle: () => void;
 }) => ({
   label: paused ? "Resume Sync" : "Pause Sync",
+  description,
   icon: paused ? <PlayIcon /> : <PauseIcon />,
   onClick: onToggle,
   disabled,
 });
+
+const toastPauseToggled = (name: string, resumed: boolean) =>
+  toast.success(
+    `${name} ${resumed ? "resumed" : "paused. Its settings and records are kept"}.`,
+  );
 
 export const IntegrationActionsMenu = ({
   integration,
@@ -78,16 +86,14 @@ export const IntegrationActionsMenu = ({
   const syncsOnSchedule = !catalogEntry?.unscheduled;
   const labels = syncsOnSchedule ? INTEGRATION_MENU_LABELS : UPLOAD_MENU_LABELS;
 
+  // Paused also covers "on, but every stream is off", so the menu always matches the status
+  // badge. Resuming such an integration resumes all of its streams (see `setEnabled`).
+  const paused = isPaused(integration);
   const togglePaused = () => {
-    const enabled = !integration.enabled;
+    const enabled = paused;
     setEnabled.mutate(
       { id: integration.id, enabled },
-      {
-        onSuccess: () =>
-          toast.success(
-            `${integration.name} ${enabled ? "resumed" : "paused. Its settings and records are kept"}.`,
-          ),
-      },
+      { onSuccess: () => toastPauseToggled(integration.name, enabled) },
     );
   };
 
@@ -112,7 +118,7 @@ export const IntegrationActionsMenu = ({
           },
           syncsOnSchedule &&
             pauseItem({
-              paused: !integration.enabled,
+              paused,
               disabled: setEnabled.isPending,
               onToggle: togglePaused,
             }),
@@ -174,8 +180,8 @@ export const IntegrationActionsMenu = ({
 };
 
 /**
- * A stream's own pause switch. While the whole integration is paused, the stream cannot be
- * resumed on its own: resume the integration first.
+ * A stream's own pause switch. While the whole integration is switched off, the stream cannot
+ * be resumed on its own, and the menu item says to resume the integration first.
  */
 export const StreamActionsMenu = ({
   integration,
@@ -193,6 +199,9 @@ export const StreamActionsMenu = ({
         pauseItem({
           paused: !integration.enabled || !sync.enabled,
           disabled: setResourceEnabled.isPending || !integration.enabled,
+          description: integration.enabled
+            ? undefined
+            : `Resume ${integration.name} first`,
           onToggle: () => {
             const enabled = !sync.enabled;
             setResourceEnabled.mutate(
@@ -201,12 +210,7 @@ export const StreamActionsMenu = ({
                 resource: sync.resource,
                 enabled,
               },
-              {
-                onSuccess: () =>
-                  toast.success(
-                    `${name} ${enabled ? "resumed" : "paused. Its settings and records are kept"}.`,
-                  ),
-              },
+              { onSuccess: () => toastPauseToggled(name, enabled) },
             );
           },
         }),

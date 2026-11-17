@@ -24,10 +24,14 @@ const fleet: CatalogEntry = {
   credentialsAreAuthShaped: false,
 };
 
+const allFilter = { category: "all", query: "" } as const;
+
 describe("SuggestedIntegrations", () => {
   it("renders nothing when no platform is suggested", () => {
     mockSuggestions.mockReturnValue([]);
-    const { container } = render(<SuggestedIntegrations catalog={[fleet]} />);
+    const { container } = render(
+      <SuggestedIntegrations catalog={[fleet]} filter={allFilter} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -35,7 +39,9 @@ describe("SuggestedIntegrations", () => {
     mockSuggestions.mockReturnValue([
       { platform: PlatformEnum.MEDISAO, reason: "no card" },
     ]);
-    const { container } = render(<SuggestedIntegrations catalog={[fleet]} />);
+    const { container } = render(
+      <SuggestedIntegrations catalog={[fleet]} filter={allFilter} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -43,7 +49,7 @@ describe("SuggestedIntegrations", () => {
     mockSuggestions.mockReturnValue([
       { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
     ]);
-    render(<SuggestedIntegrations catalog={[fleet]} />);
+    render(<SuggestedIntegrations catalog={[fleet]} filter={allFilter} />);
 
     expect(screen.getByText("Suggested for you")).toBeInTheDocument();
     expect(screen.getByText("Suggested integration")).toBeInTheDocument();
@@ -51,4 +57,20 @@ describe("SuggestedIntegrations", () => {
     expect(screen.getByText("We found 12 assets.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
   });
+
+  it.each([
+    { category: "Notifications", query: "" },
+    { category: "all", query: "servicenow" },
+  ] as const)(
+    "disappears when the filter %o leaves nothing to suggest",
+    (filter) => {
+      mockSuggestions.mockReturnValue([
+        { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
+      ]);
+      const { container } = render(
+        <SuggestedIntegrations catalog={[fleet]} filter={filter} />,
+      );
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
 });

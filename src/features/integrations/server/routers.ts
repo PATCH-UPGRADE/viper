@@ -4,8 +4,6 @@ import { z } from "zod";
 import { type Prisma, ResourceType, SubmissionState } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
-import { paginationInputSchema } from "@/lib/pagination";
-import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import { decryptCredentials } from "../core/credentials";
@@ -37,11 +35,33 @@ const integrationListSelect = {
   config: true,
   enabled: true,
   resourceSyncs: integrationsInclude.resourceSyncs,
+  _count: {
+    select: {
+      assetMappings: true,
+      vulnerabilityRecordMappings: true,
+      deviceArtifactMappings: true,
+      remediationMappings: true,
+      workOrderMappings: true,
+      sourceRecordMappings: true,
+    },
+  },
 } as const satisfies Prisma.IntegrationSelect;
 
 type IntegrationListRow = Prisma.IntegrationGetPayload<{
   select: typeof integrationListSelect;
 }>;
+
+/** How many records of each resource type an integration has brought in, read from its External*Mapping rows. */
+const recordCountsOf = (
+  counts: IntegrationListRow["_count"],
+): Record<ResourceType, number> => ({
+  [ResourceType.Asset]: counts.assetMappings,
+  [ResourceType.Vulnerability]: counts.vulnerabilityRecordMappings,
+  [ResourceType.DeviceArtifact]: counts.deviceArtifactMappings,
+  [ResourceType.Remediation]: counts.remediationMappings,
+  [ResourceType.WorkOrder]: counts.workOrderMappings,
+  [ResourceType.SourceRecord]: counts.sourceRecordMappings,
+});
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -84,51 +104,40 @@ const credentialsPatch = (
 const requireIntegration = async (id: string) => {
   const existing = await prisma.integration.findUnique({
     where: { id },
-    select: { id: true, platform: true },
+    select: { id: true, platform: true, config: true },
   });
   return requireExistence(existing, "Integration");
 };
 
 export const integrationsRouter = createTRPCRouter({
-  getMany: protectedProcedure
-    .input(paginationInputSchema)
-    .query(async ({ input }) => {
-      const where = {
-        name: {
-          contains: input.search,
-          mode: "insensitive" as const,
-        },
-      };
+  // Every integration, unpaginated: the connectors page counts and filters the whole set, and a
+  // hospital's connector list is small.
+  getMany: protectedProcedure.query(async () => {
+    const rows: IntegrationListRow[] = await prisma.integration.findMany({
+      select: integrationListSelect,
+      orderBy: { createdAt: "desc" },
+    });
 
-      const result = await fetchPaginated(prisma.integration, input, {
-        where,
-        select: integrationListSelect,
-      });
-
-      const now = new Date();
-      const items = (result.items as IntegrationListRow[]).map(
-        (integration) => ({
-          ...integration,
-          platformLabel: displayNameFor(integration.platform),
-          categories: categoriesFor(integration.platform),
-          resourceSyncs: integration.resourceSyncs.map((sync) => ({
-            ...sync,
-            // A resource row doesn't see its parent's syncEvery, so isOverridden has to check both.
-            isOverridden:
-              sync.syncEvery !== null || integration.syncEvery !== null,
-            effectiveSyncEvery: effectiveSyncEvery(
-              sync.syncEvery,
-              integration.syncEvery,
-              defaultSyncEveryFor(integration.platform, sync.resource),
-            ),
-            // Same "due" check the cron uses, against the server's clock.
-            isDue: sync.nextSyncAt === null || sync.nextSyncAt <= now,
-          })),
-        }),
-      );
-
-      return { ...result, items };
-    }),
+    const now = new Date();
+    return rows.map(({ _count, ...integration }) => ({
+      ...integration,
+      recordCounts: recordCountsOf(_count),
+      platformLabel: displayNameFor(integration.platform),
+      categories: categoriesFor(integration.platform),
+      resourceSyncs: integration.resourceSyncs.map((sync) => ({
+        ...sync,
+        // A resource row doesn't see its parent's syncEvery, so isOverridden has to check both.
+        isOverridden: sync.syncEvery !== null || integration.syncEvery !== null,
+        effectiveSyncEvery: effectiveSyncEvery(
+          sync.syncEvery,
+          integration.syncEvery,
+          defaultSyncEveryFor(integration.platform, sync.resource),
+        ),
+        // Same "due" check the cron uses, against the server's clock.
+        isDue: sync.nextSyncAt === null || sync.nextSyncAt <= now,
+      })),
+    }));
+  }),
 
   getSuggestions: protectedProcedure.query(() => suggestedPlatforms()),
 
@@ -236,11 +245,40 @@ export const integrationsRouter = createTRPCRouter({
   setEnabled: protectedProcedure
     .input(z.object({ id: z.string(), enabled: z.boolean() }))
     .mutation(async ({ input }) => {
-      await requireIntegration(input.id);
-      return prisma.integration.update({
+      const integration = await requireIntegration(input.id);
+      const update = {
         where: { id: input.id },
         data: { enabled: input.enabled },
         omit: omitCredentials,
+      };
+      if (!input.enabled) return prisma.integration.update(update);
+
+      // An integration with every stream paused would stay paused after "Resume", so resuming
+      // it resumes all of its streams. If any stream is still on, the others keep their state.
+      // Only the streams its config still implies count: `update` disables a stream whose
+      // resource the config dropped, and resuming must not bring that stream back.
+      const current = {
+        integrationId: input.id,
+        resource: {
+          in: asBadRequest(() =>
+            resourcesFor(
+              requirePlatform(integration.platform),
+              integration.config,
+            ),
+          ),
+        },
+      };
+      return prisma.$transaction(async (tx) => {
+        const running = await tx.integrationResourceSync.count({
+          where: { ...current, enabled: true },
+        });
+        if (running === 0) {
+          await tx.integrationResourceSync.updateMany({
+            where: current,
+            data: { enabled: true },
+          });
+        }
+        return tx.integration.update(update);
       });
     }),
 

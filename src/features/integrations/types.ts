@@ -81,7 +81,7 @@ export const resourceTypeLabel = (type: ResourceType): string =>
 
 export type IntegrationListItem = inferOutput<
   typeof trpc.integrations.getMany
->["items"][number];
+>[number];
 export type IntegrationResourceSyncItem =
   IntegrationListItem["resourceSyncs"][number];
 

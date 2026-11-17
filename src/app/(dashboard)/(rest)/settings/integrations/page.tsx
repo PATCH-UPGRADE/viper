@@ -1,4 +1,3 @@
-import { PAGINATION } from "@/config/constants";
 import {
   IntegrationsContainer,
   IntegrationsError,
@@ -6,34 +5,24 @@ import {
   IntegrationsLoading,
 } from "@/features/integrations/components/integrations";
 import { catalogEntries } from "@/features/integrations/core/catalog";
-import { paginationParamsLoader } from "@/features/integrations/server/params-loader";
 import {
   prefetchIntegrationSuggestions,
   prefetchIntegrations,
 } from "@/features/integrations/server/prefetch";
-import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
 // Static (derived from the registry, not from any request), so this can be
 // computed once at module load rather than per-request.
 const CATALOG = catalogEntries();
 
-// pageSize must match useSuspenseIntegrations' override, or SSR won't
-// hydrate the client query; also prefetches the suggestions and the sidebar's
-// webhook count.
-const prefetchConnectorsPage = async (
-  params: Parameters<typeof prefetchIntegrations>[0],
-) => {
-  await Promise.all([
-    prefetchIntegrations({ ...params, pageSize: PAGINATION.MAX_PAGE_SIZE }),
-    prefetchIntegrationSuggestions(),
-    prefetchWebhooks({}),
-  ]);
+const prefetchConnectorsPage = async () => {
+  await Promise.all([prefetchIntegrations(), prefetchIntegrationSuggestions()]);
 };
 
 export default createListPage({
   Container: IntegrationsContainer,
-  paramsLoader: paginationParamsLoader,
+  // The page reads no URL params: search and the category chips are local state.
+  paramsLoader: async () => undefined,
   prefetch: prefetchConnectorsPage,
   List: () => <IntegrationsList catalog={CATALOG} />,
   Loading: IntegrationsLoading,

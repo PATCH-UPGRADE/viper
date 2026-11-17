@@ -24,7 +24,12 @@ const {
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
+    integrationResourceSync: {
+      count: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
     user: { create: vi.fn() },
     workOrderTicket: { count: vi.fn() },
     $executeRaw: vi.fn(),
@@ -56,6 +61,14 @@ const caller = createCallerFactory(integrationsRouter)({
   req: undefined,
   auth: { user: { id: "user-test" } },
 });
+const noRecords = {
+  assetMappings: 0,
+  vulnerabilityRecordMappings: 0,
+  deviceArtifactMappings: 0,
+  remediationMappings: 0,
+  workOrderMappings: 0,
+  sourceRecordMappings: 0,
+};
 const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
   id: "integration-1",
   name: "Partner feed",
@@ -70,10 +83,12 @@ const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
       syncEvery: null,
     },
   ],
+  _count: { ...noRecords, assetMappings: 12, workOrderMappings: 3 },
 });
 const existingIntegration = {
   id: "integration-1",
   platform: PlatformEnum.PARTNER,
+  config: { resource: ResourceType.Asset },
 };
 
 mockDefaultSyncEveryFor.mockReturnValue(900);
@@ -96,16 +111,15 @@ describe("integrationsRouter.getSuggestions", () => {
 
 describe("integrationsRouter.getMany", () => {
   it("returns one unified, browser-safe list with resolved resource cadences", async () => {
-    mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
       integrationRow(600, new Date(Date.now() - 1_000)),
     ]);
 
-    const result = await caller.getMany({ search: "partner" });
+    const result = await caller.getMany();
 
     expect(mockPrisma.integration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { name: { contains: "partner", mode: "insensitive" } },
+        orderBy: { createdAt: "desc" },
         select: {
           id: true,
           name: true,
@@ -114,10 +128,11 @@ describe("integrationsRouter.getMany", () => {
           config: true,
           enabled: true,
           resourceSyncs: expect.any(Object),
+          _count: expect.any(Object),
         },
       }),
     );
-    expect(result.items).toEqual([
+    expect(result).toEqual([
       {
         id: "integration-1",
         name: "Partner feed",
@@ -127,6 +142,14 @@ describe("integrationsRouter.getMany", () => {
         enabled: true,
         syncEvery: 600,
         config: { endpoint: "https://partner.example" },
+        recordCounts: {
+          Asset: 12,
+          Vulnerability: 0,
+          DeviceArtifact: 0,
+          Remediation: 0,
+          WorkOrder: 3,
+          SourceRecord: 0,
+        },
         resourceSyncs: [
           expect.objectContaining({
             resource: ResourceType.Asset,
@@ -140,14 +163,13 @@ describe("integrationsRouter.getMany", () => {
   });
 
   it("falls back to the platform default cadence and is due with no nextSyncAt", async () => {
-    mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
       integrationRow(null, null),
     ]);
 
-    const result = await caller.getMany({ search: "partner" });
+    const result = await caller.getMany();
 
-    expect(result.items[0].resourceSyncs[0]).toMatchObject({
+    expect(result[0].resourceSyncs[0]).toMatchObject({
       effectiveSyncEvery: 900,
       isOverridden: false,
       isDue: true,
@@ -159,7 +181,6 @@ describe("integrationsRouter.getMany", () => {
       "Vulnerability Management Platforms",
       "Notifications",
     ]);
-    mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
       {
         id: "integration-1",
@@ -169,13 +190,14 @@ describe("integrationsRouter.getMany", () => {
         config: {},
         enabled: true,
         resourceSyncs: [],
+        _count: noRecords,
       },
     ]);
 
-    const result = await caller.getMany({ search: "" });
+    const result = await caller.getMany();
 
     expect(mockCategoriesFor).toHaveBeenCalledWith(PlatformEnum.AI);
-    expect(result.items[0].categories).toEqual([
+    expect(result[0].categories).toEqual([
       "Vulnerability Management Platforms",
       "Notifications",
     ]);
@@ -194,6 +216,75 @@ describe("integrationsRouter enable controls", () => {
         data: { enabled: false },
       }),
     );
+  });
+
+  it("resumes every stream when resuming an integration whose streams are all paused", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.$transaction.mockImplementation((run) => run(mockPrisma));
+    mockPrisma.integrationResourceSync.count.mockResolvedValue(0);
+
+    await caller.setEnabled({ id: "integration-1", enabled: true });
+
+    expect(mockPrisma.integrationResourceSync.updateMany).toHaveBeenCalledWith({
+      where: {
+        integrationId: "integration-1",
+        resource: { in: [ResourceType.Asset] },
+      },
+      data: { enabled: true },
+    });
+    expect(mockPrisma.integration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { enabled: true } }),
+    );
+  });
+
+  it("resumes only the resource the config now names, after a generic integration's resource changed", async () => {
+    // `update` moved this integration from Asset to WorkOrder and disabled the Asset stream;
+    // then the WorkOrder stream was paused on its own.
+    mockPrisma.integration.findUnique.mockResolvedValue({
+      ...existingIntegration,
+      config: { resource: ResourceType.WorkOrder },
+    });
+    mockPrisma.integrationResourceSync.count.mockResolvedValue(0);
+
+    await caller.setEnabled({ id: "integration-1", enabled: true });
+
+    const current = {
+      integrationId: "integration-1",
+      resource: { in: [ResourceType.WorkOrder] },
+    };
+    expect(mockPrisma.integrationResourceSync.count).toHaveBeenCalledWith({
+      where: { ...current, enabled: true },
+    });
+    expect(mockPrisma.integrationResourceSync.updateMany).toHaveBeenCalledWith({
+      where: current,
+      data: { enabled: true },
+    });
+  });
+
+  it("leaves paused streams paused when resuming an integration that still has one running", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.$transaction.mockImplementation((run) => run(mockPrisma));
+    mockPrisma.integrationResourceSync.count.mockResolvedValue(1);
+
+    await caller.setEnabled({ id: "integration-1", enabled: true });
+
+    expect(
+      mockPrisma.integrationResourceSync.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(mockPrisma.integration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { enabled: true } }),
+    );
+  });
+
+  it("does not touch streams when pausing", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+
+    await caller.setEnabled({ id: "integration-1", enabled: false });
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.integrationResourceSync.updateMany,
+    ).not.toHaveBeenCalled();
   });
 
   it("404s instead of 500ing when the integration doesn't exist", async () => {

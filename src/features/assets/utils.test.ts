@@ -141,7 +141,7 @@ describe("getAssetSources", () => {
     ).toEqual(["Blueflow"]);
   });
 
-  it('shows every CSV import as one "CSV Upload"', () => {
+  it('shows every CSV import as one "Spreadsheet Upload"', () => {
     expect(
       getAssetSources({
         user: { name: "Seed User" },
@@ -150,7 +150,7 @@ describe("getAssetSources", () => {
           mapping("CSV Assets Upload - Oct 2", PlatformEnum.CSV_UPLOAD),
         ],
       }),
-    ).toEqual(["Seed User", "CSV Upload"]);
+    ).toEqual(["Seed User", "Spreadsheet Upload"]);
   });
 
   it("lists only the creator when no integration reports the asset", () => {
@@ -177,7 +177,7 @@ describe("getAssetSourceBlocks", () => {
     expect(blocks.map(({ name, kind }) => [name, kind])).toEqual([
       ["Seed User", "person"],
       ["Blueflow", "integration"],
-      ["CSV Upload", "integration"],
+      ["Spreadsheet Upload", "integration"],
     ]);
   });
 

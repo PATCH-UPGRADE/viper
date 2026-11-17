@@ -121,7 +121,7 @@ hook and never branches on the platform. If a hook throws, core reports the erro
 shows the other suggestions.
 
 Set `definition.singleton: true` if a hospital needs only one Integration of the platform. The
-`create` procedure rejects a second one with `CONFLICT`, and the catalog disables its "Add" button.
+`create` procedure rejects a second one with `CONFLICT`.
 
 Set `definition.unscheduled: true` for a platform whose records arrive only when someone imports
 them (CSV Upload). The cron never schedules its resource rows, "Sync Now" refuses it with
@@ -252,10 +252,11 @@ not fit. CSV Upload is the only platform that uses them today.
 1. **A platform with its own "Add" button.** Register a component for the platform in
    `components/platform-add-overrides.ts`. The catalog card shows that component in place of the
    generic `CreateIntegrationDialog`. CSV Upload uses this to open its import overlay.
-2. **A platform that never syncs on a schedule** (`definition.unscheduled: true`). The Enabled
-   Integrations list shows one row for the whole platform, not one row per integration
-   (`components/platform-uploads-row.tsx`):
-   - The row shows when the latest upload ran. It has no enable switch.
+2. **A platform that never syncs on a schedule** (`definition.unscheduled: true`). The Configured
+   integrations table shows one row for the whole platform, not one row per integration
+   (`configuredRowsFor` in `components/configured-rows.ts`):
+   - The row shows the latest upload's status and when it ran, and adds up every upload's
+     records. It has no "Pause Sync".
    - The row expands to list each upload. An upload's menu has "Edit Name" and "Remove", and no
      "Sync Now". "Edit Name" only renames the upload; there is no sync interval to set.
    - An integration that never started an upload (`lastAttemptAt` is null) is left out.

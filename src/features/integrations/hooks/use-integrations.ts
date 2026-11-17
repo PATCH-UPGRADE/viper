@@ -4,22 +4,16 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { INTEGRATIONS_POLL_INTERVAL_MS, PAGINATION } from "@/config/constants";
+import { INTEGRATIONS_POLL_INTERVAL_MS } from "@/config/constants";
 import type { PlatformEnum } from "@/generated/prisma";
-import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
-// Category counts/filtering need every integration, not one page of them —
-// a hospital's connector list is bounded, so max page size is effectively "all".
+// Every integration (getMany is unpaginated), so counts and filters see the whole set.
 const useIntegrationsQueryOptions = () => {
   const trpc = useTRPC();
-  const [params] = usePaginationParams();
 
   return {
-    ...trpc.integrations.getMany.queryOptions({
-      ...params,
-      pageSize: PAGINATION.MAX_PAGE_SIZE,
-    }),
+    ...trpc.integrations.getMany.queryOptions(),
     refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,
   };
@@ -28,12 +22,32 @@ const useIntegrationsQueryOptions = () => {
 export const useSuspenseIntegrations = () =>
   useSuspenseQuery(useIntegrationsQueryOptions());
 
-/** Re-renders only when the set of platforms changes, not on every sync-status poll. */
-export const useAddedPlatforms = (): PlatformEnum[] =>
+/**
+ * How many integrations each platform has. Structural sharing keeps the result stable, so this
+ * re-renders only when a count changes, not on every sync-status poll.
+ */
+export const useAddedPlatformCounts = (): Partial<
+  Record<PlatformEnum, number>
+> =>
+  useSuspenseQuery({
+    ...useIntegrationsQueryOptions(),
+    select: (data) => {
+      const counts: Partial<Record<PlatformEnum, number>> = {};
+      for (const { platform } of data) {
+        counts[platform] = (counts[platform] ?? 0) + 1;
+      }
+      return counts;
+    },
+  }).data;
+
+/** One platform's integrations, sorted by name. */
+export const usePlatformIntegrations = (platform: PlatformEnum) =>
   useSuspenseQuery({
     ...useIntegrationsQueryOptions(),
     select: (data) =>
-      [...new Set(data.items.map((item) => item.platform))].sort(),
+      data
+        .filter((item) => item.platform === platform)
+        .sort((a, b) => a.name.localeCompare(b.name)),
   }).data;
 
 export const useSuspenseIntegrationSuggestions = () => {

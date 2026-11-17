@@ -1,199 +1,138 @@
 "use client";
 
-import {
-  ArchiveIcon,
-  BellIcon,
-  BugIcon,
-  InboxIcon,
-  type LucideIcon,
-  WebhookIcon,
-} from "lucide-react";
-import Link from "next/link";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import {
   EmptyView,
+  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { cn } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
-import { CATEGORIES, type Category } from "../types";
-import { IntegrationCard } from "./integration-row";
+import { CATEGORIES } from "../types";
+import { ConfiguredIntegrationsTable } from "./configured-integrations";
+import {
+  type CategoryFilter,
+  type ConfiguredRow,
+  type ConnectorFilter,
+  categoriesOf,
+  configuredRowsFor,
+  filterConfiguredRows,
+  inCategory,
+} from "./configured-rows";
 import { IntegrationsCatalog } from "./integrations-catalog";
-import { enabledRowsFor, PlatformUploadsCard } from "./platform-uploads-row";
 import { SuggestedIntegrations } from "./suggested-integrations";
 
-const SECTION_ICONS: Record<Category, LucideIcon> = {
-  "Hospital Inventory": ArchiveIcon,
-  "Vulnerability Management Platforms": BugIcon,
-  "Ticketing Platforms": InboxIcon,
-  Notifications: BellIcon,
-};
-
-/** Highlights whichever catalog section's top is closest to (but above) the viewport top. */
-const useScrollSpy = () => {
-  const [active, setActive] = useState<Category>(CATEGORIES[0]);
-  const elements = useRef(new Map<Category, HTMLDivElement>());
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length === 0) return;
-        const topmost = visible.reduce((a, b) =>
-          a.boundingClientRect.top <= b.boundingClientRect.top ? a : b,
-        );
-        setActive(topmost.target.getAttribute("data-section") as Category);
-      },
-      { rootMargin: "-96px 0px -70% 0px", threshold: 0 },
-    );
-    for (const el of elements.current.values()) observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const register = (section: Category) => (el: HTMLDivElement | null) => {
-    if (el) elements.current.set(section, el);
-    else elements.current.delete(section);
-  };
-
-  const scrollTo = (section: Category) => {
-    setActive(section);
-    elements.current
-      .get(section)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  return { active, register, scrollTo };
-};
-
-const ConnectorsSidebar = ({
-  catalog,
-  active,
-  onSelect,
+/** One chip per category, counting the configured rows in it. The counts ignore the search. */
+const FilterChips = ({
+  rows,
+  value,
+  onChange,
 }: {
-  catalog: CatalogEntry[];
-  active: Category;
-  onSelect: (section: Category) => void;
+  rows: ConfiguredRow[];
+  value: CategoryFilter;
+  onChange: (value: CategoryFilter) => void;
 }) => {
-  const { data } = useSuspenseIntegrations();
-  const { data: webhooks } = useSuspenseWebhooks();
-
-  const countBySection = useMemo(() => {
-    const counts = {} as Record<Category, number>;
-    for (const row of enabledRowsFor(data.items, catalog)) {
-      const categories =
-        row.kind === "uploads"
-          ? row.catalogEntry.categories
-          : row.integration.categories;
-      for (const category of categories) {
-        counts[category] = (counts[category] ?? 0) + 1;
-      }
-    }
-    return counts;
-  }, [data.items, catalog]);
+  const chips: { id: CategoryFilter; label: string; count: number }[] = [
+    { id: "all", label: "All", count: rows.length },
+    ...CATEGORIES.map((category) => ({
+      id: category,
+      label: category,
+      count: rows.filter((row) => inCategory(categoriesOf(row), category))
+        .length,
+    })),
+  ];
 
   return (
-    <nav className="flex flex-col gap-1 w-56 shrink-0 sticky top-4 self-start">
-      {CATEGORIES.map((name) => {
-        const Icon = SECTION_ICONS[name];
-        return (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onSelect(name)}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
-              active === name
-                ? "bg-accent text-accent-foreground font-medium"
-                : "text-muted-foreground hover:bg-accent/50",
-            )}
-          >
-            <Icon className="size-4 shrink-0" />
-            <span className="flex-1">{name}</span>
-            <span className="text-xs tabular-nums">
-              {countBySection[name] ?? 0}
-            </span>
-          </button>
-        );
-      })}
-      <Separator className="my-1" />
-      <Link
-        href="/settings/webhooks"
-        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50"
-      >
-        <WebhookIcon className="size-4 shrink-0" />
-        <span className="flex-1">Webhooks</span>
-        <span className="text-xs tabular-nums">{webhooks.totalCount}</span>
-      </Link>
-    </nav>
+    <ToggleGroup
+      type="single"
+      value={value}
+      // Radix emits "" when the selected chip is clicked again; keep the current filter.
+      onValueChange={(next) => next && onChange(next as CategoryFilter)}
+      aria-label="Filter by category"
+      className="w-auto flex-wrap gap-2"
+    >
+      {chips.map((chip) => (
+        <ToggleGroupItem
+          key={chip.id}
+          value={chip.id}
+          className="group h-8 flex-none rounded-full border bg-background px-3 text-foreground first:rounded-full last:rounded-full hover:bg-accent hover:text-foreground data-[state=on]:border-foreground data-[state=on]:bg-foreground data-[state=on]:text-background"
+        >
+          {chip.label}
+          <span className="text-xs tabular-nums text-muted-foreground group-data-[state=on]:text-background/70">
+            {chip.count}
+          </span>
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 };
 
-const EnabledIntegrations = ({ catalog }: { catalog: CatalogEntry[] }) => {
-  const { data } = useSuspenseIntegrations();
-  const rows = useMemo(
-    () => enabledRowsFor(data.items, catalog),
-    [data.items, catalog],
+const ConfiguredIntegrations = ({
+  rows,
+  filter,
+}: {
+  rows: ConfiguredRow[];
+  filter: ConnectorFilter;
+}) => {
+  const visible = useMemo(
+    () => filterConfiguredRows(rows, filter),
+    [rows, filter],
   );
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-w-0">
+    <section className="flex flex-col gap-3">
       <SettingsSubheader
-        title="Enabled Integrations"
-        description="Currently active connections syncing data into VIPER."
+        title="Configured integrations"
+        description="Every connection set up for this hospital, including paused ones."
       />
-      {rows.length === 0 ? (
-        <EmptyView message="No integrations enabled yet." />
+      {visible.length > 0 ? (
+        <ConfiguredIntegrationsTable rows={visible} />
       ) : (
-        <Card className="p-0 gap-0 overflow-hidden divide-y">
-          {rows.map((row) =>
-            row.kind === "uploads" ? (
-              <PlatformUploadsCard
-                key={row.catalogEntry.platform}
-                catalogEntry={row.catalogEntry}
-                uploads={row.uploads}
-              />
-            ) : (
-              <IntegrationCard
-                key={row.integration.id}
-                integration={row.integration}
-                catalogEntry={row.catalogEntry}
-              />
-            ),
-          )}
-        </Card>
+        <EmptyView
+          message={
+            rows.length === 0
+              ? "No integrations configured yet."
+              : "No configured integrations match."
+          }
+        />
       )}
-    </div>
+    </section>
   );
 };
 
 export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
-  const { active, register, scrollTo } = useScrollSpy();
+  const { data } = useSuspenseIntegrations();
+  const rows = useMemo(() => configuredRowsFor(data, catalog), [data, catalog]);
+  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [query, setQuery] = useState("");
+  const filter = useMemo(() => ({ category, query }), [category, query]);
 
   return (
-    <div className="flex gap-6">
-      <ConnectorsSidebar
-        catalog={catalog}
-        active={active}
-        onSelect={scrollTo}
-      />
-      <div className="flex flex-col gap-10 flex-1 min-w-0">
-        <EnabledIntegrations catalog={catalog} />
-        {/* Suggestions are optional: if they fail or load slowly, the rest of the page still renders. */}
-        <ReportingErrorBoundary fallback={null}>
-          <Suspense fallback={null}>
-            <SuggestedIntegrations catalog={catalog} />
-          </Suspense>
-        </ReportingErrorBoundary>
-        <IntegrationsCatalog catalog={catalog} register={register} />
+    <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-3">
+        <EntitySearch
+          value={query}
+          onChange={setQuery}
+          placeholder="Search configured and available integrations"
+          label="Search integrations"
+          clearable
+        />
+        <FilterChips rows={rows} value={category} onChange={setCategory} />
       </div>
+      <ConfiguredIntegrations rows={rows} filter={filter} />
+      {/* Suggestions are optional: if they fail or load slowly, the rest of the page still renders. */}
+      <ReportingErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <SuggestedIntegrations catalog={catalog} filter={filter} />
+        </Suspense>
+      </ReportingErrorBoundary>
+      <IntegrationsCatalog catalog={catalog} filter={filter} />
     </div>
   );
 };

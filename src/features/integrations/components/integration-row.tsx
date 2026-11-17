@@ -1,8 +1,14 @@
 "use client";
 
-import { PencilIcon, RefreshCw, TrashIcon } from "lucide-react";
-import ms from "ms";
+import {
+  PauseIcon,
+  PencilIcon,
+  PlayIcon,
+  RefreshCw,
+  TrashIcon,
+} from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,18 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
-import { Switch } from "@/components/ui/switch";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { SyncStatusEnum } from "@/generated/prisma";
-import { relativeTime } from "@/lib/date-utils";
-import { initialsOf } from "@/lib/string-utils";
-import { cn } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import {
   useRemoveIntegration,
@@ -36,155 +31,8 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import { resourceTypeLabel } from "../types";
+import { isPaused, isStreamPaused, streamName } from "./connector-status";
 import { IntegrationFormDialog } from "./create-integration-dialog";
-
-type TimingInput = Pick<
-  IntegrationResourceSyncItem,
-  | "status"
-  | "errorMessage"
-  | "lastAttemptAt"
-  | "lastSuccessfulSync"
-  | "nextSyncAt"
-  | "isDue"
->;
-
-export const timingLine = (sync: TimingInput) => {
-  if (sync.status === SyncStatusEnum.Error) {
-    const when = sync.lastAttemptAt ?? sync.lastSuccessfulSync;
-    return {
-      text: when ? `Failed sync ${relativeTime(when)}` : "Sync failed",
-      isError: true,
-    };
-  }
-  const next = sync.isDue
-    ? "Sync due"
-    : sync.nextSyncAt
-      ? `Next sync ${relativeTime(sync.nextSyncAt)}`
-      : null;
-  if (!sync.lastSuccessfulSync) {
-    return { text: next ?? "Never synced", isError: false };
-  }
-  const parts = [`Synced ${relativeTime(sync.lastSuccessfulSync)}`];
-  if (next) parts.push(next);
-  return { text: parts.join(" · "), isError: false };
-};
-
-/** Most-recent success, soonest next sync, any-error, across a set of resource syncs. */
-export const aggregateTiming = (
-  resourceSyncs: IntegrationResourceSyncItem[],
-): TimingInput | null => {
-  const enabled = resourceSyncs.filter((s) => s.enabled);
-  if (enabled.length === 0) return null;
-
-  const pick = (dates: (Date | null)[], dir: 1 | -1) => {
-    const ts = dates
-      .filter((d): d is Date => d != null)
-      .map((d) => d.getTime());
-    return ts.length
-      ? new Date(dir === 1 ? Math.min(...ts) : Math.max(...ts))
-      : null;
-  };
-
-  const failing = enabled.find((s) => s.status === SyncStatusEnum.Error);
-  const timingSource = failing ? [failing] : enabled;
-  return {
-    status: failing ? SyncStatusEnum.Error : SyncStatusEnum.Success,
-    errorMessage: failing?.errorMessage ?? null,
-    lastAttemptAt: pick(
-      timingSource.map((s) => s.lastAttemptAt),
-      -1,
-    ),
-    lastSuccessfulSync: pick(
-      timingSource.map((s) => s.lastSuccessfulSync),
-      -1,
-    ),
-    nextSyncAt: pick(
-      enabled.map((s) => s.nextSyncAt),
-      1,
-    ),
-    isDue: enabled.some((s) => s.isDue),
-  };
-};
-
-export type StatusTone = "error" | "ok" | "idle";
-
-const STATUS_DOT_STYLES: Record<StatusTone, string> = {
-  error: "bg-destructive",
-  ok: "bg-emerald-500",
-  idle: "bg-muted-foreground/40",
-};
-
-export const StatusLine = ({
-  text,
-  tone,
-  errorMessage,
-}: {
-  text: string;
-  tone: StatusTone;
-  errorMessage?: string | null;
-}) => {
-  const isError = tone === "error";
-  const label = (
-    <span
-      className={cn(
-        "inline-flex items-center text-xs",
-        isError ? "text-destructive font-medium" : "text-muted-foreground",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block size-1.5 rounded-full mr-1.5",
-          STATUS_DOT_STYLES[tone],
-        )}
-      />
-      {text}
-    </span>
-  );
-
-  if (!isError || !errorMessage) return label;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{label}</TooltipTrigger>
-      <TooltipContent>{errorMessage}</TooltipContent>
-    </Tooltip>
-  );
-};
-
-const timingToneOf = (timing: TimingInput): StatusTone => {
-  if (timing.status === SyncStatusEnum.Error) return "error";
-  return timing.lastSuccessfulSync ? "ok" : "idle";
-};
-
-const TimingText = ({ timing }: { timing: TimingInput }) => (
-  <StatusLine
-    text={timingLine(timing).text}
-    tone={timingToneOf(timing)}
-    errorMessage={timing.errorMessage}
-  />
-);
-
-const ResourceStatus = ({
-  sync,
-  integrationEnabled,
-}: {
-  sync: IntegrationResourceSyncItem;
-  integrationEnabled: boolean;
-}) => {
-  if (!integrationEnabled || !sync.enabled) {
-    return <span className="text-sm text-muted-foreground">Disabled</span>;
-  }
-  return (
-    <div className="text-right">
-      <div className="flex items-center justify-end gap-1 text-sm font-medium">
-        <RefreshCw className="size-3.5 text-muted-foreground" />
-        Every {ms(sync.effectiveSyncEvery * 1000)}
-        {sync.isOverridden ? "" : " (default)"}
-      </div>
-      <TimingText timing={sync} />
-    </div>
-  );
-};
 
 const INTEGRATION_MENU_LABELS = {
   edit: "Edit Integration",
@@ -198,6 +46,29 @@ const UPLOAD_MENU_LABELS = {
   confirmTitle: "Remove upload?",
 };
 
+const pauseItem = ({
+  paused,
+  disabled,
+  description,
+  onToggle,
+}: {
+  paused: boolean;
+  disabled: boolean;
+  description?: string;
+  onToggle: () => void;
+}) => ({
+  label: paused ? "Resume Sync" : "Pause Sync",
+  description,
+  icon: paused ? <PlayIcon /> : <PauseIcon />,
+  onClick: onToggle,
+  disabled,
+});
+
+const toastPauseToggled = (name: string, resumed: boolean) =>
+  toast.success(
+    `${name} ${resumed ? "resumed" : "paused. Its settings and records are kept"}.`,
+  );
+
 export const IntegrationActionsMenu = ({
   integration,
   catalogEntry,
@@ -207,12 +78,24 @@ export const IntegrationActionsMenu = ({
 }) => {
   const removeItem = useRemoveIntegration();
   const triggerSync = useTriggerSync();
+  const setEnabled = useSetIntegrationEnabled();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const canSync =
-    integration.enabled && integration.resourceSyncs.some((s) => s.enabled);
   const syncsOnSchedule = !catalogEntry?.unscheduled;
   const labels = syncsOnSchedule ? INTEGRATION_MENU_LABELS : UPLOAD_MENU_LABELS;
+
+  // Paused also covers "on, but every stream is off", so the menu always matches the status
+  // badge. Resuming such an integration resumes all of its streams (see `setEnabled`).
+  const paused = isPaused(integration);
+  // An integration with no streams is not paused, but has nothing to sync either.
+  const canSync = !paused && integration.resourceSyncs.length > 0;
+  const togglePaused = () => {
+    const enabled = paused;
+    setEnabled.mutate(
+      { id: integration.id, enabled },
+      { onSuccess: () => toastPauseToggled(integration.name, enabled) },
+    );
+  };
 
   return (
     <>
@@ -233,6 +116,12 @@ export const IntegrationActionsMenu = ({
             icon: <PencilIcon />,
             onClick: () => setEditOpen(true),
           },
+          syncsOnSchedule &&
+            pauseItem({
+              paused,
+              disabled: setEnabled.isPending,
+              onToggle: togglePaused,
+            }),
           {
             label: labels.remove,
             icon: <TrashIcon />,
@@ -290,123 +179,42 @@ export const IntegrationActionsMenu = ({
   );
 };
 
-const IntegrationHeaderRow = ({
+/**
+ * A stream's own pause switch. While the whole integration is switched off, the stream cannot
+ * be resumed on its own, and the menu item says to resume the integration first.
+ */
+export const StreamActionsMenu = ({
   integration,
-  catalogEntry,
+  sync,
 }: {
   integration: IntegrationListItem;
-  catalogEntry?: CatalogEntry;
-}) => {
-  const setEnabled = useSetIntegrationEnabled();
-  const singleSync =
-    integration.resourceSyncs.length === 1
-      ? integration.resourceSyncs[0]
-      : null;
-  const aggregate =
-    singleSync || !integration.enabled
-      ? null
-      : aggregateTiming(integration.resourceSyncs);
-
-  return (
-    <div className="flex items-center gap-3 p-4">
-      <Avatar className="size-9 shrink-0 rounded-md border">
-        <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
-          {initialsOf(integration.name)}
-        </AvatarFallback>
-      </Avatar>
-
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold overflow-ellipsis overflow-hidden">
-          {integration.name}
-          <span className="font-normal text-muted-foreground">
-            {" "}
-            · {integration.platformLabel}
-          </span>
-        </div>
-      </div>
-
-      {singleSync ? (
-        <ResourceStatus
-          sync={singleSync}
-          integrationEnabled={integration.enabled}
-        />
-      ) : (
-        aggregate && (
-          <div className="text-right">
-            <TimingText timing={aggregate} />
-          </div>
-        )
-      )}
-
-      <Switch
-        checked={integration.enabled}
-        disabled={setEnabled.isPending}
-        onCheckedChange={(enabled) =>
-          setEnabled.mutate({ id: integration.id, enabled })
-        }
-        aria-label={`${integration.enabled ? "Disable" : "Enable"} ${integration.name}`}
-      />
-
-      <IntegrationActionsMenu
-        integration={integration}
-        catalogEntry={catalogEntry}
-      />
-    </div>
-  );
-};
-
-const ResourceRow = ({
-  sync,
-  integrationEnabled,
-}: {
   sync: IntegrationResourceSyncItem;
-  integrationEnabled: boolean;
 }) => {
   const setResourceEnabled = useSetResourceSyncEnabled();
+  const name = `${integration.name} · ${streamName(sync.resource)}`;
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5">
-      <span className="flex-1 text-sm font-medium">
-        {resourceTypeLabel(sync.resource)}
-      </span>
-      <ResourceStatus sync={sync} integrationEnabled={integrationEnabled} />
-      <Switch
-        checked={sync.enabled}
-        disabled={setResourceEnabled.isPending}
-        onCheckedChange={(enabled) =>
-          setResourceEnabled.mutate({
-            integrationId: sync.integrationId,
-            resource: sync.resource,
-            enabled,
-          })
-        }
-        aria-label={`${sync.enabled ? "Disable" : "Enable"} ${resourceTypeLabel(sync.resource)} sync`}
-      />
-    </div>
+    <MoreVerticalDropdownMenu
+      items={[
+        pauseItem({
+          paused: isStreamPaused(integration, sync),
+          disabled: setResourceEnabled.isPending || !integration.enabled,
+          description: integration.enabled
+            ? undefined
+            : `Resume ${integration.name} first`,
+          onToggle: () => {
+            const enabled = !sync.enabled;
+            setResourceEnabled.mutate(
+              {
+                integrationId: sync.integrationId,
+                resource: sync.resource,
+                enabled,
+              },
+              { onSuccess: () => toastPauseToggled(name, enabled) },
+            );
+          },
+        }),
+      ]}
+    />
   );
 };
-
-export const IntegrationCard = ({
-  integration,
-  catalogEntry,
-}: {
-  integration: IntegrationListItem;
-  catalogEntry?: CatalogEntry;
-}) => (
-  <>
-    <IntegrationHeaderRow
-      integration={integration}
-      catalogEntry={catalogEntry}
-    />
-    {integration.resourceSyncs.length > 1 && (
-      <div className="mx-4 mb-3 rounded-lg border divide-y">
-        {integration.resourceSyncs.map((sync) => (
-          <ResourceRow
-            key={sync.resource}
-            sync={sync}
-            integrationEnabled={integration.enabled}
-          />
-        ))}
-      </div>
-    )}
-  </>
-);

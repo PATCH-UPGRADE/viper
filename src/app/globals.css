@@ -230,6 +230,18 @@
   }
 }
 
+/*
+ * A grid of cards that wraps into as many columns as fit, each at least --card-grid-min wide.
+ * Override the minimum per use with `[--card-grid-min:20rem]`.
+ */
+@utility card-grid {
+  display: grid;
+  grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--card-grid-min, 20rem), 100%), 1fr)
+    );
+}
+
 /* React Flow node selection styles */
 .react-flow__node.selected #base-node {
   @apply ring-3 ring-muted-foreground/25 shadow-lg;

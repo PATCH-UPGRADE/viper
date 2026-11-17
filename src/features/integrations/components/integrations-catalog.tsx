@@ -1,14 +1,19 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { initialsOf } from "@/lib/string-utils";
 import type { CatalogEntry } from "../core/catalog";
-import { useAddedPlatforms } from "../hooks/use-integrations";
+import { useAddedPlatformCounts } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
+import { AddedIntegrations } from "./added-integrations";
+import {
+  type ConnectorFilter,
+  inCategory,
+  matchesQuery,
+} from "./configured-rows";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
 import { PLATFORM_ADD_OVERRIDES } from "./platform-add-overrides";
+import { PlatformAvatar } from "./platform-avatar";
 
 const SECTION_SUBTITLES: Record<Category, string> = {
   "Hospital Inventory": "Bring your asset inventory into VIPER.",
@@ -22,41 +27,42 @@ const SECTION_SUBTITLES: Record<Category, string> = {
 
 export const PlatformAddAction = ({
   entry,
-  added,
+  addedCount,
 }: {
   entry: CatalogEntry;
-  added: boolean;
+  addedCount: number;
 }) => {
   const PlatformAddButton = PLATFORM_ADD_OVERRIDES[entry.platform];
-  return PlatformAddButton ? (
-    <PlatformAddButton entry={entry} />
-  ) : (
-    <CreateIntegrationDialog entry={entry} added={added} />
+  if (PlatformAddButton) return <PlatformAddButton entry={entry} />;
+  return (
+    <div className="flex items-center gap-3">
+      <CreateIntegrationDialog entry={entry} addedCount={addedCount} />
+      {addedCount > 0 && (
+        <AddedIntegrations entry={entry} showCount={!entry.singleton} />
+      )}
+    </div>
   );
 };
 
 const PlatformCard = ({
   entry,
-  added,
+  addedCount,
 }: {
   entry: CatalogEntry;
-  added: boolean;
+  addedCount: number;
 }) => {
   return (
     <Card className="p-0 gap-0 overflow-hidden">
-      <div className="flex items-center gap-3 p-4">
-        <Avatar className="size-9 shrink-0 rounded-md border">
-          <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
-            {initialsOf(entry.displayName)}
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
+      {/* Grows to fill the card, so every card in a row puts its divider and button at the same height. */}
+      <div className="flex flex-1 items-center gap-3 p-4">
+        <PlatformAvatar name={entry.displayName} />
+        <div className="min-w-0 h-full">
           <CardTitle>{entry.displayName}</CardTitle>
           <CardDescription>{entry.description}</CardDescription>
         </div>
       </div>
       <div className="p-4 border-t">
-        <PlatformAddAction entry={entry} added={added} />
+        <PlatformAddAction entry={entry} addedCount={addedCount} />
       </div>
     </Card>
   );
@@ -65,53 +71,63 @@ const PlatformCard = ({
 const CategorySection = ({
   category,
   catalog,
+  query,
 }: {
   category: Category;
   catalog: CatalogEntry[];
+  query: string;
 }) => {
-  const addedPlatforms = useAddedPlatforms();
-  const isAdded = (entry: CatalogEntry) =>
-    entry.singleton && addedPlatforms.includes(entry.platform);
+  const addedCounts = useAddedPlatformCounts();
+  const countOf = (entry: CatalogEntry) => addedCounts[entry.platform] ?? 0;
+  const isFull = (entry: CatalogEntry) => entry.singleton && countOf(entry) > 0;
 
   // A card that cannot take another integration goes last. The sort is stable, so the rest keep catalog order.
   const entries = catalog
-    .filter((entry) => entry.categories.includes(category))
-    .sort((a, b) => Number(isAdded(a)) - Number(isAdded(b)));
+    .filter(
+      (entry) =>
+        entry.categories.includes(category) &&
+        matchesQuery(query, entry.displayName, entry.description),
+    )
+    .sort((a, b) => Number(isFull(a)) - Number(isFull(b)));
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-3">
+    <section className="flex flex-col gap-3" data-section={category}>
       <SettingsSubheader
         title={category}
         description={SECTION_SUBTITLES[category]}
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="card-grid gap-3">
         {entries.map((entry) => (
           <PlatformCard
             key={entry.platform}
             entry={entry}
-            added={isAdded(entry)}
+            addedCount={countOf(entry)}
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 
+/** The platforms a hospital can add, one section per category, narrowed by the page's filter. */
 export const IntegrationsCatalog = ({
   catalog,
-  register,
+  filter,
 }: {
   catalog: CatalogEntry[];
-  register: (category: Category) => (el: HTMLDivElement | null) => void;
+  filter: ConnectorFilter;
 }) => (
-  <div className="flex flex-col gap-10 flex-1 min-w-0">
-    {CATEGORIES.map((name) => (
-      <div key={name} ref={register(name)} data-section={name}>
-        <CategorySection category={name} catalog={catalog} />
-      </div>
-    ))}
-    {/* Lets the last section scroll all the way to the top, like the others. */}
-    <div className="min-h-[70vh]" aria-hidden="true" />
+  <div className="flex flex-col gap-10">
+    {CATEGORIES.filter((name) => inCategory([name], filter.category)).map(
+      (name) => (
+        <CategorySection
+          key={name}
+          category={name}
+          catalog={catalog}
+          query={filter.query}
+        />
+      ),
+    )}
   </div>
 );

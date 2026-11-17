@@ -193,13 +193,13 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 ```
 ### Feature flags
 
-Each deployment turns features on with `VIEPR_FEATURES` (a comma-separated list from
+Each deployment turns features on with `VIPER_FEATURES` (a comma-separated list from
 `src/config/features.ts`, or `all` / `none`). Unset means `all` in `npm run dev` and tests;
 It must be set in production, an invalid value stops the server.
 
 - Server: `isEnabled("chat")`, `requireFeature("reports")` in pages, `featureProcedure("workflows")`
 in routers (`src/lib/features/server.ts`, `src/trpc/init.ts`)
-- Client: `useFeatures("chat")` under `(dashbarod)` `(src/lib/features.client.tsx)`
+- Client: `useFeature("chat")` under `(dashbarod)` `(src/lib/features.client.tsx)`
 - Inngest: check `isEnabled` inside the handler, never at module scope.
 - Never read `process.env.VIPER_FEATURES` directly, and never import `server.ts` from a client component.
 - A flag hides a feature; it never deletes its data. Hiding in the UI is not enough: also block it on the server.

@@ -26,6 +26,8 @@ services:
       - INNGEST_DEV=1
       - INNGEST_BASE_URL=http://inngest:8288
       - PRISMA_CLIENT_ENGINE_TYPE=binary
+      - VIPER_DEPLOYMENT=${VIPER_DEPLOYMENT:-local}
+      - VIPER_FEATURES=${VIPER_FEATURES:-all}
     volumes:
       - viper-stamps:/srv/stamps
     ports:

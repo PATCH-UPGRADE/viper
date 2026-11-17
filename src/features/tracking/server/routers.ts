@@ -72,6 +72,7 @@ import {
 import {
   cascadeDoneStatus,
   createAssetTicket,
+  createAssetTickets,
   parentFieldsSelect,
 } from "./asset-tickets";
 import {
@@ -729,15 +730,12 @@ export const trackingRouter = createTRPCRouter({
             });
             await recordCreationActivity(tx, parent.id);
 
-            for (const asset of assets) {
-              await createAssetTicket(tx, {
-                parentTicketId: parent.id,
-                assetId: asset.id,
-                actorId: ctx.auth.user.id,
-                parent,
-                asset,
-              });
-            }
+            await createAssetTickets(tx, {
+              parentTicketId: parent.id,
+              parent,
+              assets,
+              actorId: ctx.auth.user.id,
+            });
 
             const created = await tx.workOrderTicket.findUniqueOrThrow({
               where: { id: parent.id },

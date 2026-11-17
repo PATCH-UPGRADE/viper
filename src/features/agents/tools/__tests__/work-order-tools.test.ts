@@ -28,7 +28,7 @@ vi.mock("@/features/tracking/server/asset-tickets", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("@/features/tracking/server/asset-tickets")
   >()),
-  createAssetTicket: vi.fn(),
+  createAssetTickets: vi.fn(),
 }));
 
 import { makeWorkOrderTools } from "../work-order-tools";

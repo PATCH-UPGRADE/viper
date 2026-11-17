@@ -2,7 +2,7 @@ import "server-only";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import {
-  createAssetTicket,
+  createAssetTickets,
   parentFieldsSelect,
 } from "@/features/tracking/server/asset-tickets";
 import {
@@ -194,17 +194,12 @@ const makeProposeWorkOrder = (userId: string) =>
           select: { id: true, ...parentFieldsSelect },
         });
 
-        // The parent was just written and the assets came back with the
-        // targets, so both are passed down. Otherwise each child re-reads the
-        // same parent row and its own asset row, inside this transaction.
-        for (const assetId of covered) {
-          await createAssetTicket(tx, {
-            parentTicketId: parent.id,
-            assetId,
-            actorId: userId,
-            parent,
-          });
-        }
+        await createAssetTickets(tx, {
+          parentTicketId: parent.id,
+          parent,
+          assets: covered,
+          actorId: userId,
+        });
         return parent;
       });
 

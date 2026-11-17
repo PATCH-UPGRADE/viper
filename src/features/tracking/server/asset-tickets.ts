@@ -147,6 +147,32 @@ export async function createAssetTicket(
   return child.id;
 }
 
+/**
+ * One child ticket per asset, for a parent the caller already holds. An asset
+ * given as an id is read inside the transaction; one given with its labels is
+ * not. Duplicates are harmless: createAssetTicket returns the existing child.
+ */
+export async function createAssetTickets(
+  tx: TransactionClient,
+  params: {
+    parentTicketId: string;
+    parent: ParentFields;
+    assets: ReadonlyArray<string | (AssetNameSource & { id: string })>;
+    actorId: string;
+  },
+): Promise<void> {
+  const { parentTicketId, parent, actorId } = params;
+  for (const asset of params.assets) {
+    await createAssetTicket(tx, {
+      parentTicketId,
+      assetId: typeof asset === "string" ? asset : asset.id,
+      actorId,
+      parent,
+      asset: typeof asset === "string" ? undefined : asset,
+    });
+  }
+}
+
 // Given an array of DeviceGroupMatching ids, finds every asset whose device
 // group matches at least one of them and creates an AssetTicket for each,
 // parented to parentTicketId.
@@ -170,21 +196,7 @@ export async function attachMatchingAssets(
     select: parentFieldsSelect,
   });
 
-  // Guards against creating the same asset's child ticket twice — findMany
-  // already returns each asset once, so this only matters if that changes.
-  const attachedAssetIds = new Set<string>();
-  for (const asset of assets) {
-    if (attachedAssetIds.has(asset.id)) continue;
-    attachedAssetIds.add(asset.id);
-
-    await createAssetTicket(tx, {
-      parentTicketId,
-      assetId: asset.id,
-      actorId,
-      parent,
-      asset,
-    });
-  }
+  await createAssetTickets(tx, { parentTicketId, parent, assets, actorId });
 }
 
 // Walks up the ticket's parent chain: if every child of the parent is now

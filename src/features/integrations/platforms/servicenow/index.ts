@@ -15,7 +15,6 @@ export const serviceNow: ConnectorModule<ServiceNowConfig, ServiceNowCreds> = {
     displayName: "ServiceNow",
     description: "Sync change requests from ServiceNow as work orders.",
     categories: ["Ticketing Platforms"],
-    singleton: true,
     configSchema,
     credentialSchema,
   },

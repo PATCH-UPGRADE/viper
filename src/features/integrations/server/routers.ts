@@ -37,11 +37,33 @@ const integrationListSelect = {
   config: true,
   enabled: true,
   resourceSyncs: integrationsInclude.resourceSyncs,
+  _count: {
+    select: {
+      assetMappings: true,
+      vulnerabilityRecordMappings: true,
+      deviceArtifactMappings: true,
+      remediationMappings: true,
+      workOrderMappings: true,
+      sourceRecordMappings: true,
+    },
+  },
 } as const satisfies Prisma.IntegrationSelect;
 
 type IntegrationListRow = Prisma.IntegrationGetPayload<{
   select: typeof integrationListSelect;
 }>;
+
+/** How many records of each resource type an integration has brought in, read from its External*Mapping rows. */
+const recordCountsOf = (
+  counts: IntegrationListRow["_count"],
+): Record<ResourceType, number> => ({
+  [ResourceType.Asset]: counts.assetMappings,
+  [ResourceType.Vulnerability]: counts.vulnerabilityRecordMappings,
+  [ResourceType.DeviceArtifact]: counts.deviceArtifactMappings,
+  [ResourceType.Remediation]: counts.remediationMappings,
+  [ResourceType.WorkOrder]: counts.workOrderMappings,
+  [ResourceType.SourceRecord]: counts.sourceRecordMappings,
+});
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -107,8 +129,9 @@ export const integrationsRouter = createTRPCRouter({
 
       const now = new Date();
       const items = (result.items as IntegrationListRow[]).map(
-        (integration) => ({
+        ({ _count, ...integration }) => ({
           ...integration,
+          recordCounts: recordCountsOf(_count),
           platformLabel: displayNameFor(integration.platform),
           categories: categoriesFor(integration.platform),
           resourceSyncs: integration.resourceSyncs.map((sync) => ({

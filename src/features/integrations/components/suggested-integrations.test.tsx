@@ -24,10 +24,14 @@ const fleet: CatalogEntry = {
   credentialsAreAuthShaped: false,
 };
 
+const allFilter = { category: "all", query: "" } as const;
+
 describe("SuggestedIntegrations", () => {
   it("renders nothing when no platform is suggested", () => {
     mockSuggestions.mockReturnValue([]);
-    const { container } = render(<SuggestedIntegrations catalog={[fleet]} />);
+    const { container } = render(
+      <SuggestedIntegrations catalog={[fleet]} filter={allFilter} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -35,7 +39,9 @@ describe("SuggestedIntegrations", () => {
     mockSuggestions.mockReturnValue([
       { platform: PlatformEnum.MEDISAO, reason: "no card" },
     ]);
-    const { container } = render(<SuggestedIntegrations catalog={[fleet]} />);
+    const { container } = render(
+      <SuggestedIntegrations catalog={[fleet]} filter={allFilter} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -43,12 +49,38 @@ describe("SuggestedIntegrations", () => {
     mockSuggestions.mockReturnValue([
       { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
     ]);
-    render(<SuggestedIntegrations catalog={[fleet]} />);
+    render(<SuggestedIntegrations catalog={[fleet]} filter={allFilter} />);
 
     expect(screen.getByText("Suggested for you")).toBeInTheDocument();
     expect(screen.getByText("Suggested integration")).toBeInTheDocument();
     expect(screen.getByText("Siemens Healthineers")).toBeInTheDocument();
     expect(screen.getByText("We found 12 assets.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+  });
+
+  it("disappears when the category chip leaves nothing to suggest", () => {
+    mockSuggestions.mockReturnValue([
+      { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
+    ]);
+    const { container } = render(
+      <SuggestedIntegrations
+        catalog={[fleet]}
+        filter={{ category: "Notifications", query: "" }}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("disappears when the search matches no suggestion", () => {
+    mockSuggestions.mockReturnValue([
+      { platform: PlatformEnum.FLEET, reason: "We found 12 assets." },
+    ]);
+    const { container } = render(
+      <SuggestedIntegrations
+        catalog={[fleet]}
+        filter={{ category: "all", query: "servicenow" }}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

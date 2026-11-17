@@ -28,12 +28,22 @@ const useIntegrationsQueryOptions = () => {
 export const useSuspenseIntegrations = () =>
   useSuspenseQuery(useIntegrationsQueryOptions());
 
-/** Re-renders only when the set of platforms changes, not on every sync-status poll. */
-export const useAddedPlatforms = (): PlatformEnum[] =>
+/**
+ * How many integrations each platform has. Structural sharing keeps the result stable, so this
+ * re-renders only when a count changes, not on every sync-status poll.
+ */
+export const useAddedPlatformCounts = (): Partial<
+  Record<PlatformEnum, number>
+> =>
   useSuspenseQuery({
     ...useIntegrationsQueryOptions(),
-    select: (data) =>
-      [...new Set(data.items.map((item) => item.platform))].sort(),
+    select: (data) => {
+      const counts: Partial<Record<PlatformEnum, number>> = {};
+      for (const { platform } of data.items) {
+        counts[platform] = (counts[platform] ?? 0) + 1;
+      }
+      return counts;
+    },
   }).data;
 
 export const useSuspenseIntegrationSuggestions = () => {

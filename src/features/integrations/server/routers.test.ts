@@ -56,6 +56,14 @@ const caller = createCallerFactory(integrationsRouter)({
   req: undefined,
   auth: { user: { id: "user-test" } },
 });
+const noRecords = {
+  assetMappings: 0,
+  vulnerabilityRecordMappings: 0,
+  deviceArtifactMappings: 0,
+  remediationMappings: 0,
+  workOrderMappings: 0,
+  sourceRecordMappings: 0,
+};
 const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
   id: "integration-1",
   name: "Partner feed",
@@ -70,6 +78,7 @@ const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
       syncEvery: null,
     },
   ],
+  _count: { ...noRecords, assetMappings: 12, workOrderMappings: 3 },
 });
 const existingIntegration = {
   id: "integration-1",
@@ -114,6 +123,7 @@ describe("integrationsRouter.getMany", () => {
           config: true,
           enabled: true,
           resourceSyncs: expect.any(Object),
+          _count: expect.any(Object),
         },
       }),
     );
@@ -127,6 +137,14 @@ describe("integrationsRouter.getMany", () => {
         enabled: true,
         syncEvery: 600,
         config: { endpoint: "https://partner.example" },
+        recordCounts: {
+          Asset: 12,
+          Vulnerability: 0,
+          DeviceArtifact: 0,
+          Remediation: 0,
+          WorkOrder: 3,
+          SourceRecord: 0,
+        },
         resourceSyncs: [
           expect.objectContaining({
             resource: ResourceType.Asset,
@@ -169,6 +187,7 @@ describe("integrationsRouter.getMany", () => {
         config: {},
         enabled: true,
         resourceSyncs: [],
+        _count: noRecords,
       },
     ]);
 

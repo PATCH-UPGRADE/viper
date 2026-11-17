@@ -8,6 +8,7 @@ import {
   DatabaseIcon,
   ExternalLink,
   FileTextIcon,
+  HandshakeIcon,
   HeartIcon,
   HomeIcon,
   InboxIcon,
@@ -88,6 +89,11 @@ const mainItems: NavItem[] = [
     title: "Vulnerability Dashboard",
     icon: BugIcon,
     url: "/vulnerabilities",
+  },
+  {
+    title: "Vendor Management",
+    icon: HandshakeIcon,
+    url: "/vendors",
   },
   {
     title: "Reports",

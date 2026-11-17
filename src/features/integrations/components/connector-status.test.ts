@@ -7,6 +7,7 @@ import type {
 import {
   integrationView,
   isPaused,
+  isStreamPaused,
   recordLabel,
   streamView,
   uploadGroupView,
@@ -203,6 +204,18 @@ describe("integrationView", () => {
         integration([neverRan, { ...neverRan, resource: "Asset" }]),
       ).state,
     ).toBe("unknown");
+  });
+});
+
+describe("isStreamPaused", () => {
+  it("is paused when the stream or its integration is off", () => {
+    expect(isStreamPaused(integration([]), sync({ enabled: false }))).toBe(
+      true,
+    );
+    expect(isStreamPaused(integration([], { enabled: false }), sync())).toBe(
+      true,
+    );
+    expect(isStreamPaused(integration([]), sync())).toBe(false);
   });
 });
 

@@ -140,6 +140,13 @@ describe("ConfiguredIntegrationsTable", () => {
     expect(row.getByText("0 assets")).toBeInTheDocument();
   });
 
+  it("shows no schedule line for an integration with no streams yet", () => {
+    renderTable([{ ...partner, resourceSyncs: [] }]);
+    const row = rowNamed("Blueflow");
+    expect(row.getByText("Never synced")).toBeInTheDocument();
+    expect(row.queryByText(/^Every/)).not.toBeInTheDocument();
+  });
+
   it("starts a multi-stream integration expanded, and collapses it", async () => {
     const user = userEvent.setup();
     renderTable([fleet]);

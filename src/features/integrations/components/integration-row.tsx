@@ -31,7 +31,7 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import { isPaused, streamName } from "./connector-status";
+import { isPaused, isStreamPaused, streamName } from "./connector-status";
 import { IntegrationFormDialog } from "./create-integration-dialog";
 
 const INTEGRATION_MENU_LABELS = {
@@ -81,14 +81,14 @@ export const IntegrationActionsMenu = ({
   const setEnabled = useSetIntegrationEnabled();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const canSync =
-    integration.enabled && integration.resourceSyncs.some((s) => s.enabled);
   const syncsOnSchedule = !catalogEntry?.unscheduled;
   const labels = syncsOnSchedule ? INTEGRATION_MENU_LABELS : UPLOAD_MENU_LABELS;
 
   // Paused also covers "on, but every stream is off", so the menu always matches the status
   // badge. Resuming such an integration resumes all of its streams (see `setEnabled`).
   const paused = isPaused(integration);
+  // An integration with no streams is not paused, but has nothing to sync either.
+  const canSync = !paused && integration.resourceSyncs.length > 0;
   const togglePaused = () => {
     const enabled = paused;
     setEnabled.mutate(
@@ -197,7 +197,7 @@ export const StreamActionsMenu = ({
     <MoreVerticalDropdownMenu
       items={[
         pauseItem({
-          paused: !integration.enabled || !sync.enabled,
+          paused: isStreamPaused(integration, sync),
           disabled: setResourceEnabled.isPending || !integration.enabled,
           description: integration.enabled
             ? undefined

@@ -66,13 +66,24 @@ const recordsOf = (
 };
 
 /**
+ * Whether one stream is paused: switched off itself, or its whole integration is. The stream's
+ * status badge and its Pause/Resume menu item both read this, so they cannot disagree.
+ */
+export const isStreamPaused = (
+  integration: IntegrationListItem,
+  sync: IntegrationResourceSyncItem,
+): boolean => !integration.enabled || !sync.enabled;
+
+/**
  * Whether an integration is paused as a whole: switched off, or with every stream switched off.
  * The status badge and the Pause/Resume menu item both read this, so they cannot disagree.
  */
 export const isPaused = (integration: IntegrationListItem): boolean =>
   !integration.enabled ||
   (integration.resourceSyncs.length > 0 &&
-    integration.resourceSyncs.every((sync) => !sync.enabled));
+    integration.resourceSyncs.every((sync) =>
+      isStreamPaused(integration, sync),
+    ));
 
 /** "1,204 work orders", "1 asset", "0 notifications". */
 export const recordLabel = ({ resource, count }: RecordCount) =>
@@ -96,10 +107,10 @@ const pickDate = (
 };
 
 const syncState = (
+  integration: IntegrationListItem,
   sync: IntegrationResourceSyncItem,
-  integrationEnabled: boolean,
 ): ConnectorState => {
-  if (!integrationEnabled || !sync.enabled) return "paused";
+  if (isStreamPaused(integration, sync)) return "paused";
   if (sync.status === SyncStatusEnum.Error) return "failing";
   if (sync.status === SyncStatusEnum.Success) return "healthy";
   return "unknown";
@@ -110,7 +121,7 @@ export const streamView = (
   integration: IntegrationListItem,
   sync: IntegrationResourceSyncItem,
 ): ConnectorView => {
-  const state = syncState(sync, integration.enabled);
+  const state = syncState(integration, sync);
   const paused = state === "paused";
   return {
     state,

@@ -77,7 +77,11 @@ export const StatusBadge = ({
   );
 };
 
-const scheduleLine = (schedule: NonNullable<ConnectorView["schedule"]>) => {
+/** Null for an integration with no streams yet, which has no interval to show. */
+const scheduleLine = (
+  schedule: NonNullable<ConnectorView["schedule"]>,
+): string | null => {
+  if (schedule.every.length === 0) return null;
   const every = `Every ${schedule.every.map((seconds) => ms(seconds * 1000)).join(" / ")}`;
   if (schedule.isDue) return `${every} · sync due`;
   if (schedule.nextSyncAt)
@@ -87,6 +91,7 @@ const scheduleLine = (schedule: NonNullable<ConnectorView["schedule"]>) => {
 
 const LastSyncCell = ({ view }: { view: ConnectorView }) => {
   const when = view.lastAt ? relativeTime(view.lastAt) : null;
+  const schedule = view.schedule ? scheduleLine(view.schedule) : null;
   return (
     <TableCell>
       <div
@@ -100,10 +105,8 @@ const LastSyncCell = ({ view }: { view: ConnectorView }) => {
             ? `Uploaded ${when}`
             : "Not uploaded yet"}
       </div>
-      {view.schedule && (
-        <div className="text-xs text-muted-foreground">
-          {scheduleLine(view.schedule)}
-        </div>
+      {schedule && (
+        <div className="text-xs text-muted-foreground">{schedule}</div>
       )}
     </TableCell>
   );

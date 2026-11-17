@@ -46,6 +46,16 @@ export const useAddedPlatformCounts = (): Partial<
     },
   }).data;
 
+/** One platform's integrations, sorted by name. */
+export const usePlatformIntegrations = (platform: PlatformEnum) =>
+  useSuspenseQuery({
+    ...useIntegrationsQueryOptions(),
+    select: (data) =>
+      data.items
+        .filter((item) => item.platform === platform)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+  }).data;
+
 export const useSuspenseIntegrationSuggestions = () => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.integrations.getSuggestions.queryOptions());

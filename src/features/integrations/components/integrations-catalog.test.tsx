@@ -8,6 +8,11 @@ const mockAddedPlatformCounts =
   vi.fn<() => Partial<Record<PlatformEnum, number>>>();
 vi.mock("../hooks/use-integrations", () => ({
   useAddedPlatformCounts: () => mockAddedPlatformCounts(),
+  usePlatformIntegrations: (platform: PlatformEnum) =>
+    Array.from(
+      { length: mockAddedPlatformCounts()[platform] ?? 0 },
+      (_, i) => ({ id: `${platform}-${i}`, name: `${platform} ${i}` }),
+    ),
   useCreateIntegration: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateIntegration: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -68,6 +73,10 @@ describe("IntegrationsCatalog order", () => {
       "MedISAO",
     ]);
     expect(screen.getByRole("button", { name: "Added" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Edit MEDISAO 0" }),
+    ).toBeEnabled();
+    expect(screen.queryByText(/1 added/)).not.toBeInTheDocument();
   });
 
   it("does not move a platform that can take many integrations", () => {
@@ -79,6 +88,9 @@ describe("IntegrationsCatalog order", () => {
     ]);
     expect(screen.getByRole("button", { name: "Add another" })).toBeEnabled();
     expect(screen.getByText("2 added")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit Partner API integrations" }),
+    ).toBeEnabled();
   });
 });
 

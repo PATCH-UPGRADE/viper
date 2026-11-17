@@ -208,7 +208,7 @@ describe("CreateIntegrationDialog", () => {
     expect(screen.getByRole("button", { name: "Added" })).toBeDisabled();
   });
 
-  it("offers Add another, with a count, once a multi-instance platform is added", () => {
+  it("offers Add another once a multi-instance platform is added", () => {
     render(
       <CreateIntegrationDialog
         entry={{ ...authShapedEntry, singleton: false }}
@@ -216,7 +216,6 @@ describe("CreateIntegrationDialog", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Add another" })).toBeEnabled();
-    expect(screen.getByText("2 added")).toBeInTheDocument();
   });
 });
 

@@ -109,17 +109,30 @@ const LastSyncCell = ({ view }: { view: ConnectorView }) => {
   );
 };
 
+/**
+ * "128 assets", one line per record type, or "0" when there are none. Spans rather than a list,
+ * so it can also sit inside a button (the edit picker's rows).
+ */
+export const RecordsList = ({
+  records,
+  className,
+}: {
+  records: ConnectorView["records"];
+  className?: string;
+}) =>
+  records.length === 0 ? (
+    <span className={className}>0</span>
+  ) : (
+    <span className={cn("flex flex-col gap-0.5", className)}>
+      {records.map((record) => (
+        <span key={record.resource}>{recordLabel(record)}</span>
+      ))}
+    </span>
+  );
+
 const RecordsCell = ({ view }: { view: ConnectorView }) => (
   <TableCell>
-    {view.records.length === 0 ? (
-      "0"
-    ) : (
-      <ul className="flex flex-col gap-0.5">
-        {view.records.map((record) => (
-          <li key={record.resource}>{recordLabel(record)}</li>
-        ))}
-      </ul>
-    )}
+    <RecordsList records={view.records} />
   </TableCell>
 );
 

@@ -5,6 +5,7 @@ import { SettingsSubheader } from "@/features/settings/components/settings-layou
 import type { CatalogEntry } from "../core/catalog";
 import { useAddedPlatformCounts } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
+import { AddedIntegrations } from "./added-integrations";
 import {
   type ConnectorFilter,
   inCategory,
@@ -32,10 +33,14 @@ export const PlatformAddAction = ({
   addedCount: number;
 }) => {
   const PlatformAddButton = PLATFORM_ADD_OVERRIDES[entry.platform];
-  return PlatformAddButton ? (
-    <PlatformAddButton entry={entry} />
-  ) : (
-    <CreateIntegrationDialog entry={entry} addedCount={addedCount} />
+  if (PlatformAddButton) return <PlatformAddButton entry={entry} />;
+  return (
+    <div className="flex items-center gap-3">
+      <CreateIntegrationDialog entry={entry} addedCount={addedCount} />
+      {addedCount > 0 && (
+        <AddedIntegrations entry={entry} showCount={!entry.singleton} />
+      )}
+    </div>
   );
 };
 
@@ -51,7 +56,7 @@ const PlatformCard = ({
       {/* Grows to fill the card, so every card in a row puts its divider and button at the same height. */}
       <div className="flex flex-1 items-center gap-3 p-4">
         <PlatformAvatar name={entry.displayName} />
-        <div className="min-w-0">
+        <div className="min-w-0 h-full">
           <CardTitle>{entry.displayName}</CardTitle>
           <CardDescription>{entry.description}</CardDescription>
         </div>

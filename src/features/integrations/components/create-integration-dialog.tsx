@@ -412,8 +412,8 @@ export const IntegrationFormDialog = ({
 
 /**
  * The catalog's add button. A singleton platform that already has an integration shows a
- * disabled "Added"; any other platform with integrations offers "Add another" and says how many
- * it has.
+ * disabled "Added"; any other platform with integrations offers "Add another". The catalog card
+ * shows how many are added next to it (`AddedIntegrations`).
  */
 export const CreateIntegrationDialog = ({
   entry,
@@ -432,20 +432,13 @@ export const CreateIntegrationDialog = ({
           <CheckIcon /> Added
         </Button>
       ) : (
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant={another ? "outline" : "default"}
-            onClick={() => setOpen(true)}
-          >
-            <PlusIcon /> {another ? "Add another" : "Add"}
-          </Button>
-          {another && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              <CheckIcon className="size-3.5" /> {addedCount} added
-            </span>
-          )}
-        </div>
+        <Button
+          size="sm"
+          variant={another ? "outline" : "default"}
+          onClick={() => setOpen(true)}
+        >
+          <PlusIcon /> {another ? "Add another" : "Add"}
+        </Button>
       )}
       <IntegrationFormDialog
         entry={entry}

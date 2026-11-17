@@ -88,6 +88,7 @@ const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
 const existingIntegration = {
   id: "integration-1",
   platform: PlatformEnum.PARTNER,
+  config: { resource: ResourceType.Asset },
 };
 
 mockDefaultSyncEveryFor.mockReturnValue(900);
@@ -110,16 +111,15 @@ describe("integrationsRouter.getSuggestions", () => {
 
 describe("integrationsRouter.getMany", () => {
   it("returns one unified, browser-safe list with resolved resource cadences", async () => {
-    mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
       integrationRow(600, new Date(Date.now() - 1_000)),
     ]);
 
-    const result = await caller.getMany({ search: "partner" });
+    const result = await caller.getMany();
 
     expect(mockPrisma.integration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { name: { contains: "partner", mode: "insensitive" } },
+        orderBy: { createdAt: "desc" },
         select: {
           id: true,
           name: true,
@@ -132,7 +132,7 @@ describe("integrationsRouter.getMany", () => {
         },
       }),
     );
-    expect(result.items).toEqual([
+    expect(result).toEqual([
       {
         id: "integration-1",
         name: "Partner feed",
@@ -163,14 +163,13 @@ describe("integrationsRouter.getMany", () => {
   });
 
   it("falls back to the platform default cadence and is due with no nextSyncAt", async () => {
-    mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
       integrationRow(null, null),
     ]);
 
-    const result = await caller.getMany({ search: "partner" });
+    const result = await caller.getMany();
 
-    expect(result.items[0].resourceSyncs[0]).toMatchObject({
+    expect(result[0].resourceSyncs[0]).toMatchObject({
       effectiveSyncEvery: 900,
       isOverridden: false,
       isDue: true,
@@ -182,7 +181,6 @@ describe("integrationsRouter.getMany", () => {
       "Vulnerability Management Platforms",
       "Notifications",
     ]);
-    mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
       {
         id: "integration-1",
@@ -196,10 +194,10 @@ describe("integrationsRouter.getMany", () => {
       },
     ]);
 
-    const result = await caller.getMany({ search: "" });
+    const result = await caller.getMany();
 
     expect(mockCategoriesFor).toHaveBeenCalledWith(PlatformEnum.AI);
-    expect(result.items[0].categories).toEqual([
+    expect(result[0].categories).toEqual([
       "Vulnerability Management Platforms",
       "Notifications",
     ]);
@@ -228,12 +226,39 @@ describe("integrationsRouter enable controls", () => {
     await caller.setEnabled({ id: "integration-1", enabled: true });
 
     expect(mockPrisma.integrationResourceSync.updateMany).toHaveBeenCalledWith({
-      where: { integrationId: "integration-1" },
+      where: {
+        integrationId: "integration-1",
+        resource: { in: [ResourceType.Asset] },
+      },
       data: { enabled: true },
     });
     expect(mockPrisma.integration.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { enabled: true } }),
     );
+  });
+
+  it("resumes only the resource the config now names, after a generic integration's resource changed", async () => {
+    // `update` moved this integration from Asset to WorkOrder and disabled the Asset stream;
+    // then the WorkOrder stream was paused on its own.
+    mockPrisma.integration.findUnique.mockResolvedValue({
+      ...existingIntegration,
+      config: { resource: ResourceType.WorkOrder },
+    });
+    mockPrisma.integrationResourceSync.count.mockResolvedValue(0);
+
+    await caller.setEnabled({ id: "integration-1", enabled: true });
+
+    const current = {
+      integrationId: "integration-1",
+      resource: { in: [ResourceType.WorkOrder] },
+    };
+    expect(mockPrisma.integrationResourceSync.count).toHaveBeenCalledWith({
+      where: { ...current, enabled: true },
+    });
+    expect(mockPrisma.integrationResourceSync.updateMany).toHaveBeenCalledWith({
+      where: current,
+      data: { enabled: true },
+    });
   });
 
   it("leaves paused streams paused when resuming an integration that still has one running", async () => {

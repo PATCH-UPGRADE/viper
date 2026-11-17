@@ -108,10 +108,7 @@ const ConfiguredIntegrations = ({
 
 export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
   const { data } = useSuspenseIntegrations();
-  const rows = useMemo(
-    () => configuredRowsFor(data.items, catalog),
-    [data.items, catalog],
-  );
+  const rows = useMemo(() => configuredRowsFor(data, catalog), [data, catalog]);
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [query, setQuery] = useState("");
   const filter = useMemo(() => ({ category, query }), [category, query]);

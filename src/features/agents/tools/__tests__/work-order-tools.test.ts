@@ -24,7 +24,10 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/features/work-orders/server/departments", () => ({
   resolveResponsibleDepartments: mockDepartments,
 }));
-vi.mock("@/features/tracking/server/asset-tickets", () => ({
+vi.mock("@/features/tracking/server/asset-tickets", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/tracking/server/asset-tickets")
+  >()),
   createAssetTicket: vi.fn(),
 }));
 

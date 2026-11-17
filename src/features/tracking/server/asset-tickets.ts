@@ -22,6 +22,21 @@ interface ParentFields {
   isDraft: boolean;
 }
 
+/**
+ * The parent columns a child copies. A caller that creates N children reads
+ * these once and passes them down.
+ */
+export const parentFieldsSelect = {
+  summary: true,
+  body: true,
+  category: true,
+  priority: true,
+  creatorId: true,
+  scheduledAt: true,
+  sourceLabel: true,
+  isDraft: true,
+} as const;
+
 export interface ExternalMappingInput {
   integrationId: string;
   externalId: string;
@@ -90,16 +105,7 @@ export async function createAssetTicket(
     params.parent ??
       tx.workOrderTicket.findUniqueOrThrow({
         where: { id: parentTicketId },
-        select: {
-          summary: true,
-          body: true,
-          category: true,
-          priority: true,
-          creatorId: true,
-          scheduledAt: true,
-          sourceLabel: true,
-          isDraft: true,
-        },
+        select: parentFieldsSelect,
       }),
     params.asset ??
       tx.asset.findUniqueOrThrow({
@@ -161,16 +167,7 @@ export async function attachMatchingAssets(
   // leaving this to createAssetTicket would re-read it for each asset.
   const parent = await tx.workOrderTicket.findUniqueOrThrow({
     where: { id: parentTicketId },
-    select: {
-      summary: true,
-      body: true,
-      category: true,
-      priority: true,
-      creatorId: true,
-      scheduledAt: true,
-      sourceLabel: true,
-      isDraft: true,
-    },
+    select: parentFieldsSelect,
   });
 
   // Guards against creating the same asset's child ticket twice — findMany

@@ -1,7 +1,10 @@
 import "server-only";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { createAssetTicket } from "@/features/tracking/server/asset-tickets";
+import {
+  createAssetTicket,
+  parentFieldsSelect,
+} from "@/features/tracking/server/asset-tickets";
 import {
   proposeWorkOrderSchema,
   type WorkOrderProposal,
@@ -188,17 +191,7 @@ const makeProposeWorkOrder = (userId: string) =>
             departments: { connect: departmentIds.map((id) => ({ id })) },
             ...draftTargetFields(target ?? null, payload),
           },
-          select: {
-            id: true,
-            summary: true,
-            body: true,
-            category: true,
-            priority: true,
-            creatorId: true,
-            scheduledAt: true,
-            sourceLabel: true,
-            isDraft: true,
-          },
+          select: { id: true, ...parentFieldsSelect },
         });
 
         // The parent was just written and the assets came back with the

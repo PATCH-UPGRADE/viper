@@ -19,6 +19,7 @@ import { useSuspenseTrackingTickets } from "../hooks/use-tracking";
 import { useTrackingParams } from "../hooks/use-tracking-params";
 import type { TrackingTicketChildRow, TrackingTicketRow } from "../types";
 import { trackingColumns } from "./columns";
+import { CreateWorkOrderButton } from "./create-work-order-dialog";
 
 export const TrackingSearch = () => {
   const [params, setParams] = useTrackingParams();
@@ -82,6 +83,7 @@ export const TrackingHeader = () => {
           Maintenance calendar
         </Link>
       </Button>
+      <CreateWorkOrderButton />
     </div>
   );
 };

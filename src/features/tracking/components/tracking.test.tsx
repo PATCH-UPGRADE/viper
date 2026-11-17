@@ -81,6 +81,10 @@ vi.mock("../hooks/use-tracking-params", () => ({
 
 vi.mock("../hooks/use-tracking", () => ({
   useSuspenseTrackingTickets: mockUseSuspenseTrackingTickets,
+  useCreateTicket: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useAttachableAssets: vi.fn(() => ({ data: [] })),
+  useAssignableUsers: vi.fn(() => ({ data: [] })),
+  useDepartments: vi.fn(() => ({ data: [] })),
 }));
 
 vi.mock("@/hooks/use-entity-search", () => ({
@@ -126,6 +130,15 @@ describe("TrackingHeader", () => {
     expect(
       screen.getByText(/work order tickets and approval gates/i),
     ).toBeInTheDocument();
+  });
+
+  it("opens the create dialog from the New work order button", async () => {
+    const user = userEvent.setup();
+    render(<TrackingHeader />);
+
+    await user.click(screen.getByRole("button", { name: /new work order/i }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });
 

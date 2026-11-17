@@ -57,7 +57,7 @@ export async function ingestPulledWorkOrders(
       mappingRelation: "externalMapping",
       // Every other ingest path records this, so a synced work order gets the
       // same "created" entry in its timeline.
-      onItemCreated: (id: string) => recordCreationActivity(id),
+      onItemCreated: (id: string) => recordCreationActivity(prisma, id),
       // finalize-sync already records this attempt. A second write
       // double-counts consecutiveFailures.
       shouldRecordSyncOutcome: false,

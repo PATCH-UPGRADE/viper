@@ -4,10 +4,10 @@
 
 import "server-only";
 import { tool } from "@langchain/core/tools";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { fetchPdfAttachments } from "../../utils";
 import { gatherTriageContext, type LinkableIds } from "../triage/context";
 import {
@@ -16,7 +16,6 @@ import {
   type MitigationPlansResult,
 } from "./schema";
 
-const MODEL = "gpt-6.1-sol";
 const TOOL_NAME = "record_mitigation_plans";
 
 const SYSTEM_PROMPT = `You are a mitigation-planning agent for a hospital cybersecurity platform. Given a security notification and the resolved hospital context (linked vulnerabilities, remediations, the sorted status of each device group, affected device groups, care areas, and clinical workflows), propose a small set of distinct mitigation plans for the hospital to choose between.
@@ -96,12 +95,7 @@ export async function createMitigationPlans(
   // Bind the single recording tool, force the call, and read its args. The args
   // are re-validated against the schema below. Reasoning tokens count toward
   // maxTokens, so leave room for them on top of the recorded output.
-  const model = new ChatOpenAI({
-    model: MODEL,
-    maxTokens: 16000,
-    useResponsesApi: true,
-    reasoning: { effort: "medium" },
-  }).bindTools([recordTool], { tool_choice: "required" });
+  const model = createChatModel("inbox.vex").bindTools([recordTool], { tool_choice: "required" });
 
   const textPrompt = buildTextPrompt({
     notificationType: notification?.type ?? "Other",

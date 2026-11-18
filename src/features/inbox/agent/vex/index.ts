@@ -32,7 +32,9 @@ export async function sortVulnerabilities(
   // Bind the single recording tool, force the call, and read its args. The args
   // are re-validated against the schema below. Reasoning tokens count toward
   // maxTokens, so leave room for them on top of the recorded output.
-  const model = createChatModel("inbox.vex").bindTools([recordTool], { tool_choice: "required" });
+  const model = createChatModel("inbox.vex").bindTools([recordTool], {
+    tool_choice: "required",
+  });
 
   const res = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

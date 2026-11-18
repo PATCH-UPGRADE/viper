@@ -5,10 +5,9 @@ import {
   type DebriefBullet,
   debriefBulletDraftSchema,
 } from "@/features/debrief/types";
+import { createChatModel, resolveModelId } from "@/lib/llm/chat-model";
 import { buildWriterPrompt, type WriterPromptInput } from "./prompts";
 import { validateBullets } from "./validate";
-
-const WRITER_MODEL = "gpt-6.1-sol";
 
 /**
  * Deliberately the DRAFT schema, not the strict one — see
@@ -34,15 +33,13 @@ export async function writeDepartmentDebrief(
 ): Promise<WriteDebriefResult> {
   // "low" is the lowest effort Sol accepts. Reasoning tokens still count toward
   // maxTokens, so leave room above the bullets themselves.
-  const model = new ChatOpenAI({
-    model: WRITER_MODEL,
-    maxTokens: 8000,
-    useResponsesApi: true,
-    reasoning: { effort: "low" },
-  }).withStructuredOutput(writerOutputSchema, {
+
+
+    const model = createChatModel("debrief.writer").withStructuredOutput(writerOutputSchema, {
     name: "emit_debrief",
     method: "functionCalling",
   });
+
 
   const draft = await model.invoke([
     { role: "user", content: buildWriterPrompt(input) },
@@ -50,5 +47,5 @@ export async function writeDepartmentDebrief(
 
   const { bullets } = await validateBullets(draft.bullets);
 
-  return { bullets, model: WRITER_MODEL };
+  return { bullets, model: resolveModelId("debrief.writer") };
 }

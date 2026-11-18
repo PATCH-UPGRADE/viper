@@ -1,12 +1,12 @@
 import "server-only";
 import { SystemMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
 import {
   ASSET_ROLE_INSTRUCTIONS,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
   VULNERABILITY_ROLE_INSTRUCTIONS,
 } from "@/features/chat/utils";
+import { createChatModel } from "@/lib/llm/chat-model";
 import {
   type AssetForMarkdown,
   assetToMarkdown,
@@ -24,7 +24,6 @@ import {
   REPORTS_VIEW_TOOL_NAMES,
 } from "./recommendation-prompt";
 
-const CHAT_MODEL = "gpt-6-luna";
 const RECOMMENDATION_MODEL = "gpt-6.1-sol";
 
 const BASE_PROMPT = `You are a helpful AI assistant for a hospital vulnerability management platform (Viper).
@@ -207,24 +206,14 @@ export function buildChatGraph({
   );
   const focus = buildFocusBlocks(userRole, assetData, vulnerabilityData);
 
-  const model = new ChatOpenAI({
-    model: CHAT_MODEL,
-    maxTokens: 4096,
-    streaming: true,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-  }).bindTools(tools);
+  const model = createChatModel("chat.main").bindTools(tools);
 
   // The reasoning summary is what streams to the UI's reasoning block; without
   // it OpenAI returns no reasoning text at all. Reasoning tokens count toward
   // maxTokens, so the budget covers the reasoning as well as the reply.
-  const recommendationModel = new ChatOpenAI({
-    model: RECOMMENDATION_MODEL,
-    maxTokens: 32000,
-    streaming: true,
-    useResponsesApi: true,
-    reasoning: { effort: "high", summary: "auto" },
-  }).bindTools(recommendationTools);
+  const recommendationModel = createChatModel("chat.recommendation").bindTools(
+    recommendationTools,
+  );
 
   return buildAgentGraph({
     model,

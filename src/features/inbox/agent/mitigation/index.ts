@@ -95,7 +95,9 @@ export async function createMitigationPlans(
   // Bind the single recording tool, force the call, and read its args. The args
   // are re-validated against the schema below. Reasoning tokens count toward
   // maxTokens, so leave room for them on top of the recorded output.
-  const model = createChatModel("inbox.vex").bindTools([recordTool], { tool_choice: "required" });
+  const model = createChatModel("inbox.vex").bindTools([recordTool], {
+    tool_choice: "required",
+  });
 
   const textPrompt = buildTextPrompt({
     notificationType: notification?.type ?? "Other",

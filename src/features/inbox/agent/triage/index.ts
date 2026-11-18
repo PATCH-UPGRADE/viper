@@ -1,13 +1,11 @@
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { hospitalImpactSchema } from "../../types";
 import { fetchPdfAttachments } from "../../utils";
 import { gatherTriageContext } from "./context";
-
-const MODEL = "gpt-6-luna";
 
 const triageSchema = z.object({
   priority: z.enum(["Critical", "High", "Monitor", "Defer"]),
@@ -78,12 +76,10 @@ export async function triageNotification(
     gatherTriageContext(notificationId),
   ]);
 
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 2048,
-  }).withStructuredOutput(triageSchema, { method: "functionCalling" });
+  const model = createChatModel("inbox.triage").withStructuredOutput(
+    triageSchema,
+    { method: "functionCalling" },
+  );
 
   const textPrompt = buildTextPrompt({
     notificationType: notification?.type ?? "Other",

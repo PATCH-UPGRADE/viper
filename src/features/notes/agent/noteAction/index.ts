@@ -1,5 +1,5 @@
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
+import { createChatModel } from "@/lib/llm/chat-model";
 import {
   gatherNoteActionContext,
   type NoteActionContext,
@@ -9,17 +9,13 @@ import {
 import { applyNoteAction, type NoteActionSummary } from "./process_output";
 import { type NoteActionResult, noteActionSchema } from "./schema";
 
-const MODEL = "gpt-6-luna";
-
 export async function draftNoteActions(
   context: NoteActionContext,
 ): Promise<NoteActionResult> {
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 2048,
-  }).withStructuredOutput(noteActionSchema, { method: "functionCalling" });
+  const model = createChatModel("notes.action").withStructuredOutput(
+    noteActionSchema,
+    { method: "functionCalling" },
+  );
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

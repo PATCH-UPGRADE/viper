@@ -1,5 +1,6 @@
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
+
+import { createChatModel } from "@/lib/llm/chat-model";
 import {
   buildNamePrompt,
   type NameCandidate,
@@ -11,8 +12,6 @@ import {
   type NameSuggestion,
   toNameSuggestions,
 } from "./schema";
-
-const MODEL = "gpt-6-luna";
 
 export interface SuggestNameMatchesInput {
   kind: NameKind;
@@ -27,12 +26,11 @@ export async function suggestNameMatches(
   if (names.length === 0 || candidates.length === 0) return new Map();
   const candidateIds = candidates.map((candidate) => candidate.id);
   const schema = buildNameMatchSchema(names, candidateIds);
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 4000,
-  }).withStructuredOutput(schema, { method: "functionCalling" });
+
+  const model = createChatModel("csv.match-names").withStructuredOutput(
+    schema,
+    { method: "functionCalling" },
+  );
 
   const guess = await model.invoke([
     { role: "system", content: systemPromptFor(kind) },

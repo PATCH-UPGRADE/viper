@@ -2,10 +2,10 @@
 // classifies notification as Advisory/Recall/UpdateAvailable/Other (NotificationType)
 
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import {
   matchingLabelsInclude,
@@ -14,8 +14,6 @@ import {
 } from "../types";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
-
-const MODEL = "gpt-6-luna";
 
 // Flat schema required: a tool's parameters schema must have a top-level "type": "object",
 // which z.discriminatedUnion / z.union produce as "oneOf" and fail validation.
@@ -166,12 +164,10 @@ export async function classifyNotification(
     classifyContext(sourceId),
   ]);
 
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 1024,
-  }).withStructuredOutput(classifySchema, { method: "functionCalling" });
+  const model = createChatModel("inbox.classify").withStructuredOutput(
+    classifySchema,
+    { method: "functionCalling" },
+  );
 
   const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

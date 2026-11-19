@@ -47,12 +47,18 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
 
   const nodeData = props.data;
 
-  const { data: assetsWithVulns } = useAssetsVulns({
+  const { data: assetsWithVulns, isError } = useAssetsVulns({
     assetIds: nodeData.assetIds ?? [],
     deviceTypeIds: nodeData.deviceTypeIds ?? [],
   });
   const numVulns = assetsWithVulns?.vulnerabilitiesCount ?? 0;
   const numAssets = assetsWithVulns?.assetsCount ?? 0;
+  // Until the first result, or after a failed lookup, the counts are unknown.
+  const countLabel = (count: number) =>
+    assetsWithVulns ? count : isError ? "!" : "…";
+  const countTitle = isError
+    ? "Could not load the devices of this node"
+    : undefined;
 
   const nodeStatus = numVulns > 0 ? "vulnerable" : "initial";
 
@@ -89,19 +95,26 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
           <Badge
             className={cn(
               "text-[6px]",
-              numAssets === 0 ? "border-red-500" : "",
+              isError || (assetsWithVulns && numAssets === 0)
+                ? "border-red-500"
+                : "",
             )}
             variant="outline"
+            title={countTitle}
           >
             <ComputerIcon className="w-2! h-2!" />
-            {numAssets}
+            {countLabel(numAssets)}
           </Badge>
           <Badge
-            className={cn("text-[6px]", numVulns > 0 ? "border-red-500" : "")}
+            className={cn(
+              "text-[6px]",
+              isError || numVulns > 0 ? "border-red-500" : "",
+            )}
             variant="outline"
+            title={countTitle}
           >
             <BugIcon className="w-2! h-2!" />
-            {numVulns}
+            {countLabel(numVulns)}
           </Badge>
         </div>
       </BaseAssetNode>

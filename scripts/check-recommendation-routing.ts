@@ -39,7 +39,7 @@ const QUESTIONS: [expected: "hand off" | "stay", question: string][] = [
 ];
 
 async function main() {
-  const { ChatOpenAI } = await import("@langchain/openai");
+  const { createChatModel } = await import("@/lib/llm/chat-model");
   const { HumanMessage, SystemMessage } = await import(
     "@langchain/core/messages"
   );
@@ -54,12 +54,11 @@ async function main() {
     where: { email: "user@example.com" },
     select: { id: true },
   });
-  const chatModel = new ChatOpenAI({
-    model: "gpt-6-luna",
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 1024,
-  }).bindTools(buildAgentTools(user.id, "routing-check"));
+
+  const chatModel = createChatModel("scripts.recommendation-routing").bindTools(
+    buildAgentTools(user.id, "routing-check"),
+  );
+
   const system = new SystemMessage(
     buildSystemPrompt("hospital administration"),
   );

@@ -34,12 +34,13 @@ export async function writeDepartmentDebrief(
   // "low" is the lowest effort Sol accepts. Reasoning tokens still count toward
   // maxTokens, so leave room above the bullets themselves.
 
-
-    const model = createChatModel("debrief.writer").withStructuredOutput(writerOutputSchema, {
-    name: "emit_debrief",
-    method: "functionCalling",
-  });
-
+  const model = createChatModel("debrief.writer").withStructuredOutput(
+    writerOutputSchema,
+    {
+      name: "emit_debrief",
+      method: "functionCalling",
+    },
+  );
 
   const draft = await model.invoke([
     { role: "user", content: buildWriterPrompt(input) },

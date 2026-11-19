@@ -4,7 +4,7 @@ import { type Node, type NodeProps, useReactFlow } from "@xyflow/react";
 import { BugIcon, CircleQuestionMark, ComputerIcon } from "lucide-react";
 import { memo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { useSuspenseAssetsVulns } from "@/features/assets/hooks/use-assets";
+import { useAssetsVulns } from "@/features/assets/hooks/use-assets";
 import { cn } from "@/lib/utils";
 import { type DeviceIconType, getIconByType } from "../types";
 import { BaseAssetNode } from "./base-asset-node";
@@ -47,12 +47,12 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
 
   const nodeData = props.data;
 
-  const assetsWithVulns = useSuspenseAssetsVulns({
+  const { data: assetsWithVulns } = useAssetsVulns({
     assetIds: nodeData.assetIds ?? [],
     deviceTypeIds: nodeData.deviceTypeIds ?? [],
   });
-  const numVulns = assetsWithVulns.data.vulnerabilitiesCount;
-  const numAssets = assetsWithVulns.data.assetsCount;
+  const numVulns = assetsWithVulns?.vulnerabilitiesCount ?? 0;
+  const numAssets = assetsWithVulns?.assetsCount ?? 0;
 
   const nodeStatus = numVulns > 0 ? "vulnerable" : "initial";
 
@@ -69,10 +69,8 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
         onOpenChange={setDialogOpen}
         onSubmit={handleSubmit}
         defaultValues={nodeData}
-        assets={assetsWithVulns ? assetsWithVulns.data.assets : []}
-        vulnerabilities={
-          assetsWithVulns ? assetsWithVulns.data.vulnerabilities : []
-        }
+        assets={assetsWithVulns?.assets ?? []}
+        vulnerabilities={assetsWithVulns?.vulnerabilities ?? []}
       />
       <BaseAssetNode
         {...props}

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
+import { models } from "@/lib/llm/models";
 
 vi.mock("server-only", () => ({}));
 
@@ -20,23 +21,21 @@ const read = (file: string) =>
 describe("writer model configuration", () => {
   // Sol's lowest accepted effort is "low"; "none" is a 400 on every call.
   it("uses low reasoning effort, the lowest Sol accepts", () => {
-    expect(read("writer.ts")).toMatch(/reasoning:\s*\{\s*effort:\s*"low"\s*\}/);
+    expect(models["debrief.writer"].reasoning.effort).toBe("low");
   });
 
   // Match the assignment, not the bare word. The setting is worth explaining
   // in a comment, and a comment doing so must not fail the test that guards it.
   it("never sets temperature, which reasoning models reject", () => {
-    for (const file of ["writer.ts", "scout.ts"]) {
-      expect(read(file)).not.toMatch(/temperature\s*:/);
+    for (const key of ["debrief.writer", "debrief.scout"] as const) {
+      expect(models[key]).not.toHaveProperty("temperature");
     }
   });
 });
 
 describe("scout model configuration", () => {
   it("reasons at medium effort", () => {
-    expect(read("scout.ts")).toMatch(
-      /reasoning:\s*\{\s*effort:\s*"medium"\s*\}/,
-    );
+    expect(models["debrief.scout"].reasoning.effort).toBe("medium");
   });
 
   // The registry holds two HALT_TOOLS and a note writer. A nightly cron has

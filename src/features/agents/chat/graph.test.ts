@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { constructedModelFields } = vi.hoisted(() => ({
   constructedModelFields: [] as Record<string, unknown>[],
@@ -33,6 +33,11 @@ import { buildChatGraph, buildSystemPrompt } from "./graph";
 beforeEach(() => {
   vi.clearAllMocks();
   constructedModelFields.length = 0;
+  vi.stubEnv("BEDROCK_REGION", undefined); // OPENAI only
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 const graphConfig = () => vi.mocked(buildAgentGraph).mock.calls[0][0];
@@ -281,6 +286,24 @@ describe("recommendation model configuration", () => {
       loadNotes: async () => "Hospital notes",
     });
     expect(constructedModelFields[0]?.reasoning).toEqual({ effort: "none" });
+  });
+  it("on Bedrock, sends the recommendation reasoning through modelKawrgs", () => {
+    vi.stubEnv("BEDROCK_REGION", "us-east-2");
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      loadNotes: async () => "Hospital notes",
+    });
+    const fields = constructedModelFields.find(
+      (f) =>
+        (f.modelKwargs as { reasoning?: { effort?: string } } | undefined)
+          ?.reasoning?.effort === "high",
+    );
+    expect(fields?.modelKwargs).toEqual({
+      reasoning: { effort: "high", summary: "auto" },
+    });
+    expect(fields).not.toHaveProperty("reasoning");
+    expect(fields?.model).toBe("us.openai.gpt-6.1-sol");
   });
 });
 

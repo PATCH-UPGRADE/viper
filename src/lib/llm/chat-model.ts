@@ -22,6 +22,7 @@ export function resolveModelId(key: ModelKey): string {
  */
 export function createChatModel(key: ModelKey): ChatOpenAI {
   const region = process.env.BEDROCK_REGION;
+
   // Vercel and local dev: OpenAI, exactly as today
   if (!region) return new ChatOpenAI(models[key]);
 
@@ -29,15 +30,13 @@ export function createChatModel(key: ModelKey): ChatOpenAI {
   if (!provideBedrockKey) {
     provideBedrockKey = getTokenProvider({
       region,
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-      },
     });
   }
+  const { reasoning, ...entry } = models[key];
   return new ChatOpenAI({
-    ...models[key],
+    ...entry,
     model: resolveModelId(key),
+    modelKwargs: { reasoning }, // LangChain only sends reasoning for model names starting with "gpt-6"
     apiKey: provideBedrockKey,
     configuration: {
       baseURL: `https://bedrock-runtime.${region}.amazonaws.com/openai/v1`,

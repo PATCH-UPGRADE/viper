@@ -30,7 +30,6 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
-  assetWhereForMatchings,
   buildUpdatedAtFilter,
   deviceInputToAsset,
   fetchPaginated,
@@ -265,31 +264,23 @@ export const assetsRouter = createTRPCRouter({
     }),
 
   // Assets used in a clinical workflow — either linked directly to one of its
-  // nodes, or matched by a node's device-group matching.
+  // nodes, or of a device type that one of its nodes links.
   getManyByWorkflow: protectedProcedure
     .input(z.object({ id: z.string() }))
     .output(assetArrayResponseSchema)
     .query(async ({ input }) => {
       const { id: workflowId } = input;
 
-      const matchings = await prisma.deviceGroupMatching.findMany({
-        where: { nodes: { some: { workflowId } } },
-        select: {
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          versionRange: true,
-        },
-      });
-      const matchedWhere = await assetWhereForMatchings(matchings, {
-        loose: true,
-      });
-
-      // Find assets that are directly linked by a node
-      // and assets that are indirectly linked via a node's matching
       const assets = await prisma.asset.findMany({
         where: {
-          OR: [{ nodes: { some: { workflowId } } }, matchedWhere],
+          OR: [
+            { nodes: { some: { workflowId } } },
+            {
+              product: {
+                deviceType: { nodes: { some: { workflowId } } },
+              },
+            },
+          ],
         },
         include: assetInclude,
         orderBy: { updatedAt: "desc" },
@@ -456,25 +447,16 @@ export const assetsRouter = createTRPCRouter({
   getManyWithVulns: protectedProcedure
     .input(assetsVulnsInputSchema)
     .query(async ({ input }) => {
-      const { deviceGroupMatchingIds, assetIds } = input;
+      const { deviceTypeIds, assetIds } = input;
 
-      // Assets are matched directly by id and/or via the device-group matchings
-      // the node links (each matching resolves to the assets it applies to).
+      // Assets are matched directly by id and/or by the device types the node
+      // links (an asset is of its product's device type).
       const orConditions: Prisma.AssetWhereInput[] = [];
       if (assetIds?.length) orConditions.push({ id: { in: assetIds } });
-      if (deviceGroupMatchingIds?.length) {
-        const matchings = await prisma.deviceGroupMatching.findMany({
-          where: { id: { in: deviceGroupMatchingIds } },
-          select: {
-            manufacturerId: true,
-            productId: true,
-            versionId: true,
-            versionRange: true,
-          },
+      if (deviceTypeIds?.length) {
+        orConditions.push({
+          product: { deviceTypeId: { in: deviceTypeIds } },
         });
-        orConditions.push(
-          await assetWhereForMatchings(matchings, { loose: true }),
-        );
       }
 
       // No resolvable filters => nothing matches.
@@ -487,11 +469,8 @@ export const assetsRouter = createTRPCRouter({
         };
       }
 
-      const where = { OR: orConditions };
-      const assetsCount = await prisma.asset.count({ where: where });
-
       const assetItems = await prisma.asset.findMany({
-        where: where,
+        where: { OR: orConditions },
         include: assetInclude,
         orderBy: { updatedAt: "desc" },
       });
@@ -502,7 +481,7 @@ export const assetsRouter = createTRPCRouter({
 
       return {
         assets: assetItems,
-        assetsCount,
+        assetsCount: assetItems.length,
         vulnerabilities,
         vulnerabilitiesCount: vulnerabilities.length,
       };

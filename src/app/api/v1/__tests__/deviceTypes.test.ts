@@ -47,6 +47,7 @@ describe("Device Types Endpoint (/deviceTypes)", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.items).toContainEqual({
+      id: expect.any(String),
       slug: deviceType.slug,
       displayName: deviceType.displayName,
       assetCount: 3,

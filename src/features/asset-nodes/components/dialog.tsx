@@ -34,6 +34,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { AssetWithDevice } from "@/features/assets/types";
 import { getAssetTitle } from "@/features/assets/utils";
+import { DeviceTypeMultiSelect } from "@/features/device-types/components/device-type-multi-select";
 import type { Vulnerability } from "@/generated/prisma";
 import { deviceLabel } from "@/lib/markdown";
 import { DeviceIconType, getIconByType } from "../types";
@@ -43,10 +44,7 @@ const formSchema = z.object({
   icon: z.string(),
   label: z.string(),
   description: z.string().optional(),
-  deviceGroupMatchingIds: z
-    .array(z.object({ value: z.string() }))
-    .default([])
-    .optional(),
+  deviceTypeIds: z.array(z.string()).default([]).optional(),
   assetIds: z
     .array(z.object({ value: z.string() }))
     .default([])
@@ -77,9 +75,7 @@ export const AssetDialog = ({
       icon: defaultValues.icon ?? "",
       label: defaultValues.label ?? "",
       description: defaultValues.description ?? "",
-      deviceGroupMatchingIds:
-        defaultValues.deviceGroupMatchingIds?.map((id) => ({ value: id })) ??
-        [],
+      deviceTypeIds: defaultValues.deviceTypeIds ?? [],
       assetIds: defaultValues.assetIds?.map((id) => ({ value: id })) ?? [],
     },
   });
@@ -91,22 +87,11 @@ export const AssetDialog = ({
         icon: defaultValues.icon ?? "",
         label: defaultValues.label ?? "",
         description: defaultValues.description ?? "",
-        deviceGroupMatchingIds:
-          defaultValues.deviceGroupMatchingIds?.map((id) => ({ value: id })) ??
-          [],
+        deviceTypeIds: defaultValues.deviceTypeIds ?? [],
         assetIds: defaultValues.assetIds?.map((id) => ({ value: id })) ?? [],
       });
     }
   }, [open, defaultValues, form]);
-
-  const {
-    fields: dgmFields,
-    append: dgmAppend,
-    remove: dgmRemove,
-  } = useFieldArray({
-    name: "deviceGroupMatchingIds",
-    control: form.control,
-  });
 
   const {
     fields: assetIdFields,
@@ -200,60 +185,28 @@ export const AssetDialog = ({
               <div>
                 <h2 className="font-semibold">Devices</h2>
                 <p className="text-sm text-muted-foreground">
-                  Match devices by device-group matching, or manually specify
-                  individual assets.
+                  Match devices by device type, or manually specify individual
+                  assets.
                 </p>
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium">
-                    Device group matchings
-                  </h3>
-
-                  {dgmFields.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Add a device-group matching id to match a class of devices
-                    </p>
-                  )}
-
-                  <div className="space-y-2 mt-2">
-                    {dgmFields.map((field, index) => (
-                      <div key={field.id} className="flex gap-2 items-start">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          onClick={() => dgmRemove(index)}
-                          aria-label={`Remove device group matching ${index + 1}`}
-                        >
-                          <CircleX />
-                        </Button>
-                        <FormField
-                          control={form.control}
-                          name={`deviceGroupMatchingIds.${index}.value`}
-                          render={({ field }) => (
-                            <FormItem className="flex-1">
-                              <FormLabel className="sr-only">
-                                Device group matching {index + 1}
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="cmirwmn1f000713yojcsy2ok4"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="deviceTypeIds"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>Device types</FormLabel>
+                      <FormControl>
+                        <DeviceTypeMultiSelect
+                          selectedIds={field.value ?? []}
+                          onChange={field.onChange}
                         />
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => dgmAppend({ value: "" })}
-                    >
-                      Add device group matching
-                    </Button>
-                  </div>
-                </div>
+                      </FormControl>
+                      <FormDescription>
+                        Every asset of a selected type is linked to this node.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="mt-4">
                   <h3 className="text-sm font-medium">Assets</h3>

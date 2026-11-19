@@ -103,7 +103,7 @@ Available read-only procedures for query_platform_data:
   their version.id, not vulnerabilities.getManyByAsset for each asset.
 - remediations.getMany — list/search remediations. input: { search?, page?, pageSize? }
 - remediations.getOne — one remediation by id. input: { id }
-- deviceTypes.getMany — every device type with its assetCount, the hospital's number of assets of that type (decommissioned ones are not counted). untypedAssetCount is the assets with no device type; while it is above 0, a count is only a minimum. input: {}
+- deviceTypes.getMany — every device type (id, slug, displayName; a workflow node's deviceTypeIds are these ids) with its assetCount, the hospital's number of assets of that type (decommissioned ones are not counted). untypedAssetCount is the assets with no device type; while it is above 0, a count is only a minimum. input: {}
 - manufacturers.getMany — list/search device manufacturers. input: { search?, page?, pageSize? } — search matches a name or an alias.
 - manufacturers.getOne — one manufacturer by id. input: { id }
 - products.getManyByManufacturer — list/search one manufacturer's products, each with its device type. input: { id, search?, page?, pageSize? } (manufacturer id)

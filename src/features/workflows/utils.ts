@@ -10,7 +10,7 @@ export const workflowSerializeInclude = {
   nodes: {
     include: {
       assets: { select: { id: true } },
-      deviceGroupMatchings: { select: { id: true } },
+      deviceTypes: { select: { id: true } },
     },
   },
 } satisfies Prisma.WorkflowInclude;
@@ -20,14 +20,14 @@ type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
 }>;
 
 /**
- * `where` selecting workflows a set of assets/matchings participate in: a node
- * links one of the assets directly, or links one of the device-group matchings.
+ * `where` selecting workflows a set of assets/device types participate in: a
+ * node links one of the assets directly, or links one of the device types.
  * Callers guard the all-empty case (this returns `{ OR: [] }`, which matches
  * nothing).
  */
-export function workflowsUsingAssetsOrMatchings(
+export function workflowsUsingAssetsOrDeviceTypes(
   assetIds: string[],
-  matchingIds: string[],
+  deviceTypeIds: string[],
 ): Prisma.WorkflowWhereInput {
   const or: Prisma.WorkflowWhereInput[] = [];
   if (assetIds.length > 0) {
@@ -35,10 +35,10 @@ export function workflowsUsingAssetsOrMatchings(
       nodes: { some: { assets: { some: { id: { in: assetIds } } } } },
     });
   }
-  if (matchingIds.length > 0) {
+  if (deviceTypeIds.length > 0) {
     or.push({
       nodes: {
-        some: { deviceGroupMatchings: { some: { id: { in: matchingIds } } } },
+        some: { deviceTypes: { some: { id: { in: deviceTypeIds } } } },
       },
     });
   }
@@ -46,7 +46,7 @@ export function workflowsUsingAssetsOrMatchings(
 }
 
 // Node-focused serialization for LLM/markdown consumers. Each node's linked
-// asset / device-group-matching ids are folded into node.data
+// asset / device type ids are folded into node.data
 export function serializeWorkflow(workflow: WorkflowWithRelations) {
   const nodes: SerializedNode[] = workflow.nodes.map((node) => ({
     id: node.id,
@@ -55,9 +55,7 @@ export function serializeWorkflow(workflow: WorkflowWithRelations) {
       ...(node.data as Record<string, unknown>),
       name: node.name,
       assetIds: node.assets.map((asset) => asset.id),
-      deviceGroupMatchingIds: node.deviceGroupMatchings.map(
-        (matching) => matching.id,
-      ),
+      deviceTypeIds: node.deviceTypes.map((deviceType) => deviceType.id),
     },
   }));
   return {

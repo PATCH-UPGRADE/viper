@@ -6,6 +6,16 @@ import {
 import prisma from "@/lib/db";
 import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 
+let idBySlugCache: Promise<Map<string, string>> | undefined;
+
+/** The device type ids by slug. seedDeviceTypes must run first and create them. */
+export function deviceTypeIdBySlug(): Promise<Map<string, string>> {
+  idBySlugCache ??= prisma.deviceType
+    .findMany({ select: { id: true, slug: true } })
+    .then((rows) => new Map(rows.map(({ id, slug }) => [slug, id])));
+  return idBySlugCache;
+}
+
 export function requireDeviceTypeId(
   idBySlug: Map<string, string>,
   slug: string,
@@ -125,8 +135,6 @@ export const EXAMPLE_PRODUCT_DEVICE_TYPES: Record<string, string> = {
   "symbia t": "molecular-imaging",
 };
 
-let exampleIdBySlug: Promise<Map<string, string>> | undefined;
-
 /** Upserts a product of the scripts/seed-*.ts example data, with its type. */
 export async function upsertExampleProduct(
   manufacturerId: string,
@@ -134,11 +142,8 @@ export async function upsertExampleProduct(
 ) {
   const slug = EXAMPLE_PRODUCT_DEVICE_TYPES[name.trim().toLowerCase()];
   if (!slug) return upsertSeedProduct(manufacturerId, name);
-  exampleIdBySlug ??= prisma.deviceType
-    .findMany({ select: { id: true, slug: true } })
-    .then((rows) => new Map(rows.map((r) => [r.slug, r.id])));
   const deviceTypeId = requireDeviceTypeId(
-    await exampleIdBySlug,
+    await deviceTypeIdBySlug(),
     slug,
     `Example product "${name}" (run npx prisma db seed first)`,
   );

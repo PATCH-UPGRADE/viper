@@ -1,10 +1,11 @@
-import prisma from "@/lib/db";
 import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
-import { requireDeviceTypeId } from "../production/device-types";
+import {
+  deviceTypeIdBySlug,
+  requireDeviceTypeId,
+} from "../production/device-types";
 import {
   cpeVersionStatus,
   type DeviceIds,
-  matchingForDevice,
   normalizeVersion,
   upsertManufacturer,
   upsertProduct,
@@ -161,8 +162,6 @@ type SampleDevice = DeviceIds & {
   versionStatus: "UNKNOWN" | "NOT_APPLICABLE" | "KNOWN";
 };
 
-let deviceTypeIds: Promise<Map<string, string>> | undefined;
-
 /**
  * The device ids of a sample CPE, from SAMPLE_DEVICES. Upserts the
  * manufacturer, product, and version, so any seed can call it in any order.
@@ -174,13 +173,9 @@ export async function deviceForSampleCpe(
   const sample = SAMPLE_DEVICES.find((device) => device.cpe === cpe);
   if (!sample) return null;
 
-  // The production seed runs first and creates the device types.
-  deviceTypeIds ??= prisma.deviceType
-    .findMany({ select: { id: true, slug: true } })
-    .then((rows) => new Map(rows.map(({ id, slug }) => [slug, id])));
   const deviceTypeId = sample.deviceType
     ? requireDeviceTypeId(
-        await deviceTypeIds,
+        await deviceTypeIdBySlug(),
         sample.deviceType,
         sample.modelName,
       )
@@ -219,22 +214,4 @@ export async function seedSampleDevices() {
   for (const sample of SAMPLE_DEVICES) await deviceForSampleCpe(sample.cpe);
 
   console.log(`✅ Seeded ${SAMPLE_DEVICES.length} sample devices`);
-}
-
-// Resolve sample CPEs to shared DeviceGroupMatching ids, so workflow ASSET
-// nodes can link a device class relationally instead of by CPE.
-export async function matchingIdsForCpes(cpes: string[]): Promise<string[]> {
-  const ids: string[] = [];
-  for (const cpe of cpes) {
-    const device = await deviceForSampleCpe(cpe);
-    if (!device) {
-      console.warn(
-        `⚠️  No sample device for CPE ${cpe}; skipping matching link`,
-      );
-      continue;
-    }
-    const matchingId = await matchingForDevice(device);
-    if (matchingId) ids.push(matchingId);
-  }
-  return [...new Set(ids)];
 }

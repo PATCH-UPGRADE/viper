@@ -168,7 +168,7 @@ export const integrationAssetInputSchema =
 
 export const assetsVulnsInputSchema = z.object({
   assetIds: z.array(z.string()).optional(),
-  deviceGroupMatchingIds: z.array(z.string()).optional(),
+  deviceTypeIds: z.array(z.string()).optional(),
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 

@@ -36,12 +36,12 @@ export function generateWorkflowsMarkdown(
 export function workflowClinicalSummary(
   workflows: WorkflowWithRelations[],
   affectedAssetIds: string[],
-  affectedMatchingIds: string[] = [],
+  affectedDeviceTypeIds: string[] = [],
 ): string {
   const affectedAssets = new Set(affectedAssetIds);
-  const affectedMatchings = new Set(affectedMatchingIds);
-  if (affectedAssets.size === 0 && affectedMatchings.size === 0) {
-    return "_No affected assets or device groups to map to clinical workflows._";
+  const affectedDeviceTypes = new Set(affectedDeviceTypeIds);
+  if (affectedAssets.size === 0 && affectedDeviceTypes.size === 0) {
+    return "_No affected assets or device types to map to clinical workflows._";
   }
 
   const hasId = (value: unknown, set: Set<string>) =>
@@ -53,15 +53,15 @@ export function workflowClinicalSummary(
     const serialized = serializeWorkflow(wf);
     const hitNodes = serialized.nodes.filter((node) => {
       if (node.type !== "ASSET") return false;
-      // serializeWorkflow surfaces the node's linked asset / device-group-
-      // matching ids into data; a node is affected if either intersects.
+      // serializeWorkflow surfaces the node's linked asset / device type ids
+      // into data; a node is affected if either intersects.
       const data = node.data as {
         assetIds?: unknown;
-        deviceGroupMatchingIds?: unknown;
+        deviceTypeIds?: unknown;
       };
       return (
         hasId(data.assetIds, affectedAssets) ||
-        hasId(data.deviceGroupMatchingIds, affectedMatchings)
+        hasId(data.deviceTypeIds, affectedDeviceTypes)
       );
     });
     if (hitNodes.length === 0) continue;
@@ -81,5 +81,5 @@ export function workflowClinicalSummary(
 
   return blocks.length > 0
     ? blocks.join("\n\n")
-    : "_No clinical workflows include the affected assets or device groups._";
+    : "_No clinical workflows include the affected assets or device types._";
 }

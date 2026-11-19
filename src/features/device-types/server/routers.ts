@@ -7,6 +7,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 const deviceTypeCountsSchema = z.object({
   items: z.array(
     z.object({
+      id: z.string(),
       slug: z.string(),
       displayName: z.string(),
       assetCount: z.number().int(),
@@ -60,6 +61,7 @@ export async function countAssetsByDeviceType(): Promise<
 
   return {
     items: deviceTypes.map(({ id, slug, displayName }) => ({
+      id,
       slug,
       displayName,
       assetCount: countByTypeId.get(id) ?? 0,

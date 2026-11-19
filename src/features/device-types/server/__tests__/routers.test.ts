@@ -40,9 +40,24 @@ describe("countAssetsByDeviceType", () => {
     const { items } = await countAssetsByDeviceType();
 
     expect(items).toEqual([
-      { slug: "computed-tomography", displayName: "CT", assetCount: 1 },
-      { slug: "infusion-pump", displayName: "Infusion Pump", assetCount: 23 },
-      { slug: "ventilator", displayName: "Ventilator", assetCount: 0 },
+      {
+        id: "dt-ct",
+        slug: "computed-tomography",
+        displayName: "CT",
+        assetCount: 1,
+      },
+      {
+        id: "dt-pump",
+        slug: "infusion-pump",
+        displayName: "Infusion Pump",
+        assetCount: 23,
+      },
+      {
+        id: "dt-vent",
+        slug: "ventilator",
+        displayName: "Ventilator",
+        assetCount: 0,
+      },
     ]);
   });
 

@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ErrorContext } from "better-auth/react";
 import { AlertCircle } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -30,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import { authClient } from "@/lib/auth-client";
 import { getSafeRedirectPath, withNextParam } from "@/lib/auth-redirect";
-import { handleSocialLogin } from "./login-form";
+import { SocialLoginButtons } from "./social-login-buttons";
 
 const registerSchema = z
   .object({
@@ -102,38 +101,7 @@ export function RegisterForm({ next }: RegisterFormProps) {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">
-                <div className="flex flex-col gap-4">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleSocialLogin("google", next)}
-                  >
-                    <Image
-                      alt="Google"
-                      src="/logos/google.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with Google
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleSocialLogin("github", next)}
-                  >
-                    <Image
-                      alt="GitHub"
-                      src="/logos/github.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with GitHub
-                  </Button>
-                </div>
+                <SocialLoginButtons next={next} disabled={isPending} />
                 <div className="grid gap-6">
                   <FormField
                     control={form.control}

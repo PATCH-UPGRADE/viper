@@ -15,7 +15,7 @@ graph TB
         NextJS["Next.js 15<br/>App Router + Turbopack"]
         TRPC["tRPC 11<br/>Type-Safe API"]
         OpenAPI["trpc-to-openapi<br/>OpenAPI Generation"]
-        BetterAuth["Better Auth<br/>Email/Password, Google OAuth, API Keys"]
+        BetterAuth["Better Auth<br/>Email/Password, Google/GitHub/Microsoft OAuth, API Keys"]
     end
 
     subgraph background ["Background Jobs"]

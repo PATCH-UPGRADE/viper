@@ -24,8 +24,6 @@ import {
   REPORTS_VIEW_TOOL_NAMES,
 } from "./recommendation-prompt";
 
-const RECOMMENDATION_MODEL = "gpt-6.1-sol";
-
 const BASE_PROMPT = `You are a helpful AI assistant for a hospital vulnerability management platform (Viper).
 You help hospital administrators and security engineers understand the operational impact
 of vulnerabilities and remediations across systems, safety, and clinical workflows.

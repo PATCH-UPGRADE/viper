@@ -1,5 +1,4 @@
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { createChatModel } from "@/lib/llm/chat-model";

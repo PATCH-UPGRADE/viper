@@ -22,7 +22,7 @@ describe("mapMicrosoftProfileToUser", () => {
         tid: WORK_TENANT,
         preferred_username: "nurse@hospital.org",
       }),
-    ).toEqual({ email: "nurse@hospital.org", emailVerified: true });
+    ).toEqual({ email: "nurse@hospital.org" });
   });
 
   it("does not fall back for a consumer account", () => {

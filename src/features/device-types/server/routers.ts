@@ -1,6 +1,5 @@
 import "server-only";
 import { z } from "zod";
-import { AssetStatus, type Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -16,16 +15,11 @@ const deviceTypeCountsSchema = z.object({
   untypedAssetCount: z.number().int(),
 });
 
-// Every asset but a decommissioned one. An asset with no status counts too:
-// Fleet never sends one, and `status: { not: ... }` alone leaves out NULL.
-const countedAssetWhere: Prisma.AssetWhereInput = {
-  OR: [{ status: null }, { status: { not: AssetStatus.Decommissioned } }],
-};
-
 /**
- * The number of assets of each device type. untypedAssetCount is the assets
- * whose product has no device type: while it is above 0, a type's count is
- * only a lower bound.
+ * The number of assets of each device type, whatever their status, so the
+ * count agrees with the assets a workflow node of that type resolves to.
+ * untypedAssetCount is the assets whose product has no device type: while it
+ * is above 0, a type's count is only a lower bound.
  */
 export async function countAssetsByDeviceType(): Promise<
   z.infer<typeof deviceTypeCountsSchema>
@@ -38,10 +32,10 @@ export async function countAssetsByDeviceType(): Promise<
     prisma.product.findMany({
       select: {
         deviceTypeId: true,
-        _count: { select: { assets: { where: countedAssetWhere } } },
+        _count: { select: { assets: true } },
       },
     }),
-    prisma.asset.count({ where: { ...countedAssetWhere, productId: null } }),
+    prisma.asset.count({ where: { productId: null } }),
   ]);
 
   const countByTypeId = new Map<string, number>();
@@ -114,7 +108,7 @@ export const deviceTypesRouter = createTRPCRouter({
         tags: ["DeviceTypes"],
         summary: "List Device Types",
         description:
-          "List every device type with the number of assets of that type. Decommissioned assets are not counted. untypedAssetCount is the number of assets whose product has no device type.",
+          "List every device type with the number of assets of that type, whatever their status. untypedAssetCount is the number of assets whose product has no device type.",
       },
     })
     .input(z.object({}))

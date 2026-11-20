@@ -10,7 +10,7 @@ describe("Device Types Endpoint (/deviceTypes)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("GET /deviceTypes - counts every asset of a type but decommissioned ones", async () => {
+  it("GET /deviceTypes - counts every asset of a type, whatever its status", async () => {
     const stamp = Date.now();
     const deviceType = await prisma.deviceType.create({
       data: { slug: `vitest-count-${stamp}`, displayName: `Count ${stamp}` },
@@ -50,7 +50,7 @@ describe("Device Types Endpoint (/deviceTypes)", () => {
       id: expect.any(String),
       slug: deviceType.slug,
       displayName: deviceType.displayName,
-      assetCount: 3,
+      assetCount: 4,
     });
   });
 });

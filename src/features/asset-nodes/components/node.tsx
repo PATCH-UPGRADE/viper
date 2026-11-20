@@ -53,9 +53,9 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
   });
   const numVulns = assetsWithVulns?.vulnerabilitiesCount ?? 0;
   const numAssets = assetsWithVulns?.assetsCount ?? 0;
-  // Until the first result, or after a failed lookup, the counts are unknown.
+  // After a failed lookup, or until the first result, the counts are unknown.
   const countLabel = (count: number) =>
-    assetsWithVulns ? count : isError ? "!" : "…";
+    isError ? "!" : assetsWithVulns ? count : "…";
   const countTitle = isError
     ? "Could not load the devices of this node"
     : undefined;

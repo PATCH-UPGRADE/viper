@@ -1,5 +1,7 @@
 import type { MicrosoftEntraIDProfile } from "better-auth/social-providers";
 
+// The fixed tenant that Microsoft puts in the `tid` claim of every personal
+// account token. Better Auth uses the same value but does not export it.
 const MICROSOFT_CONSUMER_TENANT_ID = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
 // Entra omits the email claim for a work account without a mail attribute.

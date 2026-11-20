@@ -1,16 +1,14 @@
 import "server-only";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
 import type { z } from "zod";
 import { buildAgentGraph } from "@/features/agents/shared/build-graph";
 import type { AuthCredential } from "@/features/integrations/core/credentials";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { makeFetchUrlTool } from "./fetch-tool";
 import { type CrawlResult, resolveCrawl } from "./outcome";
 import { buildCrawlerPreload, buildCrawlerPrompt } from "./prompt";
 import { makeRecorder } from "./record-tool";
 import { CRAWLER_ITEM_SCHEMAS, type CrawlerResource } from "./schemas";
-
-const CRAWLER_MODEL = "gpt-6.1-sol";
 
 /**
  * Super-step budget for one crawl. Each tool round costs two super-steps
@@ -58,12 +56,7 @@ export async function runAiCrawler<R extends CrawlerResource>({
   ];
 
   // Reasoning tokens count toward maxTokens, so leave room for a page of record_items arguments.
-  const model = new ChatOpenAI({
-    model: CRAWLER_MODEL,
-    maxTokens: 16000,
-    useResponsesApi: true,
-    reasoning: { effort: "medium" },
-  }).bindTools(tools);
+  const model = createChatModel("integrations.ai-crawler").bindTools(tools);
 
   const graph = buildAgentGraph({
     model,

@@ -3,7 +3,6 @@
 // db item/create a new one
 
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import {
   impactRowsUpdate,
@@ -14,6 +13,7 @@ import {
 import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { matchingVersionFields } from "@/lib/device-matching";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
 import { notRejected } from "../types";
@@ -26,8 +26,6 @@ import {
 } from "../utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
-
-const MODEL = "gpt-6-luna";
 
 // Fields the LLM may set when creating/updating a device group. Kept flat and
 // optional so the schema stays a top-level object (tool-schema requirement).
@@ -271,12 +269,10 @@ export async function matchAndLinkEntities(
     return { linked: 0, updated: 0, created: 0, skipped: 0 };
   }
 
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 2048,
-  }).withStructuredOutput(matchSchema, { method: "functionCalling" });
+  const model = createChatModel("inbox.match").withStructuredOutput(
+    matchSchema,
+    { method: "functionCalling" },
+  );
 
   const { decisions = [] } = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

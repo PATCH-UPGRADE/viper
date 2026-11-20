@@ -5,8 +5,8 @@
 
 import "server-only";
 import { tool } from "@langchain/core/tools";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
+import { createChatModel } from "@/lib/llm/chat-model";
 import {
   gatherVexContext,
   SYSTEM_PROMPT,
@@ -15,8 +15,6 @@ import {
 } from "./context";
 import { applyVexDeterminations, type VexApplySummary } from "./process_output";
 import { buildVexSchema, type VexResult } from "./tools";
-
-const MODEL = "gpt-6.1-sol";
 
 export async function sortVulnerabilities(
   context: VexContext,
@@ -34,12 +32,9 @@ export async function sortVulnerabilities(
   // Bind the single recording tool, force the call, and read its args. The args
   // are re-validated against the schema below. Reasoning tokens count toward
   // maxTokens, so leave room for them on top of the recorded output.
-  const model = new ChatOpenAI({
-    model: MODEL,
-    maxTokens: 16000,
-    useResponsesApi: true,
-    reasoning: { effort: "medium" },
-  }).bindTools([recordTool], { tool_choice: "required" });
+  const model = createChatModel("inbox.vex").bindTools([recordTool], {
+    tool_choice: "required",
+  });
 
   const res = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

@@ -1,7 +1,7 @@
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { fetchPdfAttachments } from "../../utils";
 import {
   gatherQuestionContext,
@@ -15,8 +15,6 @@ import {
 } from "./process_output";
 import { buildQuestionSchema, type QuestionResult } from "./schema";
 
-const MODEL = "gpt-6-luna";
-
 export async function draftQuestion(
   context: QuestionContext,
   pdfAttachments: PdfAttachment[] = [],
@@ -24,12 +22,9 @@ export async function draftQuestion(
   const issueIds = context.issues.map((issue) => issue.issueId);
   const schema = buildQuestionSchema(issueIds);
 
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 4000,
-  }).withStructuredOutput(schema, { method: "functionCalling" });
+  const model = createChatModel("inbox.question").withStructuredOutput(schema, {
+    method: "functionCalling",
+  });
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

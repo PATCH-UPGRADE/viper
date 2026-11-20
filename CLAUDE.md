@@ -69,7 +69,7 @@ npm run format
 - **Visual Editor**: XYFlow React 12
 - **UI**: Radix UI + Tailwind CSS 4 + shadcn/ui (New York style)
 - **AI / Chat**: LangGraph + LangChain (`ChatOpenAI`, Responses API) for the chat agent and its recommendation node, streamed to the client via Vercel AI SDK UI (`useChat`)
-- **AI Providers**: OpenAI (`OPENAI_API_KEY`) via LangChain and the Vercel AI SDK
+- **AI Providers**: OpenAI/Bedrock (`OPENAI_API_KEY`) via LangChain, depdning on if BEDROCK_REGION env var is set
 - **Code Quality**: Biome 2.2.0 (replaces ESLint/Prettier)
 - **Observability**: Sentry
 

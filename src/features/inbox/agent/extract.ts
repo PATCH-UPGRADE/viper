@@ -1,10 +1,10 @@
 // Extract potential VIPER db items from a notification (e.g, find potential device groups)
 
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { remediationImpactSchema } from "@/features/remediations/impact";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
 
@@ -63,8 +63,6 @@ export type ExtractedRemediation = z.infer<typeof extractedRemediationSchema>;
 export type ExtractedAsset = z.infer<typeof extractedAssetSchema>;
 export type ExtractResult = z.infer<typeof extractSchema>;
 
-const MODEL = "gpt-6-luna";
-
 // cvssScore format reference: https://nvd.nist.gov/vuln-metrics/cvss
 const SYSTEM_PROMPT = `You are an extraction agent for a hospital cybersecurity platform that reads security notifications (advisories, recalls, update notices) and their PDF attachments.
 
@@ -120,13 +118,10 @@ export async function extractEntities(
   inlinedPdfs?: PdfAttachment[],
 ): Promise<ExtractResult> {
   const pdfAttachments = inlinedPdfs ?? (await fetchPdfAttachments(sourceId));
-
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 4096,
-  }).withStructuredOutput(extractSchema, { method: "functionCalling" });
+  const model = createChatModel("inbox.extract").withStructuredOutput(
+    extractSchema,
+    { method: "functionCalling" },
+  );
 
   const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

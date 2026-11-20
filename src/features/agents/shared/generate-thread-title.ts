@@ -1,9 +1,7 @@
 import "server-only";
 
-import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { createChatModel } from "@/lib/llm/chat-model";
 
-const TITLE_MODEL = "gpt-6-luna";
 const MAX_TITLE_LENGTH = 60;
 
 const SYSTEM_PROMPT = `You name conversation threads. Given the first user message (and optionally the assistant's first reply), produce a concise 3-7 word title that captures the topic.
@@ -26,14 +24,12 @@ export async function generateThreadTitle(args: {
     : `User:\n${userMessage}`;
 
   try {
-    const { text } = await generateText({
-      model: openai(TITLE_MODEL),
-      providerOptions: { openai: { reasoningEffort: "none" } },
-      system: SYSTEM_PROMPT,
-      prompt,
-    });
+    const reply = await createChatModel("chat.title").invoke([
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: prompt },
+    ]);
 
-    const cleaned = text
+    const cleaned = reply.text
       .trim()
       .replace(/^["'`]+|["'`]+$/g, "")
       .replace(/[.!?]+$/g, "")

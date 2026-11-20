@@ -1,7 +1,11 @@
 // @vitest-environment node
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
+import { models } from "@/lib/llm/models";
 
 /**
  * These assert on source text rather than behaviour, because a wrong model
@@ -18,11 +22,11 @@ const src = fs.readFileSync(
 
 describe("crawler model configuration", () => {
   it("reasons at medium effort", () => {
-    expect(src).toMatch(/reasoning:\s*\{\s*effort:\s*"medium"\s*\}/);
+    expect(models["integrations.ai-crawler"].reasoning.effort).toBe("medium");
   });
 
   it("never sets temperature, which reasoning models reject", () => {
-    expect(src).not.toMatch(/temperature\s*:/);
+    expect(models["integrations.ai-crawler"]).not.toHaveProperty("temperature");
   });
 
   // The shared registry holds HALT_TOOLS, which end the run to wait for a person.

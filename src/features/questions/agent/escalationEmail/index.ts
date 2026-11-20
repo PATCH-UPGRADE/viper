@@ -1,10 +1,8 @@
 import "server-only";
-import { ChatOpenAI } from "@langchain/openai";
+import { createChatModel } from "@/lib/llm/chat-model";
 import { buildSystemPrompt } from "./context";
 import { buildEscalationEmailSchema, type EscalationDraft } from "./schema";
 import type { EscalationContext } from "./types";
-
-const MODEL = "gpt-6-luna";
 
 export async function draftEscalationEmail(
   context: EscalationContext,
@@ -17,12 +15,11 @@ export async function draftEscalationEmail(
     ),
   );
 
-  const model = new ChatOpenAI({
-    model: MODEL,
-    useResponsesApi: true,
-    reasoning: { effort: "none" },
-    maxTokens: 2000,
-  }).withStructuredOutput(schema, { method: "functionCalling" });
+  const model = createChatModel(
+    "questions.escalation-email",
+  ).withStructuredOutput(schema, {
+    method: "functionCalling",
+  });
 
   return model.invoke([
     { role: "system", content: buildSystemPrompt(context.audience) },

@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -63,12 +64,18 @@ export const useSuspenseAssetIssueMetrics = () => {
 };
 
 /**
- * Hook to fetch all assets with matching vulnerabilities using suspense
+ * The assets a workflow node covers, with their vulnerabilities. Not a
+ * suspense query: a node's ids change when its dialog saves, and a suspended
+ * node would swap the whole editor for the page's Suspense fallback while
+ * the dialog closes. The previous result stays until the new one arrives.
  */
-export const useSuspenseAssetsVulns = (params: AssetsVulnsInput) => {
+export const useAssetsVulns = (params: AssetsVulnsInput) => {
   const trpc = useTRPC();
 
-  return useSuspenseQuery(trpc.assets.getManyWithVulns.queryOptions(params));
+  return useQuery({
+    ...trpc.assets.getManyWithVulns.queryOptions(params),
+    placeholderData: keepPreviousData,
+  });
 };
 
 /**

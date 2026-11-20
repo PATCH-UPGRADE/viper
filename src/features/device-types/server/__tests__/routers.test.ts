@@ -40,9 +40,24 @@ describe("countAssetsByDeviceType", () => {
     const { items } = await countAssetsByDeviceType();
 
     expect(items).toEqual([
-      { slug: "computed-tomography", displayName: "CT", assetCount: 1 },
-      { slug: "infusion-pump", displayName: "Infusion Pump", assetCount: 23 },
-      { slug: "ventilator", displayName: "Ventilator", assetCount: 0 },
+      {
+        id: "dt-ct",
+        slug: "computed-tomography",
+        displayName: "CT",
+        assetCount: 1,
+      },
+      {
+        id: "dt-pump",
+        slug: "infusion-pump",
+        displayName: "Infusion Pump",
+        assetCount: 23,
+      },
+      {
+        id: "dt-vent",
+        slug: "ventilator",
+        displayName: "Ventilator",
+        assetCount: 0,
+      },
     ]);
   });
 
@@ -58,16 +73,13 @@ describe("countAssetsByDeviceType", () => {
     expect(untypedAssetCount).toBe(6);
   });
 
-  it("counts every asset but a decommissioned one, also with no status", async () => {
+  it("counts every asset whatever its status", async () => {
     await countAssetsByDeviceType();
 
-    const counted = {
-      OR: [{ status: null }, { status: { not: "Decommissioned" } }],
-    };
     const [{ select }] = db.product.findMany.mock.calls[0];
-    expect(select._count.select.assets.where).toEqual(counted);
+    expect(select._count.select.assets).toBe(true);
     expect(db.asset.count).toHaveBeenCalledWith({
-      where: { ...counted, productId: null },
+      where: { productId: null },
     });
   });
 });

@@ -11,10 +11,10 @@ function makeWorkflow(
     type: string;
     name?: string;
     data?: Record<string, unknown>;
-    // Linked asset / device-group-matching ids now live in relations, which
-    // serializeWorkflow surfaces into node.data.
+    // Linked asset / device type ids live in relations. serializeWorkflow
+    // surfaces them into node.data.
     assetIds?: string[];
-    deviceGroupMatchingIds?: string[];
+    deviceTypeIds?: string[];
   }>,
 ): WorkflowArg {
   return {
@@ -34,8 +34,8 @@ function makeWorkflow(
       createdAt: new Date(0),
       updatedAt: new Date(0),
       assets: (n.assetIds ?? []).map((assetId) => ({ id: assetId })),
-      deviceGroupMatchings: (n.deviceGroupMatchingIds ?? []).map((dgmId) => ({
-        id: dgmId,
+      deviceTypes: (n.deviceTypeIds ?? []).map((deviceTypeId) => ({
+        id: deviceTypeId,
       })),
     })),
     connections: [],
@@ -63,14 +63,13 @@ describe("workflowClinicalSummary", () => {
     },
   ]);
 
-  // Links a class of devices via a device-group matching rather than a
-  // specific asset id.
+  // Links a class of devices via a device type rather than a specific asset id.
   const radiology = makeWorkflow("wf_radiology", "Radiology Imaging", [
     {
       id: "n4",
       type: "ASSET",
       name: "Imaging Device",
-      deviceGroupMatchingIds: ["dgm_ge_imaging"],
+      deviceTypeIds: ["dt_x_ray"],
     },
   ]);
 
@@ -81,27 +80,27 @@ describe("workflowClinicalSummary", () => {
     expect(md).not.toContain("Medication Dispensing");
   });
 
-  it("matches ASSET nodes linked via a device-group matching", () => {
+  it("matches ASSET nodes linked via a device type", () => {
     const md = workflowClinicalSummary(
       [imaging, radiology],
       ["asset_ct"],
-      ["dgm_ge_imaging"],
+      ["dt_x_ray"],
     );
     expect(md).toContain("Radiology Imaging");
-    expect(md).toContain("Imaging Device"); // matched by device-group matching
+    expect(md).toContain("Imaging Device"); // matched by device type
   });
 
   it("reports when no workflow includes the affected assets", () => {
     const md = workflowClinicalSummary([imaging, pharmacy], ["asset_unknown"]);
     expect(md).toBe(
-      "_No clinical workflows include the affected assets or device groups._",
+      "_No clinical workflows include the affected assets or device types._",
     );
   });
 
   it("degrades gracefully when there are no affected assets", () => {
     const md = workflowClinicalSummary([imaging, pharmacy], []);
     expect(md).toBe(
-      "_No affected assets or device groups to map to clinical workflows._",
+      "_No affected assets or device types to map to clinical workflows._",
     );
   });
 
@@ -112,7 +111,7 @@ describe("workflowClinicalSummary", () => {
     ]);
     const md = workflowClinicalSummary([stepOnly], ["asset_ct"]);
     expect(md).toBe(
-      "_No clinical workflows include the affected assets or device groups._",
+      "_No clinical workflows include the affected assets or device types._",
     );
   });
 });

@@ -4,7 +4,7 @@ import { type Node, type NodeProps, useReactFlow } from "@xyflow/react";
 import { BugIcon, CircleQuestionMark, ComputerIcon } from "lucide-react";
 import { memo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { useSuspenseAssetsVulns } from "@/features/assets/hooks/use-assets";
+import { useAssetsVulns } from "@/features/assets/hooks/use-assets";
 import { cn } from "@/lib/utils";
 import { type DeviceIconType, getIconByType } from "../types";
 import { BaseAssetNode } from "./base-asset-node";
@@ -14,7 +14,7 @@ export type AssetNodeData = {
   icon?: string;
   label?: string;
   description?: string;
-  deviceGroupMatchingIds?: string[];
+  deviceTypeIds?: string[];
   assetIds?: string[];
 };
 
@@ -36,9 +36,6 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
               ...node.data,
               ...values,
               // Transform data from objects (for useFieldArray to work) into array
-              deviceGroupMatchingIds: values.deviceGroupMatchingIds?.map(
-                (m) => m.value,
-              ),
               assetIds: values.assetIds?.map((id) => id.value),
             },
           };
@@ -50,12 +47,18 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
 
   const nodeData = props.data;
 
-  const assetsWithVulns = useSuspenseAssetsVulns({
+  const { data: assetsWithVulns, isError } = useAssetsVulns({
     assetIds: nodeData.assetIds ?? [],
-    deviceGroupMatchingIds: nodeData.deviceGroupMatchingIds ?? [],
+    deviceTypeIds: nodeData.deviceTypeIds ?? [],
   });
-  const numVulns = assetsWithVulns.data.vulnerabilitiesCount;
-  const numAssets = assetsWithVulns.data.assetsCount;
+  const numVulns = assetsWithVulns?.vulnerabilitiesCount ?? 0;
+  const numAssets = assetsWithVulns?.assetsCount ?? 0;
+  // After a failed lookup, or until the first result, the counts are unknown.
+  const countLabel = (count: number) =>
+    isError ? "!" : assetsWithVulns ? count : "…";
+  const countTitle = isError
+    ? "Could not load the devices of this node"
+    : undefined;
 
   const nodeStatus = numVulns > 0 ? "vulnerable" : "initial";
 
@@ -72,10 +75,8 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
         onOpenChange={setDialogOpen}
         onSubmit={handleSubmit}
         defaultValues={nodeData}
-        assets={assetsWithVulns ? assetsWithVulns.data.assets : []}
-        vulnerabilities={
-          assetsWithVulns ? assetsWithVulns.data.vulnerabilities : []
-        }
+        assets={assetsWithVulns?.assets ?? []}
+        vulnerabilities={assetsWithVulns?.vulnerabilities ?? []}
       />
       <BaseAssetNode
         {...props}
@@ -94,19 +95,26 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
           <Badge
             className={cn(
               "text-[6px]",
-              numAssets === 0 ? "border-red-500" : "",
+              isError || (assetsWithVulns && numAssets === 0)
+                ? "border-red-500"
+                : "",
             )}
             variant="outline"
+            title={countTitle}
           >
             <ComputerIcon className="w-2! h-2!" />
-            {numAssets}
+            {countLabel(numAssets)}
           </Badge>
           <Badge
-            className={cn("text-[6px]", numVulns > 0 ? "border-red-500" : "")}
+            className={cn(
+              "text-[6px]",
+              isError || numVulns > 0 ? "border-red-500" : "",
+            )}
             variant="outline"
+            title={countTitle}
           >
             <BugIcon className="w-2! h-2!" />
-            {numVulns}
+            {countLabel(numVulns)}
           </Badge>
         </div>
       </BaseAssetNode>

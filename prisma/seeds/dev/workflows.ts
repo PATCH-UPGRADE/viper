@@ -1,14 +1,22 @@
 import prisma from "@/lib/db";
-import { matchingIdsForCpes } from "./device-groups";
+import {
+  deviceTypeIdBySlug,
+  requireDeviceTypeId,
+} from "../production/device-types";
+
+async function deviceTypeIdsForSlugs(slugs: string[]): Promise<string[]> {
+  const idBySlug = await deviceTypeIdBySlug();
+  return slugs.map((slug) =>
+    requireDeviceTypeId(idBySlug, slug, "Workflow ASSET node"),
+  );
+}
 
 export async function seedWorkflows(userId: string) {
   console.log("\n🌱 Seeding workflows...");
 
   const STEP_POS = 100;
 
-  const ctScannerMatchingIds = await matchingIdsForCpes([
-    "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
-  ]);
+  const ctScannerTypeIds = await deviceTypeIdsForSlugs(["computed-tomography"]);
 
   // ── Workflow 1: Emergency CT — Acute Stroke / Trauma Protocol ───────────────
   const workflow1 = await prisma.workflow.create({
@@ -59,8 +67,8 @@ export async function seedWorkflows(userId: string) {
           description:
             "GE BrightSpeed Elite Select acquires axial and helical CT studies. Completed images are sent to the CT acquisition workstation via DICOM.",
         },
-        deviceGroupMatchings: {
-          connect: ctScannerMatchingIds.map((id) => ({ id })),
+        deviceTypes: {
+          connect: ctScannerTypeIds.map((id) => ({ id })),
         },
       },
     }),
@@ -163,9 +171,9 @@ export async function seedWorkflows(userId: string) {
     },
   });
 
-  const imagingDeviceMatchingIds = await matchingIdsForCpes([
-    "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
-    "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+  const imagingDeviceTypeIds = await deviceTypeIdsForSlugs([
+    "ultrasound",
+    "x-ray",
   ]);
 
   const w2nodes = await Promise.all([
@@ -194,8 +202,8 @@ export async function seedWorkflows(userId: string) {
           description:
             "GE LOGIQ e R7 portable ultrasound or Optima XR200amx DR system acquires bedside or mobile studies for inpatients.",
         },
-        deviceGroupMatchings: {
-          connect: imagingDeviceMatchingIds.map((id) => ({ id })),
+        deviceTypes: {
+          connect: imagingDeviceTypeIds.map((id) => ({ id })),
         },
       },
     }),

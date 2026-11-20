@@ -43,6 +43,7 @@ export type CommandMultiSelectProps<T> = {
   emptyText: string;
   containerClassName?: string;
   triggerClassName?: string;
+  id?: string;
 } & React.AriaAttributes;
 
 export function CommandMultiSelect<T>({

@@ -3,7 +3,7 @@ import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import { summarizeRecordMetrics } from "@/features/vulnerabilities/utils";
 import {
   workflowSerializeInclude,
-  workflowsUsingAssetsOrMatchings,
+  workflowsUsingAssetsOrDeviceTypes,
 } from "@/features/workflows/utils";
 import prisma from "@/lib/db";
 import {
@@ -133,18 +133,21 @@ export async function gatherTriageContext(
   });
 
   // Only workflows relevant to this notification: a node links an affected
-  // asset directly, or links one of the advisory's device-group matchings.
-  const affectedMatchingIds = matchings.map((m) => m.id);
-  const workflows =
-    affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
-      ? await prisma.workflow.findMany({
-          where: workflowsUsingAssetsOrMatchings(
-            affectedAssetIds,
-            affectedMatchingIds,
-          ),
-          include: workflowSerializeInclude,
-        })
-      : [];
+  // asset directly, or links the device type of an affected asset's product.
+  const affectedDeviceTypeIds = [
+    ...new Set(groups.flatMap((g) => g.product?.deviceTypeId ?? [])),
+  ];
+  const hasAffectedDevices =
+    affectedAssetIds.length > 0 || affectedDeviceTypeIds.length > 0;
+  const workflows = hasAffectedDevices
+    ? await prisma.workflow.findMany({
+        where: workflowsUsingAssetsOrDeviceTypes(
+          affectedAssetIds,
+          affectedDeviceTypeIds,
+        ),
+        include: workflowSerializeInclude,
+      })
+    : [];
 
   const noteLabels: NoteTargetLabels = {
     assetLabel: new Map(
@@ -205,14 +208,13 @@ export async function gatherTriageContext(
     notes,
     noteLabels,
     includeIds: opts.includeIds ?? false,
-    workflowsMarkdown:
-      affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
-        ? workflowClinicalSummary(
-            workflows,
-            affectedAssetIds,
-            affectedMatchingIds,
-          )
-        : null,
+    workflowsMarkdown: hasAffectedDevices
+      ? workflowClinicalSummary(
+          workflows,
+          affectedAssetIds,
+          affectedDeviceTypeIds,
+        )
+      : null,
   });
 
   const linkableIds = {

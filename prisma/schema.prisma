@@ -169,8 +169,8 @@ model Node {
   position Json
   data     Json @default("{}")
 
-  assets               Asset[]
-  deviceGroupMatchings DeviceGroupMatching[]
+  assets      Asset[]
+  deviceTypes DeviceType[]
 
   outputConnections Connection[] @relation("FromNode")
   inputConnections  Connection[] @relation("ToNode")
@@ -374,6 +374,7 @@ model DeviceType {
 
   products Product[]
   guides   DeviceGuide[]
+  nodes    Node[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -443,7 +444,6 @@ model DeviceGroupMatching {
   issues               Issue[]
   sourceRecordMappings SourceRecordDeviceGroupMapping[]
   workOrderMappings    WorkOrderDeviceGroupMapping[]
-  nodes                Node[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

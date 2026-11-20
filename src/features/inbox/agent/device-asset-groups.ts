@@ -19,7 +19,11 @@ const groupedAssetSelect = {
   utilization: true,
   manufacturer: { select: { canonicalDisplayName: true } },
   product: {
-    select: { canonicalDisplayName: true, ...deviceTypeLabelSelect },
+    select: {
+      canonicalDisplayName: true,
+      deviceTypeId: true,
+      ...deviceTypeLabelSelect,
+    },
   },
   version: { select: { canonicalName: true, canonicalDisplayName: true } },
 } as const satisfies Prisma.AssetSelect;

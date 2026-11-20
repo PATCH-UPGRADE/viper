@@ -3,19 +3,17 @@ import { generateSlug } from "random-word-slugs";
 import { z } from "zod";
 import type { NodeType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { deviceIdentitySelect } from "@/lib/device-matching";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { findMatchingIdsForDevice } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import {
   serializeWorkflow,
   workflowSerializeInclude,
-  workflowsUsingAssetsOrMatchings,
+  workflowsUsingAssetsOrDeviceTypes,
 } from "../utils";
 
 export const workflowsRouter = createTRPCRouter({
@@ -88,46 +86,41 @@ export const workflowsRouter = createTRPCRouter({
         const referencedAssetIds = [
           ...new Set(nodes.flatMap((n) => readIds(n.data, "assetIds"))),
         ];
-        const referencedDgmIds = [
-          ...new Set(
-            nodes.flatMap((n) => readIds(n.data, "deviceGroupMatchingIds")),
-          ),
+        const referencedDeviceTypeIds = [
+          ...new Set(nodes.flatMap((n) => readIds(n.data, "deviceTypeIds"))),
         ];
-        const existingAssetIds = new Set(
+        const [existingAssets, existingDeviceTypes] = await Promise.all([
           referencedAssetIds.length
-            ? (
-                await tx.asset.findMany({
-                  where: { id: { in: referencedAssetIds } },
-                  select: { id: true },
-                })
-              ).map((a) => a.id)
+            ? tx.asset.findMany({
+                where: { id: { in: referencedAssetIds } },
+                select: { id: true },
+              })
             : [],
-        );
-        const existingDgmIds = new Set(
-          referencedDgmIds.length
-            ? (
-                await tx.deviceGroupMatching.findMany({
-                  where: { id: { in: referencedDgmIds } },
-                  select: { id: true },
-                })
-              ).map((m) => m.id)
+          referencedDeviceTypeIds.length
+            ? tx.deviceType.findMany({
+                where: { id: { in: referencedDeviceTypeIds } },
+                select: { id: true },
+              })
             : [],
+        ]);
+        const existingAssetIds = new Set(existingAssets.map((a) => a.id));
+        const existingDeviceTypeIds = new Set(
+          existingDeviceTypes.map((t) => t.id),
         );
 
-        // so create nodes individually and connect their assets / device-group
-        // matchings. The relation ids are stripped from the stored data blob
+        // so create nodes individually and connect their assets / device
+        // types. The relation ids are stripped from the stored data blob
         for (const node of nodes) {
           const data = { ...((node.data as Record<string, unknown>) || {}) };
           delete data.assetIds;
-          delete data.deviceGroupMatchingIds;
+          delete data.deviceTypeIds;
 
           const assetConnect = readIds(node.data, "assetIds").filter((aid) =>
             existingAssetIds.has(aid),
           );
-          const dgmConnect = readIds(
-            node.data,
-            "deviceGroupMatchingIds",
-          ).filter((mid) => existingDgmIds.has(mid));
+          const deviceTypeConnect = readIds(node.data, "deviceTypeIds").filter(
+            (tid) => existingDeviceTypeIds.has(tid),
+          );
 
           await tx.node.create({
             data: {
@@ -144,10 +137,10 @@ export const workflowsRouter = createTRPCRouter({
                     },
                   }
                 : {}),
-              ...(dgmConnect.length
+              ...(deviceTypeConnect.length
                 ? {
-                    deviceGroupMatchings: {
-                      connect: dgmConnect.map((mid) => ({ id: mid })),
+                    deviceTypes: {
+                      connect: deviceTypeConnect.map((tid) => ({ id: tid })),
                     },
                   }
                 : {}),
@@ -206,8 +199,8 @@ export const workflowsRouter = createTRPCRouter({
       const workflow = requireExistence(workflowOrNull, "Workflow");
 
       // Transform server nodes to react-flow compatible nodes. Linked asset /
-      // device-group-matching ids live in relations, not data, so surface them
-      // into node.data (the shape the editor reads and writes back on save).
+      // device type ids live in relations, not data, so surface them into
+      // node.data (the shape the editor reads and writes back on save).
       const nodes: Node[] = workflow.nodes.map((node) => ({
         id: node.id,
         type: node.type,
@@ -215,9 +208,7 @@ export const workflowsRouter = createTRPCRouter({
         data: {
           ...((node.data as Record<string, unknown>) || {}),
           assetIds: node.assets.map((asset) => asset.id),
-          deviceGroupMatchingIds: node.deviceGroupMatchings.map(
-            (matching) => matching.id,
-          ),
+          deviceTypeIds: node.deviceTypes.map((deviceType) => deviceType.id),
         },
       }));
 
@@ -294,8 +285,7 @@ export const workflowsRouter = createTRPCRouter({
     }),
 
   // Clinical workflows that use an asset — either the asset is linked directly to
-  // one of their nodes, or a node links a device-group matching that applies to
-  // the asset's device group.
+  // one of their nodes, or a node links the device type of the asset's product.
   getManyByAsset: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
@@ -303,18 +293,17 @@ export const workflowsRouter = createTRPCRouter({
 
       const asset = await prisma.asset.findUnique({
         where: { id: assetId },
-        select: deviceIdentitySelect,
+        select: { product: { select: { deviceTypeId: true } } },
       });
       const found = requireExistence(asset, "Asset");
 
-      // Device-group matchings that apply to this asset, then
-      // workflows whose nodes link the asset directly or one of those matchings
-      // (one OR query dedupes by workflow id).
-      const applicableMatchingIds = await findMatchingIdsForDevice(found);
+      // Workflows whose nodes link the asset directly or its device type (one
+      // OR query dedupes by workflow id).
+      const deviceTypeId = found.product?.deviceTypeId;
       const workflows = await prisma.workflow.findMany({
-        where: workflowsUsingAssetsOrMatchings(
+        where: workflowsUsingAssetsOrDeviceTypes(
           [assetId],
-          applicableMatchingIds,
+          deviceTypeId ? [deviceTypeId] : [],
         ),
         include: workflowSerializeInclude,
         orderBy: { updatedAt: "desc" },

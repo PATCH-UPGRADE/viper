@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ErrorContext } from "better-auth/react";
-import Image from "next/image";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -27,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { getSafeRedirectPath, withNextParam } from "@/lib/auth-redirect";
+import { SocialLoginButtons } from "./social-login-buttons";
 
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -39,23 +39,6 @@ type LoginFormProps = {
   isVerified?: boolean;
   verificationEmailSent?: boolean;
   next?: string;
-};
-
-export const handleSocialLogin = async (
-  provider: "google" | "github",
-  next?: string,
-) => {
-  await authClient.signIn.social(
-    {
-      provider,
-      callbackURL: getSafeRedirectPath(next) ?? "/",
-    },
-    {
-      onError: (ctx: ErrorContext) => {
-        toast.error(ctx.error.message);
-      },
-    },
-  );
 };
 
 export function LoginForm({
@@ -111,38 +94,7 @@ export function LoginForm({
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">
-                <div className="flex flex-col gap-4">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleSocialLogin("google", next)}
-                  >
-                    <Image
-                      alt="Google"
-                      src="/logos/google.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with Google
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleSocialLogin("github", next)}
-                  >
-                    <Image
-                      alt="GitHub"
-                      src="/logos/github.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with GitHub
-                  </Button>
-                </div>
+                <SocialLoginButtons next={next} disabled={isPending} />
                 <div className="grid gap-6">
                   <FormField
                     control={form.control}

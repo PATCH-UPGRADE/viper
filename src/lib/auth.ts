@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/mail";
+import { mapMicrosoftProfileToUser } from "@/lib/microsoft-profile";
 
 // Domains allowed to create accounts
 export const DOMAIN_WHITELIST = (process.env.DOMAIN_WHITELIST || "")
@@ -86,6 +87,12 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_OAUTH_CLIENT_ID as string,
       clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET as string,
+    },
+    microsoft: {
+      clientId: process.env.MICROSOFT_OAUTH_CLIENT_ID as string,
+      clientSecret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET as string,
+      tenantId: process.env.MICROSOFT_OAUTH_TENANT_ID,
+      mapProfileToUser: mapMicrosoftProfileToUser,
     },
   },
   trustedOrigins: [

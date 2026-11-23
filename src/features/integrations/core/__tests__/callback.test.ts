@@ -3,13 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockCreateUserToken } = vi.hoisted(() => ({
-  mockCreateUserToken: vi.fn(async () => "raw-token"),
+const { mockCreateIntegrationToken } = vi.hoisted(() => ({
+  mockCreateIntegrationToken: vi.fn(async () => "raw-token"),
 }));
 
 vi.mock("@/lib/tokens", () => ({
-  createUserToken: mockCreateUserToken,
-  DEFAULT_TOKEN_TTL_SECONDS: 900,
+  createIntegrationToken: mockCreateIntegrationToken,
 }));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
@@ -37,35 +36,34 @@ describe("createCallback", () => {
     ],
     [ResourceType.WorkOrder, "/workOrders/integrationUpload/raw-token"],
   ])("routes %s to %s", async (resource, path) => {
-    const callback = await createCallback("shadow-user", resource);
+    const callback = await createCallback("integration-1", resource);
     expect(callback.path).toBe(path);
   });
 
   it("refuses SourceRecord, which has no upload endpoint", async () => {
     await expect(
-      createCallback("shadow-user", ResourceType.SourceRecord),
+      createCallback("integration-1", ResourceType.SourceRecord),
     ).rejects.toThrow(/Unhandled ResourceType/);
   });
 
-  it("scopes a single-use token to the shadow user and the resource", async () => {
-    await createCallback("shadow-user", ResourceType.Asset);
+  it("scopes a single-use token to the integration and the resource", async () => {
+    await createCallback("integration-1", ResourceType.Asset);
 
-    expect(mockCreateUserToken).toHaveBeenCalledWith(
-      "shadow-user",
-      900,
+    expect(mockCreateIntegrationToken).toHaveBeenCalledWith(
+      "integration-1",
       ResourceType.Asset,
     );
   });
 
   it("composes url from baseApiUrl and path", async () => {
-    const callback = await createCallback("shadow-user", ResourceType.Asset);
+    const callback = await createCallback("integration-1", ResourceType.Asset);
 
     expect(callback.baseApiUrl).toMatch(/\/api\/v1$/);
     expect(callback.url).toBe(`${callback.baseApiUrl}${callback.path}`);
   });
 
   it("describes the envelope the platform must send back", async () => {
-    const callback = await createCallback("shadow-user", ResourceType.Asset);
+    const callback = await createCallback("integration-1", ResourceType.Asset);
 
     // A push platform can give this to its partner, so it has to be a real
     // JSON Schema of the upload envelope, not just any object.

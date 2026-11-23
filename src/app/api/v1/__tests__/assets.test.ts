@@ -8,11 +8,11 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { createIntegrationToken } from "@/lib/tokens";
 import {
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
-  createIntegrationToken,
   deleteAssetsForDevices,
   expectDevice,
   generateDevice,
@@ -343,7 +343,7 @@ describe("Assets Endpoint (/assets)", () => {
     // this should succeed and nothing should be created
     const noAssets = { ...assetIntegrationPayload, items: [] };
     const token = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Asset,
     );
     const createAssetResp = await request(BASE_URL)
@@ -380,7 +380,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Asset,
     );
     const assetIntegrationPayloadCopy = { ...assetIntegrationPayload };
@@ -497,7 +497,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     // create the assets first
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Asset,
     );
     const createAssetsReq = await request(BASE_URL)
@@ -518,7 +518,7 @@ describe("Assets Endpoint (/assets)", () => {
     };
 
     const updateToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Asset,
     );
     const integrationRes = await request(BASE_URL)
@@ -630,7 +630,7 @@ describe("Assets Endpoint (/assets)", () => {
       items: assetIntegrationPayload.items.slice(1),
     };
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Asset,
     );
     const createAssetResp = await request(BASE_URL)
@@ -648,7 +648,7 @@ describe("Assets Endpoint (/assets)", () => {
     const createWithUpdateAssets = { ...assetIntegrationPayload };
 
     const updateToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Asset,
     );
     const integrationResp = await request(BASE_URL)
@@ -779,7 +779,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     // then run the endpoint which should update the asset and create the mapping
     const integrationToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Asset,
     );
     const updateAssetResp = await request(BASE_URL)
@@ -892,7 +892,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     // this should create a new asset because all unique fields are missing
     const allNullToken = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Asset,
     );
     const integrationRes = await request(BASE_URL)
@@ -954,7 +954,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     // this should produce an update based on serialNumber match
     const partialNullToken = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Asset,
     );
     const integrationRes = await request(BASE_URL)

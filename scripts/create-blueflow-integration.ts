@@ -9,7 +9,7 @@
 
 import { PlatformEnum, Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { createUserToken } from "@/lib/tokens";
+import { createIntegrationToken } from "@/lib/tokens";
 
 const SEED_USER_EMAIL = "user@example.com";
 const INTEGRATION_NAME = "CI Blueflow Test";
@@ -46,8 +46,7 @@ async function main() {
     }
   }
 
-  // Mirror integrations.create: an Integration owns a dedicated integrationUser
-  // whose id the token is minted for.
+  // Mirror integrations.create: an Integration owns a dedicated integrationUser.
   const integration = await prisma.$transaction(async (tx) => {
     const integrationUser = await tx.user.create({
       data: { id: crypto.randomUUID(), name: INTEGRATION_NAME },
@@ -70,10 +69,10 @@ async function main() {
     });
   });
 
-  const token = await createUserToken(
-    integration.integrationUserId,
-    TOKEN_TTL_SECONDS,
+  const token = await createIntegrationToken(
+    integration.id,
     ResourceType.Asset,
+    TOKEN_TTL_SECONDS,
   );
 
   console.log(`INTEGRATION_TOKEN=${token}`);

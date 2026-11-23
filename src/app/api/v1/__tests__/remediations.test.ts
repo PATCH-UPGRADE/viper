@@ -11,11 +11,11 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { createIntegrationToken } from "@/lib/tokens";
 import {
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
-  createIntegrationToken,
   deleteAssetsForDevices,
   generateDevice,
   jsonHeader,
@@ -515,7 +515,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     // this should succeed and nothing should be created
     const noRemediations = { ...remediationIntegrationPayload, items: [] };
     const token = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Remediation,
     );
     const createRemResp = await request(BASE_URL)
@@ -548,7 +548,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     });
 
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Remediation,
     );
 
@@ -632,7 +632,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const { integration } = await setupMockIntegration(mockIntegrationPayload);
 
     const token = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Remediation,
     );
 
@@ -703,7 +703,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     // (omitting devices must not clear it). Integration tokens are single-use, so
     // mint a fresh one for the re-sync.
     const secondToken = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Remediation,
     );
     const secondSync = await request(BASE_URL)
@@ -873,7 +873,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       mockIntegrationPayload,
     );
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.Remediation,
     );
     const item = {

@@ -8,10 +8,10 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { createIntegrationToken } from "@/lib/tokens";
 import {
   authHeader,
   BASE_URL,
-  createIntegrationToken,
   deleteAssetsForDevices,
   generateDevice,
   jsonHeader,
@@ -371,7 +371,7 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
     // this should succeed and nothing should be created
     const noVulnerabilities = { ...vulnerabilityIntegrationPayload, items: [] };
     const token = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.Vulnerability,
     );
     const createVulnResp = await request(BASE_URL)
@@ -393,7 +393,7 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
 
     const upload = async () => {
       const token = await createIntegrationToken(
-        createdIntegration.integrationUserId,
+        createdIntegration.id,
         ResourceType.Vulnerability,
       );
       return request(BASE_URL)

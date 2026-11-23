@@ -14,7 +14,7 @@ import {
 import { actionNotesFn } from "@/inngest/functions/notes-action";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { processSourceRecord } from "@/inngest/functions/process-source-record";
-import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
+import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-tokens";
 import { reevaluateIssueOnAnswer } from "@/inngest/functions/reevaluate-issue-on-answer";
 import {
   resolveAllEntityFilters,

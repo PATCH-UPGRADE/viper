@@ -487,8 +487,9 @@ model SourceRecord {
 
 ### removing shadow users
 
-- [ ] Replace `createUserToken` and `consumeUserToken` with integration versions, and update `purgeExpiredTokens`
-- [ ] `processIntegrationToken` returns only `integrationId`; `createCallback` takes an `integrationId`
+- [x] Replace `createUserToken` and `consumeUserToken` with integration versions, and update `purgeExpiredTokens`
+- [x] `createCallback` takes an `integrationId`
+- [ ] `processIntegrationToken` returns only `integrationId`
 - [ ] Remove `integrationUserId` from `ResourceSyncCtx`, and the `userId` parameter from
       `processIntegrationSync` and `transformInputItem`
 - [ ] Stop creating shadow users in `create-integration.ts`, and remove the name sync in the integrations router

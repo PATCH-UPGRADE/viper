@@ -4,7 +4,6 @@ import type { IntegrationFormValues } from "@/features/integrations/types";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { normalizeName } from "@/lib/router-utils";
-import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 
 export const BASE_URL = "http://localhost:3000/api/v1";
 export const ROOT_API_URL = "http://localhost:3000/api";
@@ -166,15 +165,4 @@ export const setupMockIntegration = async (
     integration: createdIntegration,
     apiKey,
   };
-};
-
-export const createIntegrationToken = (
-  integrationUserId: string,
-  resourceType: string,
-): Promise<string> => {
-  return createUserToken(
-    integrationUserId,
-    DEFAULT_TOKEN_TTL_SECONDS,
-    resourceType,
-  );
 };

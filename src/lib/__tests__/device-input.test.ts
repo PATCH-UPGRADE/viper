@@ -13,7 +13,7 @@ const { mockPrisma } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
-vi.mock("../tokens", () => ({ consumeUserToken: vi.fn() }));
+vi.mock("../tokens", () => ({ consumeIntegrationToken: vi.fn() }));
 
 const { deviceInputToAsset, devicesToMatchingConnect, resolveDeviceInput } =
   await import("../router-utils");

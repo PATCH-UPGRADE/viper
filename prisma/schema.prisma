@@ -40,6 +40,7 @@ model User {
   notificationReads NotificationRead[]
   matchFeedback     MatchFeedback[]
   fieldCorrections  FieldCorrection[]
+  observations      Observation[]
   csvImports        CsvImport[]
 
   departmentId             String?
@@ -1180,6 +1181,7 @@ model Integration {
 
   resourceSyncs IntegrationResourceSync[]
   tokens        IntegrationToken[]
+  observations  Observation[]
 
   assetMappings          ExternalAssetMapping[]
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
@@ -1875,8 +1877,9 @@ model SourceRecord {
 
   observedAt DateTime @default(now())
 
-  links       SourceLink[] // what notifications / work orders this source feeds
-  attachments SourceRecordAttachment[]
+  links        SourceLink[] // what notifications / work orders this source feeds
+  attachments  SourceRecordAttachment[]
+  observations Observation[]
 
   // What this record names, as resolved by the pipeline (an LLM, a feed that
   // states them, or a TA4 submission). A notification shows the union over its
@@ -2184,4 +2187,103 @@ model Question {
   @@index([notificationId])
   @@index([status])
   @@map("question")
+}
+
+// ─── Provenance ────────────────────────────────────────────────────────────
+// Written only by src/lib/provenance. See docs/provenance-schema.md.
+
+/// Where an Observation came from.
+enum ProvenanceSource {
+  INTEGRATION // integrationName is set, and integrationId until the integration is deleted
+  MANUAL // a person using the UI
+  API_CLIENT // a request using an API key, including TA3 and TA4
+  AUTOMATION // an LLM's own conclusion, or a system rule
+  EMAIL // inbound email
+}
+
+enum ProvenanceEntityType {
+  ASSET
+  WORK_ORDER
+  NOTIFICATION
+}
+
+enum ObservationKind {
+  CREATE // this observation created the entity, or promoted it from draft; there is one per entity
+  SNAPSHOT // the source's view: a missing key means it said nothing about that field
+  PATCH // only the fields in the payload changed, e.g. a manual edit
+  TOMBSTONE // the source reports the record was deleted, or a user deleted it
+}
+
+/// What one source told us about one entity. Append-only.
+/// A SNAPSHOT is written only when `fields` differs from this source's newest CREATE or SNAPSHOT of the
+/// entity, and a PATCH only when it changes a field. CREATE and TOMBSTONE are never deduplicated.
+/// "Still saying this" stays on the mapping's lastSynced.
+model Observation {
+  id  String @id @default(cuid())
+  seq Int    @default(autoincrement()) // the order rows were written in
+
+  // No foreign key: entityId can point at any tracked model, and the history outlives the entity.
+  entityType ProvenanceEntityType
+  entityId   String
+
+  source ProvenanceSource
+
+  // Only for source = INTEGRATION. Integrations are hard deleted, which nulls integrationId. The row
+  // still has source = INTEGRATION and integrationName, so it never reads as another source.
+  integrationId   String?
+  integration     Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  integrationName String? // snapshot; set exactly when source = INTEGRATION (CHECK constraint in raw SQL)
+
+  // The user, API key's user, or automation user
+  actorUserId String?
+  actor       User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  // The document this came from, when a SourceRecord holds it: notifications and emailed work orders.
+  sourceRecordId String?
+  sourceRecord   SourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+
+  kind   ObservationKind
+  // Every tracked field the source stated, normalized to our field names; compared for the source delta.
+  // `{}` on a TOMBSTONE.
+  fields Json
+  raw    Json? // the exact payload, only for work orders from an integration; TODO: keep PHI/PII concerns in mind
+
+  observedAt DateTime @default(now()) // the same for every observation of one sync
+
+  fieldChanges FieldChange[]
+
+  @@index([entityType, entityId, seq]) // an entity's history
+  @@index([entityType, entityId, kind]) // its CREATE observation
+  @@index([entityType, entityId, source, integrationId, seq]) // what a source said last
+  @@index([integrationId, observedAt]) // what a sync changed
+  @@index([actorUserId])
+  @@index([sourceRecordId])
+  @@map("observation")
+}
+
+/// One field changing on the golden record, including being set when the entity is created.
+/// Append-only.
+model FieldChange {
+  id  String @id @default(cuid())
+  seq Int    @default(autoincrement()) // the order rows were written in
+
+  // No foreign key: entityId can point at any tracked model, and the history outlives the entity.
+  entityType ProvenanceEntityType
+  entityId   String
+  field      String // the column name, e.g. "serialNumber", "assigneeId", "assets"
+
+  oldValue Json? // a foreign key is stored as { id, label }
+  newValue Json?
+  reason   String? @db.Text // why, e.g. triage's reasoning or "all-child-tickets-done"
+
+  observationId String
+  observation   Observation @relation(fields: [observationId], references: [id], onDelete: Restrict)
+
+  changedAt DateTime @default(now())
+
+  @@index([entityType, entityId, field, seq(sort: Desc)]) // who set this field
+  @@index([entityType, entityId, seq]) // an entity's timeline
+  @@index([entityType, field, changedAt]) // recent changes, e.g. the overview page's status changes
+  @@index([observationId])
+  @@map("field_change")
 }

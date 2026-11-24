@@ -331,6 +331,7 @@ Typical shape: `new ChatOpenAI({ model, useResponsesApi: true, reasoning: { effo
 * `Issue`: A mapping between a Vulnerability and an Asset/DeviceGroupMatching. An Issue affects an Asset if:
     * The issue is linked to a device group matching that applies to that asset's manufacturer, product, and version, and there is no issue that overrides it
     * The issue is directly linked to the asset
+- `Observation` / `FieldChange`: Provenance, both append-only. An `Observation` is what one source said about one tracked entity, and a `FieldChange` is one field of it changing. Only the functions in `src/lib/provenance/write.ts` write them. Each tracked model has a map there that marks every column and relation `tracked` or `ignored`, so adding one to the schema is a compile error until you mark it. See `docs/provenance-schema.md`.
 
 **Model relationships**: `Asset` → `Manufacturer` / `Product` / `Version` is the concrete identity; `DeviceGroupMatching` is the parallel *rule* construct (there is no direct FK between `Asset` and `DeviceGroupMatching`: `matchingAppliesToDevice` in `src/lib/device-matching.ts` resolves a rule to assets, in memory for VERS ranges). `Issue` joins a `Vulnerability` to either a `DeviceGroupMatching` (class-level) or a specific `Asset` (which overrides the class-level record).
 

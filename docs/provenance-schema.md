@@ -585,6 +585,9 @@ the code.
 | Temporary behavior | Added or kept in | Changed in |
 |---|---|---|
 | `processIntegrationToken` returns the shadow user's id | 1 | 7 |
+| Only `ASSET` has a field map, so the write functions don't accept `WORK_ORDER` or `NOTIFICATION` | 2 | 8, 9 |
+| The callbacks of `createWithObservation` and `deleteWithObservation` get `tx` itself, and not `asRaw(tx)` | 2 | 4 |
+| `Asset.userId` and `Asset.user` are in the asset map | 2 | 5 |
 | Asset writes and syncs still set `Asset.userId` | 3, 4 | 5 |
 | `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
 | `processIntegrationSync` still takes a `userId` | 4 | 7 |
@@ -600,9 +603,9 @@ the code.
 
 ### provenance core
 
-- [ ] Add `applyObservation`, `createWithObservation`, `deleteWithObservation` and value normalization.
+- [x] Add `applyObservation`, `createWithObservation`, `deleteWithObservation` and value normalization.
       `applyObservation` takes everything the source said, plus the fields it may apply
-- [ ] Add the `ObservationOrigin` type, with a type test proving that an integration write without
+- [x] Add the `ObservationOrigin` type, with a type test proving that an integration write without
       `observedAt` fails to compile
 - [ ] Set the source from `ctx.auth.key` on tRPC writes: `API_CLIENT` with a key, `MANUAL` without one. Do it
       in one helper, so a source for AI writes can be added there later (see "out of scope")
@@ -613,7 +616,7 @@ the code.
 - [ ] Add the field groups. Require all `device` fields or none in a write's type. Test that a source changing
       the product clears a version that a user set on the old product, and that a source moving the start past
       the end clears the end
-- [ ] Add a type test proving that a missing key fails. CI already runs `tsc --noEmit`, which
+- [x] Add a type test proving that a missing key fails. CI already runs `tsc --noEmit`, which
       turns this into a failed check
 - [ ] Add each read helper for the questions above in the PR that first uses it
 - [ ] Route integration writes for tracked entities through it: `processIntegrationSync`, which also
@@ -645,7 +648,7 @@ the code.
       observation, since `Asset.userId` is gone
 - [ ] Make demo seeds write through `createWithObservation` and `applyObservation`, or their rows have no
       provenance after the reset
-- [ ] Add the raw SQL CHECK constraint on `Observation`
+- [x] Add the raw SQL CHECK constraint on `Observation`
 - [ ] Add the narrowed client types to `db.ts`, `asRaw` in `db-raw.ts`, and the Biome rule. Check that the types
       inferred from `ExtendedPrismaClient["asset"]` don't change
 - [ ] `processIntegrationSync` takes an entity type instead of a delegate for tracked models. Remove the `any`

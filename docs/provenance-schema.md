@@ -210,10 +210,14 @@ Email isn't an integration and won't become one, so it has its own source.
 | An LLM extracting from an integration's source record | `INTEGRATION` | Automation user |
 | An LLM extracting from a TA4 source record | `API_CLIENT` | Automation user |
 | Work order or values extracted from an email | `EMAIL` | Automation user |
+| Demo seeds | `MANUAL` | Seed user |
 
 An LLM is how a value was produced, not where it came from, so there is no LLM source. If an LLM value
 restates what a source said, it takes that source. If the LLM concluded it, it is `AUTOMATION`.
 `ctx.auth.key` separates `API_CLIENT` from `MANUAL`: it is set for API keys and undefined for sessions.
+
+A value extracted from a source record is always a `PATCH`, also from an integration. A `SNAPSHOT` would become
+that integration's newest one, so its next sync would count every other field as changed and overwrite user edits.
 
 Every write passes its origin, and the type requires what each source needs. A write from an integration
 doesn't compile without `observedAt` and `integrationName`, and a write from any other source doesn't
@@ -590,6 +594,7 @@ the code.
 | `Asset.userId` and `Asset.user` are in the asset map | 2 | 5 |
 | Asset writes and syncs still set `Asset.userId` | 3, 4 | 5 |
 | `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
+| The asset seeds use `applyObservation` to update only `utilization`, and not `updateIgnoredFields` | 3 | 10 |
 | `processIntegrationSync` still takes a `userId` | 4 | 7 |
 | `processIntegrationSync` skips provenance for work orders, which still pass their delegate | 4 | 8 |
 | `WorkOrderTicket` isn't narrowed | 4 | 11 |
@@ -607,9 +612,10 @@ the code.
       `applyObservation` takes everything the source said, plus the fields it may apply
 - [x] Add the `ObservationOrigin` type, with a type test proving that an integration write without
       `observedAt` fails to compile
-- [ ] Set the source from `ctx.auth.key` on tRPC writes: `API_CLIENT` with a key, `MANUAL` without one. Do it
+- [x] Set the source from `ctx.auth.key` on tRPC writes: `API_CLIENT` with a key, `MANUAL` without one. Do it
       in one helper, so a source for AI writes can be added there later (see "out of scope")
-- [ ] Record values that are dropped today: `ingestFleetAssets`, `enrichAssetIdentifiers`
+- [x] Record the values that `enrichAssetIdentifiers` drops today
+- [ ] Record the values that `ingestFleetAssets` drops today
 - [ ] Add an exhaustive `tracked` / `ignored` map for each `ProvenanceEntityType`, typed from Prisma's
       generated field names so a missing or stale key fails to compile. `applyObservation` reads
       this map to decide which fields get a `FieldChange`
@@ -625,7 +631,7 @@ the code.
       item's observation. Callers pass the same value for that sync's `TOMBSTONE`s
 - [ ] In `processAssetIntegrationSync`, leave out the device fields when `device` is missing, like `assets.update`
       does. Test that a missing `device` keeps the asset's device, and that an explicit null clears it
-- [ ] Route asset writes: `assets.create`, `createBulk`, `update`, `remove`, `enrichAssetIdentifiers`
+- [x] Route asset writes: `assets.create`, `createBulk`, `update`, `remove`, `enrichAssetIdentifiers`
 - [ ] Route work order writes: tracking routers, `reschedule.ts`, `asset-tickets.ts`, mitigation
       routers, `work-orders/submit.ts`, `work-order-tools.ts`, `process-inbox-email`
 - [ ] Route CSV imports (`csv-upload/import/apply.ts`) with the uploader as the actor and
@@ -646,8 +652,9 @@ the code.
 - [ ] Return the PATCH response from `pushEditToPlatforms` and record it as the integration's `SNAPSHOT`
 - [ ] Keep the behavior of `fleetCreatedEquipmentKeys`, reading who created the asset from its `CREATE`
       observation, since `Asset.userId` is gone
-- [ ] Make demo seeds write through `createWithObservation` and `applyObservation`, or their rows have no
-      provenance after the reset
+- [x] Make the asset demo seeds write through `createWithObservation` and `applyObservation`, or their rows have
+      no provenance after the reset
+- [ ] Do the same for the work order and notification demo seeds
 - [x] Add the raw SQL CHECK constraint on `Observation`
 - [ ] Add the narrowed client types to `db.ts`, `asRaw` in `db-raw.ts`, and the Biome rule. Check that the types
       inferred from `ExtendedPrismaClient["asset"]` don't change

@@ -11,10 +11,11 @@ import {
   statedImpactFields,
 } from "@/features/remediations/impact";
 import type { ConfidenceLevel, Prisma } from "@/generated/prisma";
-import prisma from "@/lib/db";
+import prisma, { type TransactionClient } from "@/lib/db";
 import { matchingVersionFields } from "@/lib/device-matching";
 import { createChatModel } from "@/lib/llm/chat-model";
 import { deviceIdentityInline } from "@/lib/markdown";
+import { sourceRecordOrigin } from "@/lib/provenance/origin";
 import { resolveMatchingId } from "@/lib/router-utils";
 import { notRejected } from "../types";
 import {
@@ -76,6 +77,10 @@ export type MatchOwner = {
   sourceRecordId: string;
   workOrderTicketId?: string;
 };
+
+// Each linked asset takes about ten sequential queries, so a notification that
+// names many of them can pass Prisma's five-second default.
+const APPLY_TIMEOUT_MS = 20_000;
 
 export type MatchSummary = {
   linked: number;
@@ -260,6 +265,11 @@ function cleanFields(fields: Decision["fields"]): {
   return out;
 }
 
+function statesAssetIdentifiers({ kind, fields }: Decision): boolean {
+  const { macAddress, serialNumber } = cleanFields(fields);
+  return kind === "asset" && Boolean(macAddress || serialNumber);
+}
+
 export async function matchAndLinkEntities(
   owner: MatchOwner,
   extracted: ExtractResult,
@@ -307,6 +317,11 @@ export async function applyDecisions(
   // ticket reports work on a device, and is not a source for what those are.
   const editsRecords = !owner.workOrderTicketId;
 
+  const assetOrigin =
+    editsRecords && decisions.some(statesAssetIdentifiers)
+      ? await sourceRecordOrigin(owner.sourceRecordId)
+      : null;
+
   const rejectedDeviceGroupMatchingIds = new Set(
     (
       await prisma.sourceRecordDeviceGroupMapping.findMany({
@@ -341,7 +356,7 @@ export async function applyDecisions(
   // which an "update" decision's description write holds locked until then.
   const pendingCvss: Parameters<typeof recordInboxCvss>[0][] = [];
 
-  await prisma.$transaction(async (tx) => {
+  const apply = async (tx: TransactionClient) => {
     for (const decision of decisions) {
       // Hard guard: the pipeline never writes Confirmed.
       const confidence: ConfidenceLevel =
@@ -639,11 +654,13 @@ export async function applyDecisions(
           },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
-        const data = cleanFields(decision.fields);
-        if (editsRecords && (data.macAddress || data.serialNumber)) {
-          await enrichAssetIdentifiers(decision.targetId, {
-            macAddress: data.macAddress,
-            serialNumber: data.serialNumber,
+        if (assetOrigin && statesAssetIdentifiers(decision)) {
+          const { macAddress, serialNumber } = cleanFields(decision.fields);
+          await enrichAssetIdentifiers(tx, {
+            assetId: decision.targetId,
+            identifiers: { macAddress, serialNumber },
+            origin: assetOrigin,
+            sourceRecordId: owner.sourceRecordId,
           });
         }
         summary.linked++;
@@ -651,7 +668,8 @@ export async function applyDecisions(
         summary.skipped++;
       }
     }
-  });
+  };
+  await prisma.$transaction(apply, { timeout: APPLY_TIMEOUT_MS });
 
   for (const cvss of pendingCvss) await recordInboxCvss(cvss);
 

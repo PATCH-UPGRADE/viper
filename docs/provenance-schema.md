@@ -235,31 +235,58 @@ type ObservationOrigin =
     };
 ```
 
-### write check
+### typed writes
 
-A test in CI finds writes to `Asset`, `WorkOrderTicket` or `Notification` in `src/` that skip the provenance
-write functions. It parses the code with the TypeScript compiler instead of searching text, because
-`createWithObservation` and `deleteWithObservation` take callbacks, and the `tx.asset.create` inside one is
-correct. It skips test files, and fails on:
+A direct write to `Asset`, `WorkOrderTicket` or `Notification` doesn't compile. `src/lib/db.ts` exports the same
+client as today, with a type that has only the read methods of those models. It narrows `TransactionClient` the
+same way, so `$transaction` needs its type restated. Nothing changes at runtime.
 
-* A direct write, like `tx.asset.update`, unless it is inside the provenance module or a callback passed to
-  one of those two functions.
-* `prisma.asset`, or the delegate of another tracked model, passed as a value (`model: prisma.asset`), unless it
-  is in a call to `processIntegrationSync`. That function's own writes are dynamic
-  (`config.model.update`), so the test can't see them.
+```ts
+tx.workOrderTicket.create({ … });  // compile error
+createWithObservation(tx, …, (raw) => raw.workOrderTicket.create({ … }));  // fine
+```
 
-Other writes need an entry in an allowlist, with a reason. Examples are an update that sets only `ignored`
-fields, draft cleanup, and a write in a helper that a callback calls. An entry that no longer matches a write
-also fails the test, so the list can't go stale. The test ships with the provenance core, and lists every
-direct write that exists then. Each PR that routes writes removes its entries.
+* **The type lists the read methods to keep, not the write methods to remove,** so a write method that a Prisma
+  upgrade adds is blocked by default. It also keeps the delegate's symbol keys, because the asset types in
+  `assets/types.ts` are inferred from them.
+* **`src/lib/db-raw.ts` has one function, `asRaw`,** which casts a client or a `tx` to its full type. It imports
+  only types from `db.ts`. Tests that mock `@/lib/db` therefore keep working, and there is no import cycle with
+  the Prisma extensions, which import `db.ts`.
+* **Only the provenance module uses `asRaw`.** It gives the raw client to the callbacks of
+  `createWithObservation` and `deleteWithObservation`. A helper that a callback calls takes a
+  `RawTransactionClient`, a type from `db.ts`.
+* **`processIntegrationSync` takes the entity type of a tracked model, not its delegate,** and writes through the
+  provenance functions. Platforms never hold a client that can write. Untracked models, like remediations, still
+  pass their delegate.
 
-The check is defense in depth, so these gaps are accepted:
+A Biome `noRestrictedImports` rule blocks importing `db-raw`, and importing `PrismaClient` from the generated
+client. Its overrides are `db.ts` for `PrismaClient`, the provenance module for `db-raw`, and tests and `scripts/`
+for both. It must use `patterns`, because `paths` misses relative imports. CI already runs `tsc --noEmit` and
+`biome ci`.
 
-* **Dynamic writes.** The test only sees a model that is named in the code.
+Two helpers in the provenance module cover the writes that need no observation, so `src/` has no other overrides:
+
+* `updateIgnoredFields(client, entityType, where, data)` accepts only the `ignored` fields of that entity, and
+  returns the count, which `claimForSubmission` needs. Examples are `submissionState`, `lastCommentAt` and
+  returning a ticket to draft. It also checks the fields at runtime, because TypeScript accepts an extra field in
+  a variable or a spread.
+* `deleteDrafts(client, where)` deletes only drafts. `mitigation/persist.ts` uses it.
+
+A model is narrowed in the PR that routes its last write: `Asset` in PR 4, `WorkOrderTicket` in PR 11 and
+`Notification` in PR 13. Narrowing one flags every direct write that is left, including any that were merged in
+the meantime. Until then, nothing stops a new one.
+
+This is defense in depth, so these gaps are accepted:
+
+* **Casts, `any` and `$extends`,** which all give back the write methods.
+* **Raw SQL.**
 * **Nested writes.** `mitigationPlan.create` with nested `workOrders` is a write to `MitigationPlan`.
 * **Database cascades.** Postgres runs them, so no code names the affected rows.
 * **Set-valued fields.** Their rows are in other tables, like `AssetTicket` and `WorkOrderTicketLink`.
-* **Code outside `src/`,** like `scripts/` and the seeds.
+* **Callbacks.** The raw client in one can write any tracked model, not only the entity it is for.
+* **`isDraft: false` through `updateIgnoredFields`,** which would promote a draft without a `CREATE`. Promoting a
+  ticket again needs it.
+* **Tests and `scripts/`.** The rows that they write with `asRaw` have no provenance.
 
 ### existing rows
 
@@ -268,15 +295,22 @@ staging, and each developer's local one. The migrations only change the schema. 
 keeps assets with no `CREATE`, which show no creator, and Fleet stops updating the device on the ones it
 created.
 
-Reset with `npx prisma migrate reset` once the write paths and the demo seeds go through the provenance
-functions, and the code no longer creates or reads shadow users. `npm run db:seed` isn't enough, because it
-skips the demo data if it is already loaded.
+Reset once, with `npx prisma migrate reset`, after PR 9 (see "PR order"). By then all asset writes, the work
+order sync, every other path that creates a work order or notification, and the demo seeds go through the
+provenance functions, and the code no longer creates or reads shadow users. `npm run db:seed` isn't enough,
+because it skips the demo data if it is already loaded. The PRs after the reset only route edits and drop
+tables, so they don't need another one.
 
 Accepted changes:
 
 * A reset deletes everything, including users, integrations and their credentials, which have to be entered
   again.
 * The old `TicketActivity` and `FieldCorrection` rows are dropped, not migrated.
+* Edits to work orders and notifications between the reset and PRs 10, 11 and 13 are recorded only in
+  `TicketActivity` or `FieldCorrection`, so they have no history once those are dropped. Until such a field
+  changes again, its newest `FieldChange` can be out of date.
+* Migrations run on the main Neon branch when they merge, so from PR 5 until the reset, staging has the problems
+  of a database that isn't reset. Shadow users also stay assignable. Merge PRs 5 to 9 close together.
 
 ## Schema
 
@@ -498,6 +532,70 @@ model SourceRecord {
 * `Webhook.userId`, `ChatThread.userId`, `CsvImport.userId`, `Note.userId`: these belong to a person or
   record an action that isn't a tracked field
 
+## PR order
+
+The goal is under about 2,000 LOC per PR, not counting migrations, generated code and this doc. Sizes are
+estimates, except for PR 1.
+
+| # | PR | LOC | Needs |
+|---|---|---|---|
+| 1 | Integration tokens (#421) | 370 | |
+| | **Assets** | | |
+| 2 | Core: `Observation`, `FieldChange`, the write functions, the asset map, field groups | 1,500 | 1 |
+| 3 | Asset writes outside sync, and the asset demo seeds | 900 | 2 |
+| 4 | Asset sync: `processIntegrationSync`, Fleet, partner, AI, CSV; typed writes, narrowing `Asset` | 1,600 | 3 |
+| 5 | Drop `Asset.user`: ownership, the Sources column, `fleetCreatedEquipmentKeys` | 700 | 4 |
+| | **Shadow users** | | |
+| 6 | Nullable owners and `creatorId`, the records router guard, source names in the UI | 800 | 1 |
+| 7 | Delete shadow users, nullable `Integration.userId` | 700 | 5, 6 |
+| | **`CREATE` for everything else** | | |
+| 8 | Work order sync: the work order map, ServiceNow, Fleet, `integrationUpload`, upstream deletes, removing `SourceRecord` | 1,300 | 4, 7 |
+| 9 | Remaining creates: tickets from the UI, chat, email, asset sub-tickets and draft promotion; the notification map and creates; their demo seeds | 1,000 | 8 |
+| | **Reset staging and local databases** | | 9 |
+| | **Edits** | | |
+| 10 | Work order edits in tracking: update, attach, link, reschedule, delete; `updateIgnoredFields` | 1,400 | 9 |
+| 11 | Other work order edits: plan edits, submit, the push-edit response; `deleteDrafts`, narrowing `WorkOrderTicket` | 800 | 10 |
+| 12 | Switch the ticket timeline and overview to `FieldChange`, drop `TicketActivity` | 1,800 | 11 |
+| 13 | Notification edits and timeline, narrowing `Notification`, drop `FieldCorrection` | 700 | 9 |
+
+PR 6 can be worked on alongside 2 to 5, and 13 alongside 10 to 12. If PR 4 gets too big, the typed
+writes can be their own PR after it. Each PR makes the doc, `CLAUDE.md` and API changes for what it ships.
+
+* PR 2 adds the whole `Observation` and `FieldChange` schema, including every enum value, `sourceRecordId`,
+  `seq` and the CHECK constraint, so no later PR changes those tables.
+* Each tracked / ignored map is settled before the reset. Marking a field `tracked` later doesn't need a reset,
+  but existing rows have no history for it.
+* The records router guard ships in PR 6 with the nullable owners. Otherwise `allowUnowned` would let anyone
+  edit integration records.
+
+### temporary behavior
+
+Code that a later PR in this stack will change gets a `TODO VW-605` comment that says what changes and in
+which PR:
+
+```ts
+// TODO VW-605 (PR 12): a synced ticket has no creator, so it gets no "created" entry here. Its
+// CREATE observation replaces this.
+if (!t.creatorId) return;
+```
+
+The PR that makes the change removes the comment. After PR 13, `git grep "TODO VW-605"` should find nothing in
+the code.
+
+| Temporary behavior | Added or kept in | Changed in |
+|---|---|---|
+| `processIntegrationToken` returns the shadow user's id | 1 | 7 |
+| Asset writes and syncs still set `Asset.userId` | 3, 4 | 5 |
+| `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
+| `processIntegrationSync` still takes a `userId` | 4 | 7 |
+| `processIntegrationSync` skips provenance for work orders, which still pass their delegate | 4 | 8 |
+| `WorkOrderTicket` isn't narrowed | 4 | 11 |
+| `Notification` isn't narrowed | 4 | 13 |
+| `recordCreationActivity` returns early when `creatorId` is null, so synced tickets show no "created" entry. Those created after the reset get one from their `CREATE` | 6 | 12 |
+| `isAutomationActor` compares with `AUTOMATION_USER_ID` | 7 | 12 |
+| Creating or promoting a ticket writes both a `CREATE` and `TicketActivity` | 9 | 12 |
+| Editing a ticket writes both `FieldChange` and `TicketActivity` | 10, 11 | 12 |
+
 ## TODO
 
 ### provenance core
@@ -536,8 +634,8 @@ model SourceRecord {
       ticket, also for asset sub-tickets. `mitigation.accept` must promote before it applies the person's edits, so the edits
       are a `MANUAL` `PATCH`
 - [ ] Leave `mitigation/persist.ts` without provenance: it only creates drafts, and only deletes ones that
-      were never promoted. Its draft deletion needs an entry in the write check's allowlist. Its nested draft
-      creates need nothing, because the check doesn't see them
+      were never promoted. Its draft deletion uses `deleteDrafts`. Its nested draft creates need nothing, because
+      the types don't block nested writes
 - [ ] Route notification writes: `inbox/pipeline.ts`, `triage/persist.ts`, the inbox router,
       `analyze-remediation.ts`
 - [ ] Set `sourceRecordId` on observations for notifications and emailed work orders
@@ -548,9 +646,18 @@ model SourceRecord {
 - [ ] Make demo seeds write through `createWithObservation` and `applyObservation`, or their rows have no
       provenance after the reset
 - [ ] Add the raw SQL CHECK constraint on `Observation`
-- [ ] Add the write check with the provenance core, and an allowlist of the direct writes that exist then.
-      Test that it rejects a direct write and a delegate passed as a value, and accepts each exception
-- [ ] Remove allowlist entries in each PR that routes writes, until only deliberate exceptions are left
+- [ ] Add the narrowed client types to `db.ts`, `asRaw` in `db-raw.ts`, and the Biome rule. Check that the types
+      inferred from `ExtendedPrismaClient["asset"]` don't change
+- [ ] `processIntegrationSync` takes an entity type instead of a delegate for tracked models. Remove the `any`
+      clients from that path
+- [ ] Add `updateIgnoredFields` and `deleteDrafts`. Test that `updateIgnoredFields` rejects a `tracked` field at
+      runtime, and that `deleteDrafts` doesn't delete a ticket that isn't a draft
+- [ ] Narrow each model in the PR that routes its last write. Add type tests with `@ts-expect-error` for each one:
+      a write on `prisma`, on `tx` and through a dynamic model name, a delegate passed as a value, and
+      `updateIgnoredFields` with a `tracked` field once it exists
+- [ ] Use `asRaw` in the tests and `scripts/` that write tracked models directly
+- [ ] Route the notification delete in `dev/fleet-integration.ts` too. The seeds in `prisma/seeds/` have no lint
+      override
 
 ### work orders and SourceRecord
 
@@ -568,7 +675,7 @@ model SourceRecord {
 - [ ] Remove `integrationUserId` from `ResourceSyncCtx`, and the `userId` parameter from
       `processIntegrationSync` and `transformInputItem`
 - [ ] Drop `Integration.integrationUserId`, and make `Integration.userId` nullable
-- [ ] Reset staging and local databases after this ships, see "existing rows"
+- [ ] Reset staging and local databases after PR 9, see "existing rows"
 - [ ] Stop creating shadow users in `create-integration.ts`, and remove the name sync in the integrations router
 - [ ] Update `csaf-integration.ts`, `dev/fleet-integration.ts`, `create-blueflow-integration.ts`,
       `seed-csaf-advisories.ts`
@@ -576,8 +683,10 @@ model SourceRecord {
       `columns.tsx` and `overview-card.tsx`
 - [ ] Show the source name when the owner is null: remediation and device artifact columns,
       `remediations.tsx`, `vulnerabilities/utils.ts`, `vulnerability-drawer.tsx`
-- [ ] Replace `isAutomationActor` in `activity-timeline.tsx`, which checks for a shadow user, with
-      `source = AUTOMATION`. Do the same for `isAgent` in the inbox router
+- [ ] In `recordCreationActivity`, return early when `creatorId` is null, because `TicketActivity.userId` is required
+- [ ] Change `isAutomationActor` in `activity-timeline.tsx`, which checks for a shadow user, to compare with
+      `AUTOMATION_USER_ID`. Replace that with `source = AUTOMATION` when the ticket timeline switches to
+      `FieldChange`, and do the same for `isAgent` in the inbox router when the notification timeline does
 - [ ] Filter the automation user out of `listAssignable`. Shadow users leave that list on their own
 
 ### changing ownership
@@ -616,7 +725,7 @@ model SourceRecord {
       and `userId` on remediations, device artifacts and artifacts; nullable `creator`; `activities` on
       tickets; `source` on the work order `integrationUpload` input; a missing `device` on the asset
       `integrationUpload` input no longer clears an existing asset's device
-- [ ] Update `CLAUDE.md` (key models, background jobs, and no nested writes to tracked models) and the shadow user comments in `vulnerability-schema.md`
+- [ ] Update `CLAUDE.md` (key models, background jobs, how to write tracked models, and no nested writes to them), `src/features/integrations/CLAUDE.md`, and the shadow user comments in `vulnerability-schema.md`
 
 ## Out of scope
 

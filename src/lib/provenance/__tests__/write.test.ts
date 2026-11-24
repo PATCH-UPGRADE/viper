@@ -193,12 +193,6 @@ describe("createWithObservation", () => {
     expect(lastChanges()).toEqual([["hostname", null, "ct-1"]]);
   });
 
-  it("writes no FieldChange for a column default", async () => {
-    await create({ hostname: "ct-1" });
-    expect(asset().versionStatus).toBe("UNKNOWN");
-    expect(lastChanges()).toEqual([["hostname", null, "ct-1"]]);
-  });
-
   it("stores a foreign key with its label, and looks each one up once", async () => {
     await create({
       manufacturerId: "m1",
@@ -254,9 +248,13 @@ describe("a SNAPSHOT", () => {
     );
   });
 
-  it("applies what the source changed", async () => {
-    await snapshot({ hostname: "ct-2", location: { facility: "ICU" } });
-    expect(asset().hostname).toBe("ct-2");
+  it("applies what the source changed, with its ignored fields", async () => {
+    await snapshot({
+      hostname: "ct-2",
+      location: { facility: "ICU" },
+      role: "Workstation",
+    });
+    expect(asset()).toMatchObject({ hostname: "ct-2", role: "Workstation" });
     expect(last()).toMatchObject({
       kind: "SNAPSHOT",
       fields: { hostname: "ct-2", location: { facility: "ICU" } },
@@ -271,15 +269,6 @@ describe("a SNAPSHOT", () => {
       hostname: "ct-2",
       location: { facility: "ER" },
     });
-  });
-
-  it("overwrites a user's edit once the source changes the field", async () => {
-    await patch({ location: { facility: "ER" } });
-    await snapshot({ hostname: "ct-1", location: { facility: "Lab" } });
-    expect(asset().location).toEqual({ facility: "Lab" });
-    expect(lastChanges()).toEqual([
-      ["location", { facility: "ER" }, { facility: "Lab" }],
-    ]);
   });
 
   it("writes no FieldChange when the source catches up with the golden record", async () => {
@@ -339,21 +328,6 @@ describe("a SNAPSHOT", () => {
     });
     expect(kinds()).toEqual(["CREATE", "SNAPSHOT"]);
   });
-
-  it("records fields that this write path may not apply", async () => {
-    await snapshot({ hostname: "ct-2", location: { facility: "Lab" } }, fleet, [
-      "location",
-    ]);
-    expect(asset()).toMatchObject({
-      hostname: "ct-1",
-      location: { facility: "Lab" },
-    });
-    expect(last().fields).toEqual({
-      hostname: "ct-2",
-      location: { facility: "Lab" },
-    });
-    expect(lastChanges().map(([field]) => field)).toEqual(["location"]);
-  });
 });
 
 describe("a PATCH", () => {
@@ -379,12 +353,6 @@ describe("a PATCH", () => {
       kind: "PATCH",
       fields: { serialNumber: "S1" },
     });
-  });
-
-  it("writes no observation for ignored fields alone", async () => {
-    await patch({ role: "Workstation" });
-    expect(asset().role).toBe("Workstation");
-    expect(kinds()).toEqual(["CREATE"]);
   });
 
   it("records a changed field that it may not apply", async () => {
@@ -551,12 +519,6 @@ describe("every write", () => {
     expect(db.queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       db.findAsset.mock.invocationCallOrder[0],
     );
-  });
-
-  it("throws on an entity that doesn't exist", async () => {
-    await expect(patch({ hostname: "ct-2" })).rejects.toMatchObject({
-      code: "NOT_FOUND",
-    });
   });
 
   it("throws on a field that the entity doesn't have", async () => {

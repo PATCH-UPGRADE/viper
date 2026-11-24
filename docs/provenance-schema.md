@@ -7,8 +7,8 @@
 | Who set this field, and when? | The newest `FieldChange` for the entity and field, then its `Observation`. With no `FieldChange`, the value is a column default, or was set before provenance existed. |
 | What was this field at time T? | The newest `FieldChange` at or before T gives `newValue`. If there is none, the field wasn't set yet, or was set before provenance existed. |
 | Which entities have this field from this source? | The newest `FieldChange` per entity for that field, joined to its `Observation`. |
-| What did this sync change? | `FieldChange` rows whose `Observation` has that `integrationId` and `observedAt`. Filter on `kind` to separate new entities from updates. |
-| What does this source say now? | That source's newest `Observation` of the entity. |
+| What did this sync change? | `FieldChange` rows whose `Observation` has that `entityType`, `integrationId` and `observedAt`, which all observations from one sync share. Filter on `kind` to separate new entities from updates. |
+| What does this source say now? | For an integration, the last value it stated for each field: its newest `CREATE` or `SNAPSHOT` of the entity, then its older ones for fields that one leaves out. Other sources only write a `PATCH` when they change something, so use the `FieldChange`s. |
 | Who created this entity? | The entity's `CREATE` observation: its `source`, `integrationName` and `actorUserId`. |
 
 ### tracked and ignored fields
@@ -40,18 +40,30 @@ no default in either direction, so:
 
 ### how a write works
 
-One function, `applyObservation`, writes tracked fields, in one transaction:
+One function, `applyObservation`, updates tracked fields. `createWithObservation` and
+`deleteWithObservation` do the same for creating and deleting an entity. Each runs in one transaction.
+`applyObservation` works like this:
 
-1. Normalize the input to our field names and hash it (`contentHash`).
-2. If the hash matches this source's newest observation of the entity, write nothing except the
-   mapping's `lastSynced`.
-3. Insert the `Observation`.
-4. Compare it to this source's previous observation to see what changed upstream (the source delta).
-   Comparing to the golden record instead would make a stale source look like it changed a
-   manually corrected field on every sync.
-5. Apply only the fields in the source delta that this write path may apply (newest value wins), update the golden record, and write
-   one `FieldChange` per field that actually changed (the golden delta). Creating an entity counts
-   every field the source set as changed.
+1. Lock the entity's row, so two writers can't compare against the same old values.
+2. Normalize the input to our field names.
+3. Find which fields changed. This depends on the kind:
+   * **A `SNAPSHOT` is compared to what the same source said before** (the source delta). Comparing to the
+     golden record instead would make a stale source look like it changed a manually corrected field on
+     every sync. Each field is compared to the last value that source stated for it. If its newest `CREATE`
+     or `SNAPSHOT` doesn't have the field, its older ones are read.
+   * **A `PATCH` is compared to the golden record.** It is a request to set these values now, so what the
+     same source said earlier doesn't matter. If a user sets a location to ER, an integration changes it to
+     ICU, and the user sets ER again, the second edit applies.
+4. Stop if there is nothing to record: the `contentHash` of a `SNAPSHOT` matches the source's newest `CREATE`
+   or `SNAPSHOT` of the entity, or a `PATCH` changes no field. Only the mapping's `lastSynced` is written.
+   A `CREATE` or `TOMBSTONE` is never skipped as a duplicate.
+5. Insert the `Observation`.
+6. Apply only the changed fields that this write path may apply (newest value wins), update the golden
+   record, and write one `FieldChange` per field that actually changed (the golden delta). Creating an
+   entity counts every field the source set as changed.
+
+A missing key in a `SNAPSHOT` means the source said nothing about that field, so leaving a field out and
+later reporting the same value isn't a change. An explicit null is a statement that the field is empty.
 
 Newest value wins, per field. A field takes the value from whichever source changed it last, including
 a user, and a later change from any source overwrites it. A source that keeps sending the same value
@@ -81,11 +93,16 @@ field on every sync.
   deletes its `SourceRecord`s, so those observations lose the exact payload but keep `fields`, `source`
   and `integrationName`.
 * **Foreign key fields are stored as `{ id, label }`,** so history stays readable after the referenced
-  row is deleted (the reason `TicketActivity.data` snapshots names today).
+  row is deleted (the reason `TicketActivity.data` snapshots names today). Only the `id` is hashed and
+  compared, so renaming a product isn't a change to its assets.
 * **Set-valued fields get one `FieldChange` per member.** `newValue` only means attached, and
   `oldValue` only means detached. This covers ticket assets, children, links and departments.
 * **Values are compared after normalization, with deep equality.** For example, `patchFor` treats
   `""` and `null` bodies as equal, and JSON columns like `location` can't use `!==`.
+* **All observations from one sync share one `observedAt`,** the time the sync's data was received. Each
+  item is saved in its own transaction, so the `now()` default would give each one a different time. The
+  type of a write's origin makes forgetting `observedAt` a compile error, see "what source a write has".
+  If one sync lists an entity twice, the tie is broken by `id`.
 
 ### where a work order came from
 
@@ -147,13 +164,33 @@ An LLM is how a value was produced, not where it came from, so there is no LLM s
 restates what a source said, it takes that source. If the LLM concluded it, it is `AUTOMATION`.
 `ctx.auth.key` separates `API_CLIENT` from `MANUAL`: it is set for API keys and undefined for sessions.
 
+Every write passes its origin, and the type requires what each source needs. A write from an integration
+doesn't compile without `observedAt` and `integrationName`, and a write from any other source doesn't
+compile without an actor:
+
+```ts
+type ObservationOrigin =
+  | {
+      source: "INTEGRATION";
+      integrationId: string;
+      integrationName: string;
+      observedAt: Date; // required: one value for the whole sync
+      actorUserId?: string;
+    }
+  | {
+      source: "MANUAL" | "API_CLIENT" | "AUTOMATION" | "EMAIL";
+      actorUserId: string;
+      observedAt?: Date; // defaults to now
+    };
+```
+
 ### write guard
 
 A Prisma client extension catches a direct write to `Asset`, `WorkOrderTicket` or `Notification` that skips
-`applyObservation`. It throws in development and tests. In production it reports to Sentry and lets the write
+the provenance write functions. It throws in development and tests. In production it reports to Sentry and lets the write
 through, because a missing history row is better than a blocked edit.
 
-`applyObservation` runs its writes inside an `AsyncLocalStorage` context, and the extension checks for that
+Those functions run their writes inside an `AsyncLocalStorage` context, and the extension checks for that
 context. Outside it, only these writes pass:
 
 * An update that sets only `ignored` fields, like `submissionState`
@@ -177,7 +214,8 @@ Fleet would stop updating the device on assets it already created, once `Asset.u
 
 Run it once every write path goes through `applyObservation`, so that nothing is created without a `CREATE`
 afterwards, and before the migration that drops `Asset.userId`. It reads `Asset.userId` and the shadow users,
-so the PR that drops that column deletes the script.
+so the PR that drops that column deletes the script. It inserts the observations directly, because
+`createWithObservation` is for entities being created now.
 
 Each backfilled observation has:
 
@@ -252,7 +290,8 @@ enum ObservationKind {
 
 // NEW
 /// What one source told us about one entity. Append-only.
-/// Written only when contentHash differs from this source's newest observation of the entity.
+/// A SNAPSHOT is written only when contentHash differs from this source's newest CREATE or SNAPSHOT of
+/// the entity, and a PATCH only when it changes a field. CREATE and TOMBSTONE are never deduplicated.
 /// "Still saying this" stays on the mapping's lastSynced.
 model Observation {
   id String @id @default(cuid())
@@ -284,9 +323,9 @@ model Observation {
   fields Json
   raw    Json? // the exact payload, null when sourceRecordId is set; TODO: keep PHI/PII concerns in mind
 
-  contentHash String // hash of `fields`, so noise in `raw` doesn't create rows
+  contentHash String // hash of `fields` without foreign key labels, so noise in `raw` doesn't create rows
 
-  observedAt      DateTime  @default(now()) // when we received it
+  observedAt      DateTime  @default(now()) // when we received it; the same for a whole sync
 
   fieldChanges FieldChange[]
 
@@ -438,8 +477,10 @@ model SourceRecord {
 
 ### provenance core
 
-- [ ] Add `applyObservation` and value normalization. It takes everything the source said, plus the
-      fields it may apply
+- [ ] Add `applyObservation`, `createWithObservation`, `deleteWithObservation` and value normalization.
+      `applyObservation` takes everything the source said, plus the fields it may apply
+- [ ] Add the `ObservationOrigin` type, with a type test proving that an integration write without
+      `observedAt` fails to compile
 - [ ] Set the source from `ctx.auth.key` on tRPC writes: `API_CLIENT` with a key, `MANUAL` without one. Do it
       in one helper, so a source for AI writes can be added there later (see "out of scope")
 - [ ] Record values that are dropped today: `ingestFleetAssets`, `enrichAssetIdentifiers`
@@ -448,9 +489,10 @@ model SourceRecord {
       this map to decide which fields get a `FieldChange`
 - [ ] Add a type test proving that a missing key fails. CI already runs `tsc --noEmit`, which
       turns this into a failed check
-- [ ] Add read helpers for the questions above
+- [ ] Add each read helper for the questions above in the PR that first uses it
 - [ ] Route integration writes for tracked entities through it: `processIntegrationSync`, which also
-      serves untracked models like remediations and must skip provenance for them
+      serves untracked models like remediations and must skip provenance for them. Pass its `lastSynced`
+      timestamp as `observedAt` for every item, and the same one for that sync's `TOMBSTONE`s
 - [ ] Route asset writes: `assets.create`, `createBulk`, `update`, `remove`, `enrichAssetIdentifiers`
 - [ ] Route work order writes: tracking routers, `reschedule.ts`, `asset-tickets.ts`, mitigation
       routers, `work-orders/submit.ts`, `work-order-tools.ts`, `process-inbox-email`
@@ -467,7 +509,7 @@ model SourceRecord {
       `analyze-remediation.ts`
 - [ ] Set `sourceRecordId` on observations for notifications and emailed work orders
 - [ ] Callers using `updateMany` must read the affected rows first to know the old values
-- [ ] Return the PATCH response from `pushEditToPlatforms` and record it as the integration's observation
+- [ ] Return the PATCH response from `pushEditToPlatforms` and record it as the integration's `SNAPSHOT`
 - [ ] Keep the behavior of `fleetCreatedEquipmentKeys`, reading who created the asset from its `CREATE`
       observation, since `Asset.userId` is gone
 - [ ] Add `scripts/backfill-provenance.ts`, see "existing rows"

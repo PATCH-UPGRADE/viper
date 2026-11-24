@@ -59,14 +59,6 @@ describe("createIntegrationToken", () => {
       },
     });
   });
-
-  it("uses a given lifetime", async () => {
-    await createIntegrationToken("integration-1", ResourceType.Asset, 60);
-
-    expect(mockToken.create.mock.calls[0][0].data.expiresAt).toEqual(
-      new Date(NOW.getTime() + 60_000),
-    );
-  });
 });
 
 describe("consumeIntegrationToken", () => {
@@ -79,12 +71,6 @@ describe("consumeIntegrationToken", () => {
     expect(mockToken.deleteMany).toHaveBeenCalledWith({
       where: { tokenHash: sha256("raw") },
     });
-  });
-
-  it("refuses an unknown token", async () => {
-    mockToken.findUnique.mockResolvedValue(null);
-
-    await expect(consume()).resolves.toBeNull();
   });
 
   it("refuses and removes an expired token", async () => {

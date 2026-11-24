@@ -334,7 +334,7 @@ describe("syncIntegration — claiming the attempt", () => {
 });
 
 describe("syncIntegration — callback", () => {
-  it("mints the upload token for the integration, not its shadow user", async () => {
+  it("mints the upload token for the integration and resource", async () => {
     await runSync(makeStep());
     await mockStrategy.mock.calls[0][0].callback();
 

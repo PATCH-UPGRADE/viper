@@ -1,5 +1,5 @@
 import request from "supertest";
-import { describe, expect, it, onTestFinished } from "vitest";
+import { expect, onTestFinished } from "vitest";
 import type { IntegrationFormValues } from "@/features/integrations/types";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
@@ -99,12 +99,6 @@ export async function deleteAssetsForDevices(devices: TestDevice[]) {
     });
   }
 }
-
-describe("Configuration Tests", () => {
-  it("dummy test", async () => {
-    expect(true).toBeTruthy();
-  });
-});
 
 export const authHeader = { Authorization: AUTH_TOKEN };
 export const jsonHeader = { "Content-Type": "application/json" };

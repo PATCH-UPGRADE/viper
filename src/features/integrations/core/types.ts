@@ -79,7 +79,7 @@ export interface BaseSyncCtx<TConfig = unknown, TCreds = unknown>
   cursor: Cursor | null;
   /** Where `partner`'s `since` comes from. */
   lastSuccessfulSync: Date | null;
-  /** Mints a one-time upload token scoped to the shadow user + resource. */
+  /** Mints a one-time upload token scoped to the integration + resource. */
   callback(): Promise<CallbackConfig>;
 }
 

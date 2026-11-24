@@ -14,7 +14,6 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/trpc/middleware", () => ({ requireExistence: vi.fn() }));
-vi.mock("../tokens", () => ({ consumeIntegrationToken: vi.fn() }));
 
 const { resolveDevice, resolveMatchingId } = await import("../router-utils");
 

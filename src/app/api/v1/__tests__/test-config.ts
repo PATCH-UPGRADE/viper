@@ -3,6 +3,7 @@ import { expect, onTestFinished } from "vitest";
 import type { IntegrationFormValues } from "@/features/integrations/types";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
+import { asRaw } from "@/lib/db-raw";
 import { normalizeName } from "@/lib/router-utils";
 
 export const BASE_URL = "http://localhost:3000/api/v1";
@@ -86,7 +87,7 @@ export function expectDevice(
 export async function deleteAssetsForDevices(devices: TestDevice[]) {
   for (const device of devices) {
     const names = namesFromDevice(device);
-    await prisma.asset.deleteMany({
+    await asRaw(prisma).asset.deleteMany({
       where: {
         manufacturer: { canonicalName: names.manufacturer },
         product: names.product

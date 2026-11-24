@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
+import { asRaw } from "@/lib/db-raw";
 import type {
   EntityDefinition,
   FieldMap,
@@ -93,7 +94,7 @@ export const assetEntity = {
   read: (tx, id) =>
     tx.asset.findUnique({ where: { id }, omit: { utilization: true } }),
   update: (tx, id, data) =>
-    tx.asset.update({
+    asRaw(tx).asset.update({
       where: { id },
       data: data as Prisma.AssetUncheckedUpdateInput,
       select: { id: true },
@@ -116,3 +117,10 @@ export type AssetInput = Partial<
     | Pick<AssetScalars, DeviceField>
     | { [K in DeviceField]?: undefined }
   );
+
+/** The columns of a new asset. A JSON column is left out when it is null. */
+export const assetColumns = (fields: AssetInput) => ({
+  ...fields,
+  location: fields.location ?? undefined,
+  utilization: fields.utilization ?? undefined,
+});

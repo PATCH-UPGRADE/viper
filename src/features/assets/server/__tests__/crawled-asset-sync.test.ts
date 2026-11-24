@@ -14,15 +14,20 @@ vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: mocks.processIntegrationSync,
 }));
 
-const { processCrawledAssetIntegrationSync } = await import(
-  "../integration-sync"
-);
+const { processAssetIntegrationSync, processCrawledAssetIntegrationSync } =
+  await import("../integration-sync");
 
 const item = (deviceType: string | null) => ({
   externalId: `ext-${deviceType}`,
   ip: "10.0.0.1",
   deviceType,
 });
+
+const RUN = {
+  userId: "shadow-1",
+  integrationId: "int-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
+};
 
 beforeEach(() => {
   mocks.findMany
@@ -36,11 +41,10 @@ describe("processCrawledAssetIntegrationSync", () => {
   it("keeps a known slug and drops an invented one, so the crawl still saves", async () => {
     await processCrawledAssetIntegrationSync(
       { items: [item("infusion-pump"), item("ct-scanner"), item(null)] },
-      "shadow-1",
-      "int-1",
+      RUN,
     );
 
-    const [, , input] = mocks.processIntegrationSync.mock.calls[0];
+    const [, input] = mocks.processIntegrationSync.mock.calls[0];
     expect(
       input.items.map((i: { deviceType: string | null }) => i.deviceType),
     ).toEqual(["infusion-pump", null, null]);
@@ -48,5 +52,28 @@ describe("processCrawledAssetIntegrationSync", () => {
       "AI crawler sent an unknown deviceType, dropped it",
       { integrationId: "int-1", deviceType: "ct-scanner" },
     );
+  });
+});
+
+describe("processAssetIntegrationSync", () => {
+  it("leaves out a missing device, and clears it on an explicit null", async () => {
+    const transform = async (device?: null) => {
+      await processAssetIntegrationSync({ items: [] }, RUN, async () => {});
+      const [config] = mocks.processIntegrationSync.mock.lastCall!;
+      const { update } = await config.transformInputItem(
+        { ...item(null), upstreamApi: null, device },
+        "shadow-1",
+      );
+      return update.fields;
+    };
+
+    expect(await transform()).toEqual({ ip: "10.0.0.1" });
+    expect(await transform(null)).toEqual({
+      ip: "10.0.0.1",
+      manufacturerId: null,
+      productId: null,
+      versionId: null,
+      versionStatus: "UNKNOWN",
+    });
   });
 });

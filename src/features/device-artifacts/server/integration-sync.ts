@@ -1,6 +1,9 @@
 import "server-only";
 import type { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import {
+  processIntegrationSync,
+  type SyncRun,
+} from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveMatchingIdForDevice } from "@/lib/router-utils";
@@ -13,17 +16,18 @@ type IntegrationDeviceArtifactItem = z.infer<
 
 export function processDeviceArtifactIntegrationSync(
   input: { items: IntegrationDeviceArtifactItem[] },
-  userId: string,
-  integrationId: string,
+  run: SyncRun,
   options: { shouldRecordSyncOutcome?: boolean } = {},
 ) {
   return processIntegrationSync(
-    prisma,
     {
       model: prisma.deviceArtifact,
       mappingModel: prisma.externalDeviceArtifactMapping,
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
-      transformInputItem: async (item, userId) => {
+      transformInputItem: async (
+        item: IntegrationDeviceArtifactItem,
+        userId,
+      ) => {
         const {
           device,
           externalId: _externalId,
@@ -58,8 +62,7 @@ export function processDeviceArtifactIntegrationSync(
       onItemCreated: (id) => requestArtifactNoteExtraction(id),
     },
     input,
-    userId,
-    integrationId,
+    run,
     ResourceType.DeviceArtifact,
   );
 }

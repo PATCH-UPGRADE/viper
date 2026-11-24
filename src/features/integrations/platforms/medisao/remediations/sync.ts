@@ -41,6 +41,7 @@ export const describeRemediation = (
 async function ingestRemediations(
   items: MedIsaoRemediationItem[],
   integrationId: string,
+  observedAt: Date,
 ): Promise<IntegrationResponse> {
   const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
     where: { id: integrationId },
@@ -55,7 +56,6 @@ async function ingestRemediations(
   const vulnerabilityIdCache = new Map<string, string>();
 
   return processIntegrationSync(
-    prisma,
     {
       model: prisma.remediation,
       mappingModel: prisma.externalRemediationMapping,
@@ -128,8 +128,7 @@ async function ingestRemediations(
       },
     },
     { items },
-    integrationUserId,
-    integrationId,
+    { userId: integrationUserId, integrationId, observedAt },
     ResourceType.Remediation,
   );
 }
@@ -189,7 +188,11 @@ export async function syncRemediations(
   // for good, so the whole window is re-read next time. Re-reading is free,
   // because every write behind this is an upsert keyed on the external id.
   if (items.length > 0) {
-    const outcome = await ingestRemediations(items, ctx.integrationId);
+    const outcome = await ingestRemediations(
+      items,
+      ctx.integrationId,
+      ctx.observedAt,
+    );
     if (outcome.shouldRetry) {
       console.warn(`MedISAO remediation ingest incomplete: ${outcome.message}`);
       return { cursor: watermarks };

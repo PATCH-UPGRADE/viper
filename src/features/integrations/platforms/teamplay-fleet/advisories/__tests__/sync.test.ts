@@ -71,6 +71,7 @@ describe("Fleet advisories sync", () => {
     ctx = {
       integrationId,
       integrationUserId: integration.integrationUserId,
+      observedAt: new Date("2026-11-01T00:00:00Z"),
       config: {},
       creds: { username: "unused", password: "unused" },
       session: {

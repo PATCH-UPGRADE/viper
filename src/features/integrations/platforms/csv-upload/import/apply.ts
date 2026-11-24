@@ -1,6 +1,7 @@
 import "server-only";
 import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
 import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
+import type { TrackedWrite } from "@/features/integrations/core/sync/stores";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -18,36 +19,24 @@ import {
 import type { CanonicalNames } from "./context";
 import type { ContextAsset, MatchContext } from "./match-rows";
 
-const SCALAR_FIELDS = [
+const TRACKED_FIELDS = [
   "ip",
   "hostname",
   "macAddress",
   "serialNumber",
-  "networkSegment",
-  "status",
 ] as const;
+
+const IGNORED_FIELDS = ["networkSegment", "status"] as const;
 
 const LOCATION_FIELDS = ["facility", "building", "floor", "room"] as const;
 
 const SINGLE_ROW_FAILURE_PREFIX = "1 of 1 items failed: ";
-
-type AssetFieldValues = Pick<
-  Prisma.AssetUncheckedCreateInput,
-  (typeof SCALAR_FIELDS)[number]
-> & { location?: Prisma.InputJsonObject };
 
 interface CsvSyncItem {
   externalId: string;
   assetId: string;
   kind: "add" | "link";
   row: StagedRow;
-}
-
-interface AssetWrite {
-  createData: Partial<Prisma.AssetUncheckedCreateInput>;
-  updateData: Prisma.AssetUncheckedUpdateInput;
-  uniqueFieldConditions: Array<{ id: string }>;
-  artifactsData: undefined;
 }
 
 export const ROWS_BETWEEN_PROGRESS_REPORTS = 100;
@@ -61,6 +50,8 @@ export interface ApplyChunkInput {
   importId: string;
   integrationId: string;
   userId: string;
+  /** When the file was received. Every row gets this time. */
+  observedAt: Date;
   rows: StagedRow[];
   outcomes: RowOutcome[];
   context: MatchContext;
@@ -77,47 +68,78 @@ export interface ChunkResult {
 const isFilled = (value: unknown): boolean =>
   typeof value === "string" ? value.trim() !== "" : value != null;
 
-function filledRowFields(row: StagedRow): AssetFieldValues {
-  const fields: AssetFieldValues = {};
-  for (const field of SCALAR_FIELDS) {
-    const value = row[field];
-    if (value !== null) Object.assign(fields, { [field]: value });
-  }
+type RowValues = Partial<
+  Pick<
+    StagedRow,
+    (typeof TRACKED_FIELDS)[number] | (typeof IGNORED_FIELDS)[number]
+  >
+>;
+
+/** The values of the row in these fields, without its empty cells. */
+function filledValues(
+  row: StagedRow,
+  fields: ReadonlyArray<keyof RowValues>,
+): RowValues {
+  const filled = fields.filter((field) => row[field] !== null);
+  return Object.fromEntries(filled.map((field) => [field, row[field]]));
+}
+
+function rowLocation(row: StagedRow): Record<string, string> {
   const location: Record<string, string> = {};
   for (const field of LOCATION_FIELDS) {
     const value = row[field];
     if (value !== null) location[field] = value;
   }
-  if (Object.keys(location).length > 0) fields.location = location;
-  return fields;
+  return location;
 }
 
-function fieldsMissingFromDevice(
+/** The tracked fields that the row states. */
+function statedFields(row: StagedRow, device: ResolvedDevice | null) {
+  const location = rowLocation(row);
+  const fields = {
+    ...filledValues(row, TRACKED_FIELDS),
+    location: Object.keys(location).length > 0 ? location : undefined,
+  };
+  return device ? { ...fields, ...device } : fields;
+}
+
+/**
+ * An update of a device that the row matched. The whole row is recorded, and
+ * only what the device doesn't have yet is applied.
+ */
+function fillMissing(
   row: StagedRow,
+  device: ResolvedDevice | null,
   matchedDevice: ContextAsset,
-): AssetFieldValues {
-  const fields: AssetFieldValues = {};
-  for (const field of SCALAR_FIELDS) {
-    const value = row[field];
-    if (value !== null && !isFilled(matchedDevice[field])) {
-      Object.assign(fields, { [field]: value });
-    }
-  }
+): TrackedWrite<"ASSET">["update"] {
+  const isMissing = (field: keyof RowValues) =>
+    row[field] !== null && !isFilled(matchedDevice[field]);
+
   const storedLocation = matchedDevice.location ?? {};
-  const missingLocationParts: Record<string, string> = {};
-  for (const field of LOCATION_FIELDS) {
-    const value = row[field];
-    if (value !== null && !isFilled(storedLocation[field])) {
-      missingLocationParts[field] = value;
-    }
-  }
-  if (Object.keys(missingLocationParts).length > 0) {
-    fields.location = {
-      ...(storedLocation as Prisma.InputJsonObject),
-      ...missingLocationParts,
-    };
-  }
-  return fields;
+  const missingLocationParts = Object.entries(rowLocation(row)).filter(
+    ([field]) => !isFilled(storedLocation[field]),
+  );
+  const isLocationMissing = missingLocationParts.length > 0;
+
+  return {
+    fields: {
+      ...statedFields(row, device),
+      // An ignored field is always written, so state only a missing one.
+      ...filledValues(row, IGNORED_FIELDS.filter(isMissing)),
+    },
+    apply: [
+      ...TRACKED_FIELDS.filter(isMissing),
+      ...(isLocationMissing ? (["location"] as const) : []),
+    ],
+    applyAs: isLocationMissing
+      ? {
+          location: {
+            ...(storedLocation as Prisma.InputJsonObject),
+            ...Object.fromEntries(missingLocationParts),
+          },
+        }
+      : undefined,
+  };
 }
 
 type FillDeviceType = (
@@ -150,13 +172,12 @@ function prepareDeviceTypeFill(importId: string): FillDeviceType {
   };
 }
 
+/** The device that the row names, or null if it has no manufacturer or model. */
 async function deviceFor(
   row: StagedRow,
   canonicalNames: CanonicalNames,
-): Promise<ResolvedDevice> {
-  if (row.manufacturer === null || row.product === null) {
-    throw new Error("Manufacturer and model are required to add a device");
-  }
+): Promise<ResolvedDevice | null> {
+  if (row.manufacturer === null || row.product === null) return null;
   const manufacturer =
     canonicalNames.manufacturers.get(normalizeNameKey(row.manufacturer)) ??
     row.manufacturer;
@@ -171,20 +192,23 @@ async function toAssetWrite(
   userId: string,
   input: ApplyChunkInput,
   fillDeviceType: FillDeviceType,
-): Promise<AssetWrite> {
+): Promise<TrackedWrite<"ASSET">> {
+  const { row } = item;
   if (item.kind === "add") {
-    const device = await deviceFor(item.row, input.canonicalNames);
-    await fillDeviceType(device.productId, item.row);
+    const device = await deviceFor(row, input.canonicalNames);
+    if (!device) {
+      throw new Error("Manufacturer and model are required to add a device");
+    }
+    await fillDeviceType(device.productId, row);
+    const fields = statedFields(row, device);
     return {
-      createData: {
-        id: item.assetId,
-        ...filledRowFields(item.row),
-        ...device,
-        userId,
+      create: {
+        fields: { ...fields, ...filledValues(row, IGNORED_FIELDS) },
+        only: { id: item.assetId, userId },
       },
-      updateData: {},
+      // Only a retry of this import finds the device that it added.
+      update: { fields, apply: [] },
       uniqueFieldConditions: [],
-      artifactsData: undefined,
     };
   }
 
@@ -192,12 +216,12 @@ async function toAssetWrite(
   if (!matchedDevice) {
     throw new Error("The matched device is no longer in VIPER");
   }
-  await fillDeviceType(matchedDevice.productId, item.row);
+  await fillDeviceType(matchedDevice.productId, row);
+  const device = await deviceFor(row, input.canonicalNames);
   return {
-    createData: {},
-    updateData: fieldsMissingFromDevice(item.row, matchedDevice),
+    create: null,
+    update: fillMissing(row, device, matchedDevice),
     uniqueFieldConditions: [{ id: item.assetId }],
-    artifactsData: undefined,
   };
 }
 
@@ -208,17 +232,19 @@ async function writeRow(
 ): Promise<string | null> {
   try {
     const response = await processIntegrationSync(
-      prisma,
       {
-        model: prisma.asset,
-        mappingModel: prisma.externalAssetMapping,
+        entityType: "ASSET",
         shouldRecordSyncOutcome: false,
         transformInputItem: (syncItem: CsvSyncItem, userId: string) =>
           toAssetWrite(syncItem, userId, input, fillDeviceType),
       },
       { items: [item] },
-      input.userId,
-      input.integrationId,
+      {
+        userId: input.userId,
+        integrationId: input.integrationId,
+        observedAt: input.observedAt,
+        actorUserId: input.userId,
+      },
       ResourceType.Asset,
     );
     if (!response.shouldRetry) return null;

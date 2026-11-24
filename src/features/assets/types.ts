@@ -44,7 +44,7 @@ export const assetInputSchema = z.object({
   device: assetDeviceInputSchema
     .nullish()
     .describe(
-      "The asset's manufacturer, product, and version. Without it, the asset has no device.",
+      "The asset's manufacturer, product, and version. Without it, a new asset has no device, and an existing asset keeps its device. Null clears it.",
     ),
   role: z
     .string()

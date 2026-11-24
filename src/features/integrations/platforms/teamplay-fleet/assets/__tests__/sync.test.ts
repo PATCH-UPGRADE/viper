@@ -26,7 +26,10 @@ vi.mock("../contracts", () => ({ syncFleetContracts: vi.fn() }));
 
 import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
 import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import {
+  processIntegrationSync,
+  type TrackedSyncConfig,
+} from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import { resolveDevice } from "@/lib/router-utils";
 import type { ResourceSyncCtx, Session } from "../../../../core/types";
@@ -89,6 +92,7 @@ const makeCtx = (
 ): ResourceSyncCtx<FleetConfig, FleetCreds> => ({
   integrationId: "int-1",
   integrationUserId: "shadow-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
   config: {},
   creds: { username: "svc@example.com", password: "pw" },
   session,
@@ -132,23 +136,35 @@ beforeEach(() => {
   });
 });
 
-const lastSyncCall = () => vi.mocked(processIntegrationSync).mock.calls[0];
+const lastSyncCall = () => {
+  const [config, input, run, resource] = vi.mocked(processIntegrationSync).mock
+    .calls[0];
+  return {
+    config: config as unknown as TrackedSyncConfig<SyncItem, "ASSET">,
+    input: input as { items: SyncItem[] },
+    run,
+    resource,
+  };
+};
+type SyncItem = Parameters<typeof processIntegrationSync>[1]["items"][number];
 
 describe("syncAssets", () => {
   it("ingests the mapped inventory under the shadow user", async () => {
     const outcome = await syncAssets(makeCtx());
 
-    const [prismaArg, , input, userId, integrationId, resource] =
-      lastSyncCall();
-    expect(prismaArg).toBe(db);
+    const { config, input, run, resource } = lastSyncCall();
+    expect(config.entityType).toBe("ASSET");
     expect(input.items[0]).toMatchObject({
       externalId: "US_1006103273",
       serialNumber: "63014",
       productName: "syngo WebSpace",
       softwareVersion: "VA11A",
     });
-    expect(userId).toBe("shadow-1");
-    expect(integrationId).toBe("int-1");
+    expect(run).toEqual({
+      userId: "shadow-1",
+      integrationId: "int-1",
+      observedAt: new Date("2026-11-01T00:00:00Z"),
+    });
     expect(resource).toBe(ResourceType.Asset);
     expect(connectUncontractedAssets).toHaveBeenCalledWith("int-1", new Set());
     expect(outcome).toEqual({ cursor: null });
@@ -157,9 +173,9 @@ describe("syncAssets", () => {
   it("derives the device from Fleet's product and version names", async () => {
     await syncAssets(makeCtx());
 
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     const out = await config.transformInputItem(
-      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      input.items[0] as SyncItem,
       "shadow-1",
     );
     expect(resolveDevice).toHaveBeenCalledWith({
@@ -167,7 +183,10 @@ describe("syncAssets", () => {
       product: "syngo WebSpace",
       version: "VA11A",
     });
-    expect(out.createData).toMatchObject({ ...device, userId: "shadow-1" });
+    expect(out.create).toMatchObject({
+      fields: device,
+      only: { userId: "shadow-1" },
+    });
     expect(out.uniqueFieldConditions).toEqual([{ serialNumber: "63014" }]);
   });
 
@@ -177,13 +196,13 @@ describe("syncAssets", () => {
     ]);
     await syncAssets(makeCtx());
 
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     const out = await config.transformInputItem(
-      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      input.items[0] as SyncItem,
       "shadow-1",
     );
-    expect(out.createData).not.toHaveProperty("role");
-    expect(out.updateData).not.toHaveProperty("role");
+    expect(out.create?.fields).not.toHaveProperty("role");
+    expect(out.update.fields).not.toHaveProperty("role");
   });
 
   it("updates the device of an asset that Fleet created", async () => {
@@ -193,25 +212,27 @@ describe("syncAssets", () => {
 
     await syncAssets(makeCtx());
 
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     const out = await config.transformInputItem(
-      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      input.items[0] as SyncItem,
       "shadow-1",
     );
-    expect(out.updateData).toMatchObject(device);
+    expect(out.update.fields).toMatchObject(device);
+    expect(out.update.apply).toBeUndefined();
   });
 
-  it("leaves the device alone on an asset that another source created", async () => {
+  it("records but doesn't apply the device on an asset that another source created", async () => {
     db.externalAssetMapping.findMany.mockResolvedValue([]);
 
     await syncAssets(makeCtx());
 
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     const out = await config.transformInputItem(
-      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      input.items[0] as SyncItem,
       "shadow-1",
     );
-    expect(out.updateData).not.toHaveProperty("productId");
+    expect(out.update.fields).toMatchObject(device);
+    expect(out.update.apply).toEqual(["serialNumber", "location"]);
   });
 
   it("only asks for the assets that the Fleet user created", async () => {
@@ -228,9 +249,9 @@ describe("syncAssets", () => {
 
     await syncAssets(makeCtx());
 
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     const out = await config.transformInputItem(
-      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      input.items[0] as SyncItem,
       "shadow-1",
     );
     expect(out.uniqueFieldConditions).toEqual([]);
@@ -239,12 +260,12 @@ describe("syncAssets", () => {
   it("skips serial matching for serials shared inside the batch", async () => {
     await syncAssets(makeCtx());
 
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     const gateway = input.items.find(
       (i: { externalId: string }) => i.externalId === "US_1064970627",
     );
     const out = await config.transformInputItem(
-      gateway as Parameters<typeof config.transformInputItem>[0],
+      gateway as SyncItem,
       "shadow-1",
     );
     expect(out.uniqueFieldConditions).toEqual([]);
@@ -300,12 +321,9 @@ describe("product device type", () => {
       },
     });
     await syncAssets(ctx);
-    const [, config, input] = lastSyncCall();
+    const { config, input } = lastSyncCall();
     for (const item of input.items) {
-      await config.transformInputItem(
-        item as Parameters<typeof config.transformInputItem>[0],
-        "shadow-1",
-      );
+      await config.transformInputItem(item as SyncItem, "shadow-1");
     }
   };
 

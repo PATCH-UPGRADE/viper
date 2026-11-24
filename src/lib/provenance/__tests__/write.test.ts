@@ -364,6 +364,24 @@ describe("a PATCH", () => {
     expect(lastChanges()).toEqual([["serialNumber", null, "S1"]]);
   });
 
+  it("records the stated value where another one is applied", async () => {
+    await create({ location: { building: "B" } });
+    await applyObservation(db.tx, {
+      entityType: "ASSET",
+      entityId: "asset_1",
+      kind: "PATCH",
+      origin: user,
+      fields: { location: { room: "1" } },
+      applyAs: { location: { building: "B", room: "1" } },
+    });
+
+    expect(last().fields).toEqual({ location: { room: "1" } });
+    expect(asset().location).toEqual({ building: "B", room: "1" });
+    expect(lastChanges()).toEqual([
+      ["location", { building: "B" }, { building: "B", room: "1" }],
+    ]);
+  });
+
   it("isn't what a later SNAPSHOT is compared to", async () => {
     await patch({ hostname: "ct-9" }, fleet);
     await snapshot({ hostname: "ct-1", location: { facility: "ICU" } });

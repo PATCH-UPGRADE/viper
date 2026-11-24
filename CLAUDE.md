@@ -332,6 +332,8 @@ Typical shape: `new ChatOpenAI({ model, useResponsesApi: true, reasoning: { effo
     * The issue is linked to a device group matching that applies to that asset's manufacturer, product, and version, and there is no issue that overrides it
     * The issue is directly linked to the asset
 - `Observation` / `FieldChange`: Provenance, both append-only. An `Observation` is what one source said about one tracked entity, and a `FieldChange` is one field of it changing. Only the functions in `src/lib/provenance/write.ts` write them. Each tracked model has a map there that marks every column and relation `tracked` or `ignored`, so adding one to the schema is a compile error until you mark it.
+  - **Create, update and delete an `Asset` only through those functions.** The client from `@/lib/db` has no write methods for it. `asRaw` in `src/lib/db-raw.ts` gives them back, and only the provenance functions, tests and `scripts/` may import it. Never write an asset as a nested write of another model, because the types can't block that.
+  - Pass who made the write as the `origin`: `requestOrigin(ctx.auth)` in a router, `sourceRecordOrigin(id)` for values extracted from a source record. `processIntegrationSync` makes its own from the `SyncRun` it gets.
 
 **Model relationships**: `Asset` → `Manufacturer` / `Product` / `Version` is the concrete identity; `DeviceGroupMatching` is the parallel *rule* construct (there is no direct FK between `Asset` and `DeviceGroupMatching`: `matchingAppliesToDevice` in `src/lib/device-matching.ts` resolves a rule to assets, in memory for VERS ranges). `Issue` joins a `Vulnerability` to either a `DeviceGroupMatching` (class-level) or a specific `Asset` (which overrides the class-level record).
 

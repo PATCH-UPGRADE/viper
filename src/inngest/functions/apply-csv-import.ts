@@ -87,12 +87,13 @@ async function loadImportJob(importId: string) {
   };
 }
 
-async function readPlanAndFailures(importId: string) {
+async function readImport(importId: string) {
   const csvImport = await prisma.csvImport.findUniqueOrThrow({
     where: { id: importId },
-    select: { plan: true, failures: true },
+    select: { plan: true, failures: true, createdAt: true },
   });
   return {
+    createdAt: csvImport.createdAt,
     plan: importPlanSchema.parse(csvImport.plan),
     recordedFailures: recordedFailuresSchema.parse(csvImport.failures),
   };
@@ -144,7 +145,7 @@ async function saveAliasesFor(
 }
 
 async function saveConfirmedAliases(job: ImportJob) {
-  const { plan } = await readPlanAndFailures(job.importId);
+  const { plan } = await readImport(job.importId);
   const { manufacturerSpellings, productSpellings } =
     await readNameSpellings(job);
   const skippedManufacturerAliases = await saveAliasesFor(
@@ -205,7 +206,7 @@ async function applyStagedChunk(
   chunkIndex: number,
   appliedBeforeChunk: AppliedCounts,
 ) {
-  const { plan, recordedFailures } = await readPlanAndFailures(job.importId);
+  const { plan, recordedFailures, createdAt } = await readImport(job.importId);
   const recordedReasonByRow = new Map(
     recordedFailures.map((failure) => [failure.rowNumber, failure.reason]),
   );
@@ -230,6 +231,7 @@ async function applyStagedChunk(
     importId: job.importId,
     integrationId: job.integrationId,
     userId: job.userId,
+    observedAt: createdAt,
     rows,
     outcomes,
     context,

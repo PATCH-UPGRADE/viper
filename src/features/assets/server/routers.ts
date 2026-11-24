@@ -29,6 +29,7 @@ import {
   type PaginationInput,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { assetColumns } from "@/lib/provenance/asset";
 import { requestOrigin } from "@/lib/provenance/origin";
 import {
   applyObservation,
@@ -138,19 +139,18 @@ function createAsset(
   {
     device: _device,
     deviceType: _deviceType,
-    utilization,
     ...input
   }: z.infer<typeof assetInputSchema>,
   device: Awaited<ReturnType<typeof deviceInputToAsset>>,
 ) {
-  const fields = { ...input, utilization: utilization ?? undefined, ...device };
+  const fields = { ...input, ...device };
   return createWithObservation(
     tx,
     { entityType: "ASSET", fields, origin: requestOrigin(auth) },
     (raw) =>
       raw.asset.create({
         // TODO VW-605 (PR 5): `userId` goes, with the column.
-        data: { ...fields, userId: auth.user.id },
+        data: { ...assetColumns(fields), userId: auth.user.id },
         include: assetInclude,
       }),
   );
@@ -647,6 +647,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
+      const observedAt = new Date();
       // The token is one-time: reject unknown slugs before it is spent, so
       // the partner can retry the batch with the same token.
       const applyDeviceType = await prepareDeviceTypeSlugs(
@@ -660,8 +661,7 @@ export const assetsRouter = createTRPCRouter({
 
       return processAssetIntegrationSync(
         input,
-        userId,
-        integrationId,
+        { userId, integrationId, observedAt },
         applyDeviceType,
       );
     }),

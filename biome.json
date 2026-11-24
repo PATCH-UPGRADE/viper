@@ -26,7 +26,23 @@
         "useSemanticElements": "warn"
       },
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["**/db-raw"],
+                "message": "Only the provenance functions may write a tracked model. Use applyObservation, createWithObservation or deleteWithObservation."
+              },
+              {
+                "group": ["**/generated/prisma", "**/generated/prisma/**"],
+                "importNamePattern": "PrismaClient",
+                "message": "Import the client from @/lib/db, which can't write tracked models."
+              }
+            ]
+          }
+        }
       }
     },
     "domains": {
@@ -40,5 +56,64 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/lib/db.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/db-raw"],
+                    "message": "Only the provenance functions may write a tracked model. Use applyObservation, createWithObservation or deleteWithObservation."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/lib/provenance/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/generated/prisma", "**/generated/prisma/**"],
+                    "importNamePattern": "PrismaClient",
+                    "message": "Import the client from @/lib/db, which can't write tracked models."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__tests__/**",
+        "tests/**",
+        "scripts/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    }
+  ]
 }

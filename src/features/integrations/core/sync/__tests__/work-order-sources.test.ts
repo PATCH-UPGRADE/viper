@@ -182,6 +182,7 @@ describe("ingestPulledWorkOrders", () => {
   const options = {
     integrationId: "int-1",
     integrationUserId: "user-1",
+    observedAt: new Date("2026-11-01T00:00:00Z"),
     sourceLabel: "ServiceNow",
   };
   const response = {
@@ -198,14 +199,15 @@ describe("ingestPulledWorkOrders", () => {
   it("maps each item onto the ticket fields with the source label", async () => {
     await ingestPulledWorkOrders([pulled], options);
 
-    const [, config, input, userId, integrationId, resource] =
+    const [config, input, run, resource] =
       mockProcessIntegrationSync.mock.calls[0];
     expect(input).toEqual({ items: [pulled] });
-    expect([userId, integrationId, resource]).toEqual([
-      "user-1",
-      "int-1",
-      ResourceType.WorkOrder,
-    ]);
+    expect(run).toEqual({
+      userId: "user-1",
+      integrationId: "int-1",
+      observedAt: options.observedAt,
+    });
+    expect(resource).toBe(ResourceType.WorkOrder);
 
     const fields = {
       summary: pulled.summary,
@@ -228,7 +230,7 @@ describe("ingestPulledWorkOrders", () => {
     const { category: _, ...withoutCategory } = pulled;
     await ingestPulledWorkOrders([withoutCategory], options);
 
-    const [, config] = mockProcessIntegrationSync.mock.calls[0];
+    const [config] = mockProcessIntegrationSync.mock.calls[0];
     const { createData, updateData } = await config.transformInputItem(
       withoutCategory,
       "user-1",
@@ -242,7 +244,7 @@ describe("ingestPulledWorkOrders", () => {
 
     await ingestPulledWorkOrders([pulled, newer], options);
 
-    expect(mockProcessIntegrationSync.mock.calls[0][2]).toEqual({
+    expect(mockProcessIntegrationSync.mock.calls[0][1]).toEqual({
       items: [newer],
     });
   });

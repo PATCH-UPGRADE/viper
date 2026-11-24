@@ -12,6 +12,7 @@ import {
   VulnerabilitySource,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { asRaw } from "@/lib/db-raw";
 import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
 import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 
@@ -214,9 +215,9 @@ async function seedFixture(userId: string) {
       where: { serialNumber: spec.serialNumber },
     });
     if (existing) {
-      await prisma.asset.update({ where: { id: existing.id }, data });
+      await asRaw(prisma).asset.update({ where: { id: existing.id }, data });
     } else {
-      await prisma.asset.create({ data });
+      await asRaw(prisma).asset.create({ data });
     }
   }
 

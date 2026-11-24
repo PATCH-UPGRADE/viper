@@ -42,16 +42,22 @@ export async function ingestPulledWorkOrders(
   {
     integrationId,
     integrationUserId,
+    observedAt,
     sourceLabel,
-  }: { integrationId: string; integrationUserId: string; sourceLabel: string },
+  }: {
+    integrationId: string;
+    integrationUserId: string;
+    observedAt: Date;
+    sourceLabel: string;
+  },
 ): Promise<IntegrationResponse> {
   const items = [
     ...new Map(allItems.map((item) => [item.externalId, item])).values(),
   ];
 
   const response = await processIntegrationSync(
-    prisma,
     {
+      // TODO VW-605 (PR 8): `entityType: "WORK_ORDER"` in place of the delegates.
       model: prisma.workOrderTicket,
       mappingModel: prisma.externalWorkOrderMapping,
       mappingRelation: "externalMapping",
@@ -89,8 +95,7 @@ export async function ingestPulledWorkOrders(
       },
     },
     { items },
-    integrationUserId,
-    integrationId,
+    { userId: integrationUserId, integrationId, observedAt },
     ResourceType.WorkOrder,
   );
   await recordWorkOrderSources(items, integrationId);

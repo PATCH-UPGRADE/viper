@@ -152,7 +152,8 @@ export async function deleteWithObservation<E extends TrackedEntityType, Row>(
   remove: (raw: RawTransactionClient) => Promise<Row>,
 ): Promise<Row> {
   const write = startWrite(tx, params);
-  await lockAndRead(write);
+  await write.def.lockForDelete(tx, params.entityId);
+  await readGolden(write);
   await insertObservation(write, "TOMBSTONE", {});
   return remove(asRaw(tx));
 }

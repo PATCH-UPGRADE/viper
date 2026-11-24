@@ -37,7 +37,7 @@
               },
               {
                 "group": ["**/generated/prisma", "**/generated/prisma/**"],
-                "importNamePattern": "PrismaClient",
+                "importNamePattern": "PrismaClient|[*]",
                 "message": "Import the client from @/lib/db, which can't write tracked models."
               }
             ]
@@ -89,7 +89,7 @@
                 "patterns": [
                   {
                     "group": ["**/generated/prisma", "**/generated/prisma/**"],
-                    "importNamePattern": "PrismaClient",
+                    "importNamePattern": "PrismaClient|[*]",
                     "message": "Import the client from @/lib/db, which can't write tracked models."
                   }
                 ]

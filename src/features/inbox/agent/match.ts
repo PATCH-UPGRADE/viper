@@ -15,6 +15,7 @@ import prisma, { type TransactionClient } from "@/lib/db";
 import { matchingVersionFields } from "@/lib/device-matching";
 import { createChatModel } from "@/lib/llm/chat-model";
 import { deviceIdentityInline } from "@/lib/markdown";
+import { assetEntity } from "@/lib/provenance/asset";
 import { sourceRecordOrigin } from "@/lib/provenance/origin";
 import { resolveMatchingId } from "@/lib/router-utils";
 import { notRejected } from "../types";
@@ -356,7 +357,20 @@ export async function applyDecisions(
   // which an "update" decision's description write holds locked until then.
   const pendingCvss: Parameters<typeof recordInboxCvss>[0][] = [];
 
+  const assetIdsToEnrich = new Set(
+    (assetOrigin ? decisions.filter(statesAssetIdentifiers) : []).flatMap(
+      ({ targetId }) =>
+        targetId && validIds.asset.has(targetId) ? [targetId] : [],
+    ),
+  );
+
   const apply = async (tx: TransactionClient) => {
+    // Up front and in one order. Two records that name the same assets in
+    // different orders would deadlock.
+    for (const assetId of [...assetIdsToEnrich].sort()) {
+      await assetEntity.lock(tx, assetId);
+    }
+
     for (const decision of decisions) {
       // Hard guard: the pipeline never writes Confirmed.
       const confidence: ConfidenceLevel =

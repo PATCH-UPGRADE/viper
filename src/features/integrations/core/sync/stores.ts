@@ -5,16 +5,18 @@ import prisma, {
   type TransactionClient,
 } from "@/lib/db";
 import { assetColumns } from "@/lib/provenance/asset";
-import type {
-  ApplyUnit,
-  EntityInputs,
-  TrackedEntityType,
+import {
+  type ApplyUnit,
+  ENTITIES,
+  type EntityInputs,
+  type TrackedEntityType,
 } from "@/lib/provenance/entities";
 import type { IntegrationOrigin } from "@/lib/provenance/types";
 import {
   applyObservation,
   createWithObservation,
 } from "@/lib/provenance/write";
+import { requireExistence } from "@/trpc/middleware";
 
 /** A mapping row, without the item it points at. */
 export interface MappingData {
@@ -173,7 +175,11 @@ const TRACKED_MODELS: { [E in TrackedEntityType]: TrackedModel<E> } = {
   },
 };
 
-/** Writes through the provenance functions. Each update is a SNAPSHOT. */
+/**
+ * Writes through the provenance functions. Each update is a SNAPSHOT. It comes
+ * before the mapping write, because it locks the item: a delete also locks the
+ * item before its mappings, so the other order would deadlock with it.
+ */
 export function trackedStore<E extends TrackedEntityType>(
   entityType: E,
   origin: IntegrationOrigin,
@@ -199,8 +205,8 @@ export function trackedStore<E extends TrackedEntityType>(
       uniqueFieldConditions.length > 0
         ? model.findItem(uniqueFieldConditions)
         : null,
-    create: async ({ create }, mapping) => {
-      if (!create) throw new Error(`${entityType} to update doesn't exist`);
+    create: async (write, mapping) => {
+      const create = requireExistence(write.create, ENTITIES[entityType].model);
       return prisma.$transaction((tx) =>
         createWithObservation(
           tx,
@@ -211,13 +217,13 @@ export function trackedStore<E extends TrackedEntityType>(
     },
     update: (write, { id, itemId }, mapping) =>
       prisma.$transaction(async (tx) => {
-        await model.updateMapping(tx, id, syncFields(mapping));
         await snapshot(tx, itemId, write);
+        await model.updateMapping(tx, id, syncFields(mapping));
       }),
     link: (write, itemId, mapping) =>
       prisma.$transaction(async (tx) => {
-        await model.createMapping(tx, itemId, mapping);
         await snapshot(tx, itemId, write);
+        await model.createMapping(tx, itemId, mapping);
       }),
   };
 }

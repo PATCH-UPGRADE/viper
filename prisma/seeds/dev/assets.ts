@@ -476,6 +476,7 @@ export async function seedAssets(userId: string) {
       await createWithObservation(
         tx,
         { entityType: "ASSET", fields, origin },
+        // TODO VW-605 (PR 5): `userId` goes, with the column.
         (raw) => raw.asset.create({ data: { id, ...fields, userId } }),
       );
     });

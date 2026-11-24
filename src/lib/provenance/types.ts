@@ -82,6 +82,8 @@ export interface EntityDefinition<M extends Prisma.ModelName> {
   };
   /** Locks the row until the transaction ends. */
   lock(tx: ProvenanceTransaction, id: string): Promise<unknown>;
+  /** The lock of a transaction that deletes the row. */
+  lockForDelete(tx: ProvenanceTransaction, id: string): Promise<unknown>;
   /** Reads at least the tracked columns. */
   read(
     tx: ProvenanceTransaction,

@@ -19,6 +19,7 @@ import {
 } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
+// TODO VW-605 (PR 5): read who created the asset from its CREATE observation.
 /**
  * The equipment whose device ids an update may change: the assets that Fleet
  * created. An asset that another source created keeps that source's device.

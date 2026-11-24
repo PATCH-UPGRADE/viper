@@ -1,4 +1,5 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import {
   type ArtifactType,
   type ResourceType,
@@ -32,6 +33,7 @@ import {
 
 export const handlePrismaError = (e: unknown): string => {
   if (
+    e instanceof TRPCError ||
     e instanceof PrismaClientKnownRequestError ||
     e instanceof PrismaClientValidationError
   ) {

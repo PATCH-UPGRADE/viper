@@ -237,6 +237,42 @@ describe("processIntegrationSync — tracked models", () => {
     });
   });
 
+  it.each([
+    { name: "updates", mapped: true, write: "update" },
+    { name: "maps", mapped: false, write: "create" },
+  ] as const)(
+    "locks the item before it $name it, as a delete does",
+    async ({ mapped, write }) => {
+      mockPrisma.externalAssetMapping.findFirst.mockResolvedValue(
+        mapped ? { id: "map-1", itemId: "item-9" } : null,
+      );
+      mockPrisma.asset.findFirst.mockResolvedValue({ id: "item-9" });
+
+      await run(config, items(1));
+
+      expect(provenance.applyObservation).toHaveBeenCalledBefore(
+        mockPrisma.externalAssetMapping[write],
+      );
+    },
+  );
+
+  it("says why an item that may not be created failed", async () => {
+    const response = await run(
+      {
+        ...config,
+        transformInputItem: async () => ({
+          create: null,
+          update,
+          uniqueFieldConditions: [],
+        }),
+      },
+      items(1),
+    );
+
+    expect(response.message).toBe("1 of 1 items failed: Asset not found");
+    expect(provenance.createWithObservation).not.toHaveBeenCalled();
+  });
+
   it("maps an item that the same properties identify", async () => {
     mockPrisma.asset.findFirst.mockResolvedValue({ id: "item-9" });
 

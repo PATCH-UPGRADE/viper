@@ -1,5 +1,4 @@
 import "server-only";
-import { TRPCError } from "@trpc/server";
 import type { z } from "zod";
 import {
   handlePrismaError,
@@ -19,9 +18,6 @@ import {
 type IntegrationVulnerabilityItem = z.infer<
   typeof integrationVulnerabilityInputSchema
 >["items"][number];
-
-const errorMessage = (error: unknown) =>
-  error instanceof TRPCError ? error.message : handlePrismaError(error);
 
 /**
  * Upsert the vulnerability records an integration sends. Each item is one record, keyed by the
@@ -111,7 +107,7 @@ export async function processVulnerabilityIntegrationSync(
       response.createdItemsCount++;
     } catch (error) {
       console.error("vulnerability record sync failed", { externalId, error });
-      errors.push(errorMessage(error));
+      errors.push(handlePrismaError(error));
     }
   }
 

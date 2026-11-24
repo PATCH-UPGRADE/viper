@@ -41,7 +41,7 @@ function makeTx() {
       ]),
     );
 
-  const queryRaw = vi.fn(async () => []);
+  const queryRaw = vi.fn(async (_sql: TemplateStringsArray, _id: string) => []);
   const findAsset = vi.fn(
     async ({ where }: { where: { id: string } }) =>
       assets.get(where.id) ?? null,
@@ -483,6 +483,19 @@ describe("deleteWithObservation", () => {
     expect(last()).toMatchObject({ fields: {}, actorUserId: "user_1" });
     expect(lastChanges()).toEqual([]);
     expect(db.fieldChanges).toHaveLength(1);
+  });
+
+  it("takes the lock that DELETE needs, so it never upgrades one", async () => {
+    await create({ hostname: "ct-1" });
+    await deleteWithObservation(
+      db.tx,
+      { entityType: "ASSET", entityId: "asset_1", origin: user },
+      (raw) => raw.asset.delete({ where: { id: "asset_1" } }),
+    );
+    expect(db.queryRaw).toHaveBeenCalledExactlyOnceWith(
+      [expect.stringContaining("id = "), " FOR UPDATE"],
+      "asset_1",
+    );
   });
 
   it("doesn't call the callback for an entity that doesn't exist", async () => {

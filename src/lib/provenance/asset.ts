@@ -91,6 +91,10 @@ export const assetEntity = {
   // so two transactions that each add a mapping first would deadlock.
   lock: (tx, id) =>
     tx.$queryRaw`SELECT 1 FROM asset WHERE id = ${id} FOR NO KEY UPDATE`,
+  // The lock that DELETE takes. Upgrading to it later would deadlock with a
+  // transaction that adds a mapping and then locks the asset.
+  lockForDelete: (tx, id) =>
+    tx.$queryRaw`SELECT 1 FROM asset WHERE id = ${id} FOR UPDATE`,
   read: (tx, id) =>
     tx.asset.findUnique({ where: { id }, omit: { utilization: true } }),
   update: (tx, id, data) =>

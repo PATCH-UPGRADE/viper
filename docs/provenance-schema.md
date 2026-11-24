@@ -269,10 +269,10 @@ createWithObservation(tx, …, (raw) => raw.workOrderTicket.create({ … }));  /
   provenance functions. Platforms never hold a client that can write. Untracked models, like remediations, still
   pass their delegate.
 
-A Biome `noRestrictedImports` rule blocks importing `db-raw`, and importing `PrismaClient` from the generated
-client. Its overrides are `db.ts` for `PrismaClient`, the provenance module for `db-raw`, and tests and `scripts/`
-for both. It must use `patterns`, because `paths` misses relative imports. CI already runs `tsc --noEmit` and
-`biome ci`.
+A Biome `noRestrictedImports` rule blocks importing `db-raw`, and importing `PrismaClient` or a namespace
+(`import * as`) from the generated client. Its overrides are `db.ts` for `PrismaClient`, the provenance module for
+`db-raw`, and tests and `scripts/` for both. It must use `patterns`, because `paths` misses relative imports. CI
+already runs `tsc --noEmit` and `biome ci`.
 
 Two helpers in the provenance module cover the writes that need no observation, so `src/` has no other overrides:
 
@@ -599,6 +599,7 @@ the code.
 | The callbacks of `createWithObservation` and `deleteWithObservation` get `tx` itself, and not `asRaw(tx)` | 2 | 4 |
 | `Asset.userId` and `Asset.user` are in the asset map | 2 | 5 |
 | Asset writes and syncs still set `Asset.userId` | 3, 4 | 5 |
+| `fleetCreatedEquipmentKeys` reads who created an asset from `Asset.userId` | 4 | 5 |
 | `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
 | The asset seeds use `applyObservation` to update only `utilization`, and not `updateIgnoredFields` | 3 | 10 |
 | `processIntegrationSync` still takes a `userId` | 4 | 7 |

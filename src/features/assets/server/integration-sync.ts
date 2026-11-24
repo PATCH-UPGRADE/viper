@@ -8,7 +8,7 @@ import {
   processIntegrationSync,
   type SyncRun,
 } from "@/features/integrations/core/sync/upsert";
-import { ResourceType } from "@/generated/prisma";
+import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceInputToAsset } from "@/lib/router-utils";
 import type { integrationAssetInputSchema } from "../types";
@@ -16,6 +16,26 @@ import type { integrationAssetInputSchema } from "../types";
 type IntegrationAssetItem = z.infer<
   typeof integrationAssetInputSchema
 >["items"][number];
+
+/** The product of the asset that a synced item is about, if VIPER has it. */
+async function currentProductId(
+  integrationId: string,
+  externalId: string,
+  uniqueFieldConditions: Prisma.AssetWhereInput[],
+): Promise<string | null> {
+  const mapping = await prisma.externalAssetMapping.findFirst({
+    where: { integrationId, externalId },
+    select: { item: { select: { productId: true } } },
+  });
+  if (mapping) return mapping.item.productId;
+  if (uniqueFieldConditions.length === 0) return null;
+
+  const asset = await prisma.asset.findFirst({
+    where: { OR: uniqueFieldConditions },
+    select: { productId: true },
+  });
+  return asset?.productId ?? null;
+}
 
 export function processAssetIntegrationSync(
   input: { items: IntegrationAssetItem[] },
@@ -30,7 +50,7 @@ export function processAssetIntegrationSync(
       transformInputItem: async (item: IntegrationAssetItem, userId) => {
         const {
           device: deviceInput,
-          externalId: _externalId,
+          externalId,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           deviceType,
@@ -41,7 +61,6 @@ export function processAssetIntegrationSync(
           deviceInput === undefined
             ? undefined
             : await deviceInputToAsset(deviceInput);
-        await applyDeviceType(device?.productId ?? null, deviceType);
 
         const uniqueFields = [
           "hostname",
@@ -51,6 +70,17 @@ export function processAssetIntegrationSync(
         const uniqueFieldConditions = uniqueFields
           .filter((field) => itemData[field])
           .map((field) => ({ [field]: itemData[field] }));
+
+        if (deviceType) {
+          const productId = device
+            ? device.productId
+            : await currentProductId(
+                run.integrationId,
+                externalId,
+                uniqueFieldConditions,
+              );
+          await applyDeviceType(productId, deviceType);
+        }
 
         const fields = { ...itemData, ...device };
         return {

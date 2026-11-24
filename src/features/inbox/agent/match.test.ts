@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
+const { mockPrisma, recordInboxCvss, mockEnrich } = vi.hoisted(() => {
   const prisma = {
     sourceRecordDeviceGroupMapping: {
       upsert: vi.fn(),
@@ -25,6 +25,8 @@ const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
     },
     sourceRecordRemediationMapping: { upsert: vi.fn() },
     remediation: { findUnique: vi.fn(), update: vi.fn() },
+    sourceRecordAssetMapping: { upsert: vi.fn() },
+    $queryRaw: vi.fn(async (_sql: TemplateStringsArray, _id: string) => []),
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
     // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
@@ -32,7 +34,11 @@ const { mockPrisma, recordInboxCvss } = vi.hoisted(() => {
       cb(prisma),
     ),
   };
-  return { mockPrisma: prisma, recordInboxCvss: vi.fn() };
+  return {
+    mockPrisma: prisma,
+    recordInboxCvss: vi.fn(),
+    mockEnrich: vi.fn(),
+  };
 });
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
@@ -40,6 +46,10 @@ vi.mock("@/lib/router-utils", () => ({ resolveMatchingId: vi.fn() }));
 vi.mock("../utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../utils")>()),
   recordInboxCvss,
+  enrichAssetIdentifiers: mockEnrich,
+}));
+vi.mock("@/lib/provenance/origin", () => ({
+  sourceRecordOrigin: vi.fn(async () => ({ source: "EMAIL" })),
 }));
 
 import { notRejected } from "../types";
@@ -640,5 +650,49 @@ describe("applyDecisions — a record extracted into a work order", () => {
     expect(mockPrisma.sourceRecordRemediationMapping.upsert).toHaveBeenCalled();
     expect(mockPrisma.remediation.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.remediation.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDecisions — asset locks", () => {
+  const assetDecision = (targetId: string): Decision => ({
+    kind: "asset",
+    op: "link",
+    targetId,
+    confidence: "Matched",
+    reasonWhy: "same serial number",
+    fields: { serialNumber: `sn-${targetId}` },
+  });
+  const assetCandidates = {
+    ...candidates,
+    assets: [{ extracted: {}, matches: [{ id: "a-1" }, { id: "a-2" }] }],
+  } as unknown as Candidates;
+  const lockedIds = () => mockPrisma.$queryRaw.mock.calls.map(([, id]) => id);
+
+  it("locks in one order, before any write, whatever order the LLM used", async () => {
+    await applyDecisions(
+      { sourceRecordId: "src-1" },
+      ["a-2", "a-1", "hallucinated", "a-2"].map(assetDecision),
+      assetCandidates,
+    );
+
+    expect(lockedIds()).toEqual(["a-1", "a-2"]);
+    expect(mockPrisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      mockPrisma.sourceRecordAssetMapping.upsert.mock.invocationCallOrder[0],
+    );
+    expect(mockEnrich.mock.calls.map(([, { assetId }]) => assetId)).toEqual([
+      "a-2",
+      "a-1",
+      "a-2",
+    ]);
+  });
+
+  it("locks nothing for a record that doesn't edit assets", async () => {
+    await applyDecisions(
+      { sourceRecordId: "src-1", workOrderTicketId: "wo-1" },
+      [assetDecision("a-1")],
+      assetCandidates,
+    );
+
+    expect(lockedIds()).toEqual([]);
   });
 });

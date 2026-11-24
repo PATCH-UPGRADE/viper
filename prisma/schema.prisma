@@ -2190,7 +2190,7 @@ model Question {
 }
 
 // ─── Provenance ────────────────────────────────────────────────────────────
-// Written only by src/lib/provenance. See docs/provenance-schema.md.
+// Written only by src/lib/provenance.
 
 /// Where an Observation came from.
 enum ProvenanceSource {
@@ -2228,9 +2228,7 @@ model Observation {
 
   source ProvenanceSource
 
-  // Only for source = INTEGRATION. Integrations are hard deleted, which nulls integrationId. The row
-  // still has source = INTEGRATION and integrationName, so it never reads as another source.
-  integrationId   String?
+  integrationId   String? // for source=INTEGRATION
   integration     Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
   integrationName String? // snapshot; set exactly when source = INTEGRATION (CHECK constraint in raw SQL)
 
@@ -2246,7 +2244,7 @@ model Observation {
   // Every tracked field the source stated, normalized to our field names; compared for the source delta.
   // `{}` on a TOMBSTONE.
   fields Json
-  raw    Json? // the exact payload, only for work orders from an integration; TODO: keep PHI/PII concerns in mind
+  raw    Json? // the exact payload
 
   observedAt DateTime @default(now()) // the same for every observation of one sync
 
@@ -2267,7 +2265,6 @@ model FieldChange {
   id  String @id @default(cuid())
   seq Int    @default(autoincrement()) // the order rows were written in
 
-  // No foreign key: entityId can point at any tracked model, and the history outlives the entity.
   entityType ProvenanceEntityType
   entityId   String
   field      String // the column name, e.g. "serialNumber", "assigneeId", "assets"

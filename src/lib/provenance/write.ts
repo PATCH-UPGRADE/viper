@@ -26,8 +26,7 @@ import {
 
 /**
  * The only way to create, update or delete a tracked entity. Each function
- * writes the golden record and its history in the caller's transaction. See
- * docs/provenance-schema.md.
+ * writes the golden record and its history in the caller's transaction.
  */
 
 interface WriteParams {

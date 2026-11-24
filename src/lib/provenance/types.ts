@@ -14,7 +14,7 @@ export type IntegrationOrigin = {
   actorUserId?: string;
 };
 
-/** Where a write came from. See "what source a write has" in docs/provenance-schema.md. */
+/** Where a write came from. */
 export type ObservationOrigin =
   | IntegrationOrigin
   | {

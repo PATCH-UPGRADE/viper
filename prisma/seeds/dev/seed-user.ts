@@ -25,10 +25,12 @@ export async function createOrGetSeedUser() {
   }
 
   const hashedPassword = await hashPassword(SEED_USER.password);
+  // Better Auth rejects a credential account unless its accountId is the user id
+  const userId = crypto.randomUUID();
 
   user = await prisma.user.create({
     data: {
-      id: crypto.randomUUID(),
+      id: userId,
       email: SEED_USER.email,
       name: SEED_USER.name,
       phone: SEED_USER.phone,
@@ -36,7 +38,7 @@ export async function createOrGetSeedUser() {
       accounts: {
         create: {
           id: crypto.randomUUID(),
-          accountId: SEED_USER.email,
+          accountId: userId,
           providerId: "credential",
           password: hashedPassword,
         },

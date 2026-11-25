@@ -7,6 +7,7 @@ const { mockPrisma, mockProcessIntegrationSync, mockDelete } = vi.hoisted(
   () => ({
     mockPrisma: {
       $transaction: vi.fn(),
+      assetTicket: { count: vi.fn() },
       externalWorkOrderMapping: { findMany: vi.fn() },
       workOrderTicket: { findMany: vi.fn(), delete: vi.fn() },
     },
@@ -120,6 +121,7 @@ describe("deletePulledWorkOrders", () => {
 
   beforeEach(() => {
     mockPrisma.$transaction.mockImplementation((fn) => fn(mockPrisma));
+    mockPrisma.assetTicket.count.mockResolvedValue(0);
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
     mockDelete.mockImplementation((tx, _params, remove) => remove(tx));
   });
@@ -142,6 +144,19 @@ describe("deletePulledWorkOrders", () => {
       })),
     );
     expect(deletedIds()).toEqual(["sub-1", "ticket-1"]);
+  });
+
+  it("allows more time for a ticket with more asset sub-tickets", async () => {
+    mockPrisma.assetTicket.count.mockResolvedValue(100);
+
+    await deletePulledWorkOrders(run, ["sys-1"]);
+
+    expect(mockPrisma.assetTicket.count).toHaveBeenCalledWith({
+      where: { parentTicketId: "ticket-1" },
+    });
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.anything(), {
+      timeout: 35_000,
+    });
   });
 
   it("goes on after a ticket that is already gone", async () => {

@@ -93,6 +93,11 @@ export async function listMappedWorkOrders(
   return mappings.map((mapping) => mapping.externalId);
 }
 
+// Deleting a ticket takes about six sequential queries, and a ticket can have
+// any number of asset sub-tickets.
+const DELETE_TIMEOUT_MS = 5_000;
+const DELETE_TIMEOUT_PER_SUB_TICKET_MS = 300;
+
 /**
  * Delete the tickets of records that the platform deleted.
  *
@@ -115,15 +120,23 @@ export async function deletePulledWorkOrders(
   });
   const origin = await integrationOrigin(run);
   for (const { itemId } of mappings) {
-    await prisma.$transaction((tx) =>
-      deleteTicket(tx, itemId, origin, async () => {
-        // The ticket is locked, so it can't get another asset in between.
-        const subTickets = await tx.workOrderTicket.findMany({
-          where: { ticket: { parentTicketId: itemId } },
-          select: { id: true },
-        });
-        for (const { id } of subTickets) await deleteTicket(tx, id, origin);
-      }),
+    const subTicketCount = await prisma.assetTicket.count({
+      where: { parentTicketId: itemId },
+    });
+    await prisma.$transaction(
+      (tx) =>
+        deleteTicket(tx, itemId, origin, async () => {
+          // The ticket is locked, so it can't get another asset in between.
+          const subTickets = await tx.workOrderTicket.findMany({
+            where: { ticket: { parentTicketId: itemId } },
+            select: { id: true },
+          });
+          for (const { id } of subTickets) await deleteTicket(tx, id, origin);
+        }),
+      {
+        timeout:
+          DELETE_TIMEOUT_MS + subTicketCount * DELETE_TIMEOUT_PER_SUB_TICKET_MS,
+      },
     );
   }
 }

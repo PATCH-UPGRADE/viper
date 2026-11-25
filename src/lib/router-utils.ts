@@ -28,7 +28,7 @@ import {
   type PaginationInput,
 } from "./pagination";
 import type { AssetDeviceInput, DeviceInput } from "./schemas";
-import { consumeUserToken } from "./tokens";
+import { consumeIntegrationToken } from "./tokens";
 
 // ============================================================================
 // SORTING
@@ -815,25 +815,25 @@ export async function createArtifactWrappers(
 // ============================================================================
 
 /**
- * Helper: return a userId and the associated integration, or throw an error
- * if invalid
+ * Helper: consume an upload token and return its integration, with the shadow
+ * user that owns the rows it uploads, or throw an error if invalid
  */
 export const processIntegrationToken = async (
   token: string,
-  expectedPermissions: ResourceType,
+  resource: ResourceType,
 ) => {
-  const userId = await consumeUserToken(token, expectedPermissions);
+  const integrationId = await consumeIntegrationToken(token, resource);
   // TODO: probably need better error messages than this tbh
-  if (!userId) {
+  if (!integrationId) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `Invalid token (couldn't find it, expired, or invalid permissions)`,
+      message: `Invalid token (couldn't find it, expired, or wrong resource)`,
     });
   }
   const integration = await prisma.integration.findUnique({
-    where: { integrationUserId: userId },
-    select: { id: true },
+    where: { id: integrationId },
+    select: { integrationUserId: true },
   });
-  const integrationId = requireExistence(integration, "Integration").id;
-  return { userId, integrationId, resource: expectedPermissions };
+  const userId = requireExistence(integration, "Integration").integrationUserId;
+  return { userId, integrationId, resource };
 };

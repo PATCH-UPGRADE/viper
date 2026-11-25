@@ -1,3 +1,4 @@
+import type { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 export const DEFAULT_TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes
@@ -17,20 +18,20 @@ async function hashToken(raw: string): Promise<string> {
 }
 
 /**
- * Creates a new one-time token for a user.
+ * Creates a one-time token that lets an integration upload one resource.
  * Returns the RAW token (shown once, never stored).
  */
-export async function createUserToken(
-  userId: string,
+export async function createIntegrationToken(
+  integrationId: string,
+  resource: ResourceType,
   ttlSeconds = DEFAULT_TOKEN_TTL_SECONDS,
-  permissions?: string,
 ): Promise<string> {
   const raw = generateRawToken();
   const tokenHash = await hashToken(raw);
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
-  await prisma.userToken.create({
-    data: { userId, tokenHash, permissions, expiresAt },
+  await prisma.integrationToken.create({
+    data: { integrationId, tokenHash, resource, expiresAt },
   });
 
   return raw;
@@ -38,33 +39,35 @@ export async function createUserToken(
 
 /**
  * Validates and consumes a one-time token.
- * Returns the userId on success, null on failure/expiry.
+ * Returns the integrationId on success, null on failure/expiry.
  */
-export async function consumeUserToken(
+export async function consumeIntegrationToken(
   raw: string,
-  expectedPermissions?: string,
+  expectedResource: ResourceType,
 ): Promise<string | null> {
   const tokenHash = await hashToken(raw);
 
-  const record = await prisma.userToken.findUnique({
+  const record = await prisma.integrationToken.findUnique({
     where: { tokenHash },
   });
 
   if (!record) return null;
   if (record.expiresAt < new Date()) {
     // Opportunistically clean up this expired record
-    await prisma.userToken.delete({ where: { tokenHash } }).catch(() => {});
+    await prisma.integrationToken
+      .delete({ where: { tokenHash } })
+      .catch(() => {});
     return null;
   }
 
-  // invalid permissions on token
-  if (expectedPermissions && record.permissions !== expectedPermissions) {
-    return null;
-  }
+  if (record.resource !== expectedResource) return null;
 
-  // Delete before returning — token is spent
-  await prisma.userToken.delete({ where: { tokenHash } });
-  return record.userId;
+  // Delete before returning — token is spent. Two requests can both read the
+  // token, and only the one that deletes it may use it.
+  const { count } = await prisma.integrationToken.deleteMany({
+    where: { tokenHash },
+  });
+  return count === 1 ? record.integrationId : null;
 }
 
 /**
@@ -72,7 +75,7 @@ export async function consumeUserToken(
  * Returns the number of rows removed.
  */
 export async function purgeExpiredTokens(): Promise<number> {
-  const { count } = await prisma.userToken.deleteMany({
+  const { count } = await prisma.integrationToken.deleteMany({
     where: { expiresAt: { lt: new Date() } },
   });
   return count;

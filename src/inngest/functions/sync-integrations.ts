@@ -176,7 +176,7 @@ export const syncIntegration = inngest.createFunction(
           lastSuccessfulSync: loaded.lastSuccessfulSync
             ? new Date(loaded.lastSuccessfulSync)
             : null,
-          callback: () => createCallback(loaded.integrationUserId, resource),
+          callback: () => createCallback(integrationId, resource),
         };
 
         // A resource module knows how to sync itself; a platform without one syncs

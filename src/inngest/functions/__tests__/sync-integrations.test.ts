@@ -60,6 +60,13 @@ vi.mock("@/features/integrations/core/credentials", () => ({
   usesGenericAuth: mockUsesGenericAuth,
 }));
 
+const { mockCreateCallback } = vi.hoisted(() => ({
+  mockCreateCallback: vi.fn(),
+}));
+vi.mock("@/features/integrations/core/callback", () => ({
+  createCallback: mockCreateCallback,
+}));
+
 import { Prisma, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import { syncAllIntegrations, syncIntegration } from "../sync-integrations";
 
@@ -323,6 +330,18 @@ describe("syncIntegration — claiming the attempt", () => {
       errorMessage: null,
     });
     expect(args.update.nextSyncAt.getTime()).toBeGreaterThan(Date.now());
+  });
+});
+
+describe("syncIntegration — callback", () => {
+  it("mints the upload token for the integration and resource", async () => {
+    await runSync(makeStep());
+    await mockStrategy.mock.calls[0][0].callback();
+
+    expect(mockCreateCallback).toHaveBeenCalledWith(
+      "integration-1",
+      ResourceType.Asset,
+    );
   });
 });
 

@@ -11,12 +11,12 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { createIntegrationToken } from "@/lib/tokens";
 import {
   ALL_VERSIONS,
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
-  createIntegrationToken,
   deleteAssetsForDevices,
   generateDevice,
   jsonHeader,
@@ -469,7 +469,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       items: [],
     };
     const token = await createIntegrationToken(
-      integration.integrationUserId,
+      integration.id,
       ResourceType.DeviceArtifact,
     );
     const createRes = await request(BASE_URL)
@@ -501,7 +501,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     });
 
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
+      createdIntegration.id,
       ResourceType.DeviceArtifact,
     );
 

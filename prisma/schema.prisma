@@ -36,7 +36,6 @@ model User {
   integration       Integration[]
   integrationUser   Integration?       @relation("integration_user")
   webhooks          Webhook[]
-  userTokens        UserToken[]
   threads           ChatThread[]
   notificationReads NotificationRead[]
   matchFeedback     MatchFeedback[]
@@ -109,19 +108,6 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
-}
-
-model UserToken {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash   String   @unique
-  permissions String? // what can the token be used for?
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
 }
 
 model Workflow {
@@ -1193,6 +1179,7 @@ model Integration {
   integrationUser   User   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
 
   resourceSyncs IntegrationResourceSync[]
+  tokens        IntegrationToken[]
 
   assetMappings          ExternalAssetMapping[]
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
@@ -1248,6 +1235,21 @@ model IntegrationResourceSync {
   @@unique([integrationId, resource])
   @@index([integrationId])
   @@map("integration_resource_sync")
+}
+
+/// A one-time, resource-scoped token that lets an integration push data back.
+model IntegrationToken {
+  id            String       @id @default(cuid())
+  integrationId String
+  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  tokenHash     String       @unique
+  resource      ResourceType // the only resource the token can upload
+  expiresAt     DateTime
+  createdAt     DateTime     @default(now())
+
+  @@index([integrationId])
+  @@index([expiresAt])
+  @@map("integration_token")
 }
 
 enum CsvImportStatus {

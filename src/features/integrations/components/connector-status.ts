@@ -9,6 +9,7 @@ import { resourceTypeLabel } from "../types";
 /** What a row of the configured-integrations table says about one integration, stream or upload. */
 export type ConnectorState =
   | "healthy"
+  | "attention"
   | "failing"
   | "paused"
   | "unknown"
@@ -29,10 +30,8 @@ export interface SyncSchedule {
 
 export interface ConnectorView {
   state: ConnectorState;
-  /** Only set while failing, and only when there is something to say. */
-  errorMessage: string | null;
-  /** Only set while healthy: the last sync succeeded, but its result looks wrong. */
-  warningMessage: string | null;
+  /** The error while failing, or the warning while in need of attention. Null in any other state. */
+  message: string | null;
   /** Last successful sync, or for an upload, when it started. */
   lastAt: Date | null;
   /** Null for an upload, which has no schedule. */
@@ -108,13 +107,26 @@ const pickDate = (
   return times.length ? new Date(choose(...times)) : null;
 };
 
+/** The last sync succeeded, but a warning says that its result looks wrong. */
+const successState = (sync: IntegrationResourceSyncItem): ConnectorState =>
+  sync.warningMessage ? "attention" : "healthy";
+
+const messageFor = (
+  state: ConnectorState,
+  sync: IntegrationResourceSyncItem,
+): string | null => {
+  if (state === "failing") return sync.errorMessage;
+  if (state === "attention") return sync.warningMessage;
+  return null;
+};
+
 const syncState = (
   integration: IntegrationListItem,
   sync: IntegrationResourceSyncItem,
 ): ConnectorState => {
   if (isStreamPaused(integration, sync)) return "paused";
   if (sync.status === SyncStatusEnum.Error) return "failing";
-  if (sync.status === SyncStatusEnum.Success) return "healthy";
+  if (sync.status === SyncStatusEnum.Success) return successState(sync);
   return "unknown";
 };
 
@@ -127,8 +139,7 @@ export const streamView = (
   const paused = state === "paused";
   return {
     state,
-    errorMessage: state === "failing" ? sync.errorMessage : null,
-    warningMessage: state === "healthy" ? sync.warningMessage : null,
+    message: messageFor(state, sync),
     lastAt: sync.lastSuccessfulSync,
     schedule: {
       every: [sync.effectiveSyncEvery],
@@ -141,8 +152,8 @@ export const streamView = (
 
 /**
  * A scheduled integration as a whole. With one stream it is that stream; with several, it is
- * failing if any running stream fails, healthy if any running stream has synced, and paused
- * only when every stream is.
+ * failing if any running stream fails, in need of attention if any has a warning, healthy if any
+ * has synced, and paused only when every stream is.
  */
 export const integrationView = (
   integration: IntegrationListItem,
@@ -159,30 +170,28 @@ export const integrationView = (
   const streams = syncs.map((sync) => streamView(integration, sync));
   const running = streams.filter((stream) => stream.state !== "paused");
   const failing = running.filter((stream) => stream.state === "failing");
+  const attention = running.filter((stream) => stream.state === "attention");
   const state: ConnectorState = isPaused(integration)
     ? "paused"
     : failing.length > 0
       ? "failing"
-      : running.some((stream) => stream.state === "healthy")
-        ? "healthy"
-        : "unknown";
+      : attention.length > 0
+        ? "attention"
+        : running.some((stream) => stream.state === "healthy")
+          ? "healthy"
+          : "unknown";
 
-  const firstError = failing.find(
-    (stream) => stream.errorMessage,
-  )?.errorMessage;
+  const firstError = failing.find((stream) => stream.message)?.message;
   const timingSource = running.length > 0 ? running : streams;
 
   return {
     state,
-    errorMessage:
+    message:
       state === "failing" && firstError
         ? `${failing.length} of ${streams.length} streams failing. ${firstError}`
-        : null,
-    warningMessage:
-      state === "healthy"
-        ? (running.find((stream) => stream.warningMessage)?.warningMessage ??
-          null)
-        : null,
+        : state === "attention"
+          ? attention[0].message
+          : null,
     lastAt: latest(timingSource.map((stream) => stream.lastAt)),
     schedule: {
       every: [...new Set(syncs.map((sync) => sync.effectiveSyncEvery))].sort(
@@ -208,8 +217,7 @@ export const uploadView = (upload: IntegrationListItem): ConnectorView => {
   if (!sync) {
     return {
       state: "unknown",
-      errorMessage: null,
-      warningMessage: null,
+      message: null,
       lastAt: null,
       schedule: null,
       records: recordsOf(upload, []),
@@ -219,12 +227,11 @@ export const uploadView = (upload: IntegrationListItem): ConnectorView => {
     sync.status === SyncStatusEnum.Error
       ? "failing"
       : sync.status === SyncStatusEnum.Success
-        ? "healthy"
+        ? successState(sync)
         : "importing";
   return {
     state,
-    errorMessage: state === "failing" ? sync.errorMessage : null,
-    warningMessage: state === "healthy" ? sync.warningMessage : null,
+    message: messageFor(state, sync),
     lastAt: sync.lastAttemptAt,
     schedule: null,
     records: recordsOf(upload, [sync.resource]),

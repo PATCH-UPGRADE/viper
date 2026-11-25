@@ -183,7 +183,7 @@ describe("syncWorkOrders hidden rows warning", () => {
       return searchParams.get("sysparm_limit") === "1" ? count() : json(rows);
     });
     const ctx = {
-      ...RUN,
+      integrationId: "int-1",
       cursor: null,
       session: { request },
     } as unknown as ResourceSyncCtx<ServiceNowConfig, ServiceNowCreds>;

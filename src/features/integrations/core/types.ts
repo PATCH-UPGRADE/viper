@@ -108,8 +108,8 @@ export interface SyncOutcome {
   cursor: Cursor | null;
   pending?: boolean;
   /**
-   * Shown to the user next to the healthy status: the sync succeeded, but its
-   * result looks wrong. Ignored while `pending`.
+   * The sync succeeded, but its result looks wrong. The user sees "Needs
+   * attention" with this text in a tooltip. Ignored while `pending`.
    */
   warning?: string;
 }

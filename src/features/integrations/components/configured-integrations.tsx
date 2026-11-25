@@ -1,10 +1,9 @@
 "use client";
 
-import { ChevronRightIcon, TriangleAlertIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import ms from "ms";
 import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -45,43 +44,20 @@ const STATE_BADGES: Record<
   { label: string; className: string }
 > = {
   healthy: { label: "Healthy", className: getChipClass("emerald") },
+  attention: { label: "Needs attention", className: getChipClass("amber") },
   failing: { label: "Failing", className: getChipClass("red") },
   paused: { label: "Paused", className: getChipClass("zinc") },
   unknown: { label: "Unknown", className: getChipClass("zinc") },
   importing: { label: "Importing", className: getChipClass("sky") },
 };
 
-/**
- * A failing badge with an error message underlines itself, like an <abbr>, and shows the message
- * on hover or focus. A warning shows in the tooltip of an icon next to the badge.
- */
+/** A badge with a message underlines itself, like an <abbr>, and shows the message on hover or focus. */
 export const StatusBadge = ({
   state,
-  errorMessage,
-  warningMessage,
-}: Pick<ConnectorView, "state" | "errorMessage" | "warningMessage">) => {
+  message,
+}: Pick<ConnectorView, "state" | "message">) => {
   const { label, className } = STATE_BADGES[state];
-  if (warningMessage) {
-    return (
-      <div className="flex items-center gap-1">
-        <Badge className={className}>{label}</Badge>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-6 cursor-help text-amber-600 hover:text-amber-600"
-              aria-label="Sync warning"
-            >
-              <TriangleAlertIcon />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">{warningMessage}</TooltipContent>
-        </Tooltip>
-      </div>
-    );
-  }
-  if (!errorMessage) {
+  if (!message) {
     return <Badge className={className}>{label}</Badge>;
   }
   return (
@@ -97,7 +73,7 @@ export const StatusBadge = ({
           <button type="button">{label}</button>
         </Badge>
       </TooltipTrigger>
-      <TooltipContent className="max-w-xs">{errorMessage}</TooltipContent>
+      <TooltipContent className="max-w-xs">{message}</TooltipContent>
     </Tooltip>
   );
 };
@@ -219,11 +195,7 @@ const ParentRow = ({
       </div>
     </TableCell>
     <TableCell>
-      <StatusBadge
-        state={view.state}
-        errorMessage={view.errorMessage}
-        warningMessage={view.warningMessage}
-      />
+      <StatusBadge state={view.state} message={view.message} />
     </TableCell>
     <LastSyncCell view={view} />
     <RecordsCell view={view} />
@@ -253,11 +225,7 @@ const ChildRow = ({
       </div>
     </TableCell>
     <TableCell>
-      <StatusBadge
-        state={view.state}
-        errorMessage={view.errorMessage}
-        warningMessage={view.warningMessage}
-      />
+      <StatusBadge state={view.state} message={view.message} />
     </TableCell>
     <LastSyncCell view={view} />
     <RecordsCell view={view} />

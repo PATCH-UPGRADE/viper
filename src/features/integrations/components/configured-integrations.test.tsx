@@ -8,17 +8,6 @@ import type {
   IntegrationResourceSyncItem,
 } from "../types";
 
-// The tooltip's arrow measures itself, and jsdom has no ResizeObserver.
-vi.hoisted(() => {
-  if (typeof window.ResizeObserver === "undefined") {
-    window.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
-  }
-});
-
 vi.mock("../hooks/use-integrations", () => {
   const idle = () => ({ mutate: vi.fn(), isPending: false });
   return {
@@ -130,42 +119,35 @@ const rowNamed = (name: string) => {
 };
 
 describe("StatusBadge", () => {
-  it("is a tooltip trigger only when there is an error to show", () => {
+  it("is a tooltip trigger only when there is a message to show", () => {
     const { rerender } = render(
-      <StatusBadge
-        state="failing"
-        errorMessage="401 Unauthorized"
-        warningMessage={null}
-      />,
+      <StatusBadge state="failing" message="401 Unauthorized" />,
     );
     expect(screen.getByRole("button", { name: "Failing" })).toBeInTheDocument();
 
-    rerender(
-      <StatusBadge state="failing" errorMessage={null} warningMessage={null} />,
-    );
+    rerender(<StatusBadge state="failing" message={null} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("Failing")).toBeInTheDocument();
-  });
-
-  it("explains a warning in the tooltip of an icon next to the badge", async () => {
-    const user = userEvent.setup();
-    render(
-      <StatusBadge
-        state="healthy"
-        errorMessage={null}
-        warningMessage="Check permissions"
-      />,
-    );
-
-    expect(screen.getByText("Healthy")).toBeInTheDocument();
-    await user.hover(screen.getByRole("button", { name: "Sync warning" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(
-      "Check permissions",
-    );
   });
 });
 
 describe("ConfiguredIntegrationsTable", () => {
+  it("shows Needs attention instead of Healthy for a sync with a warning", () => {
+    renderTable([
+      {
+        ...partner,
+        resourceSyncs: [
+          sync({ integrationId: "partner", warningMessage: "no rows" }),
+        ],
+      },
+    ]);
+    const row = rowNamed("Blueflow");
+    expect(
+      row.getByRole("button", { name: "Needs attention" }),
+    ).toBeInTheDocument();
+    expect(row.queryByText("Healthy")).not.toBeInTheDocument();
+  });
+
   it("shows Unknown and zero records for an integration that never synced", () => {
     renderTable([partner]);
     const row = rowNamed("Blueflow");

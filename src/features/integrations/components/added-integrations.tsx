@@ -44,7 +44,7 @@ const PickRow = ({
           records={records}
           className="shrink-0 text-right text-xs text-muted-foreground"
         />
-        <StatusBadge state={state} errorMessage={null} warningMessage={null} />
+        <StatusBadge state={state} message={null} />
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
       </button>
     </li>

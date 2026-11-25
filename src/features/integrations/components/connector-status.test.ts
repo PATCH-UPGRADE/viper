@@ -62,8 +62,7 @@ describe("streamView", () => {
     const item = integration([sync()]);
     expect(streamView(item, item.resourceSyncs[0])).toEqual({
       state: "healthy",
-      errorMessage: null,
-      warningMessage: null,
+      message: null,
       lastAt: new Date("2026-08-20T10:00:00Z"),
       schedule: {
         every: [3600],
@@ -87,19 +86,20 @@ describe("streamView", () => {
     ]);
     expect(streamView(item, item.resourceSyncs[0])).toMatchObject({
       state: "failing",
-      errorMessage: "401 Unauthorized",
+      message: "401 Unauthorized",
     });
   });
 
-  it("carries the warning only while healthy", () => {
+  it("needs attention after a successful sync with a warning, unless paused", () => {
     const warned = sync({ warningMessage: "check permissions" });
-    const healthy = integration([warned]);
-    const paused = integration([warned], { enabled: false });
 
-    expect(streamView(healthy, warned).warningMessage).toBe(
-      "check permissions",
-    );
-    expect(streamView(paused, warned).warningMessage).toBeNull();
+    expect(streamView(integration([warned]), warned)).toMatchObject({
+      state: "attention",
+      message: "check permissions",
+    });
+    expect(
+      streamView(integration([warned], { enabled: false }), warned),
+    ).toMatchObject({ state: "paused", message: null });
   });
 
   it("is paused, with no next sync, when the stream or its integration is off", () => {
@@ -122,7 +122,7 @@ describe("streamView", () => {
         enabled: false,
       }),
     ]);
-    expect(streamView(item, item.resourceSyncs[0]).errorMessage).toBeNull();
+    expect(streamView(item, item.resourceSyncs[0]).message).toBeNull();
   });
 });
 
@@ -158,8 +158,7 @@ describe("integrationView", () => {
       integrationView(integration([assets, workOrders, notifications])),
     ).toEqual({
       state: "failing",
-      errorMessage: "1 of 3 streams failing. 504 Gateway timeout",
-      warningMessage: null,
+      message: "1 of 3 streams failing. 504 Gateway timeout",
       lastAt: new Date("2026-08-20T10:00:00Z"),
       schedule: {
         every: [3600, 86_400],
@@ -174,16 +173,18 @@ describe("integrationView", () => {
     });
   });
 
-  it("shows a stream's warning while healthy, and not while another stream fails", () => {
+  it("needs attention over healthy, but failing comes first", () => {
     const warned = { ...assets, warningMessage: "check permissions" };
     const healthy = { ...workOrders, status: SyncStatusEnum.Success };
 
-    expect(integrationView(integration([healthy, warned])).warningMessage).toBe(
-      "check permissions",
-    );
-    expect(
-      integrationView(integration([workOrders, warned])).warningMessage,
-    ).toBeNull();
+    expect(integrationView(integration([healthy, warned]))).toMatchObject({
+      state: "attention",
+      message: "check permissions",
+    });
+    expect(integrationView(integration([workOrders, warned]))).toMatchObject({
+      state: "failing",
+      message: "1 of 2 streams failing. 504 Gateway timeout",
+    });
   });
 
   it("is paused when every stream is paused", () => {

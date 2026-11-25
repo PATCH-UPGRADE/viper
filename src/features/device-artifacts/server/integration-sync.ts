@@ -24,10 +24,7 @@ export function processDeviceArtifactIntegrationSync(
       model: prisma.deviceArtifact,
       mappingModel: prisma.externalDeviceArtifactMapping,
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
-      transformInputItem: async (
-        item: IntegrationDeviceArtifactItem,
-        userId,
-      ) => {
+      transformInputItem: async (item: IntegrationDeviceArtifactItem) => {
         const {
           device,
           externalId: _externalId,
@@ -42,9 +39,6 @@ export function processDeviceArtifactIntegrationSync(
         return {
           createData: {
             ...itemData,
-            user: {
-              connect: { id: userId },
-            },
             deviceGroupMatchings: { connect: matchingConnect },
           },
           updateData: {

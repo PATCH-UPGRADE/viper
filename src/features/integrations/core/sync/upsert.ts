@@ -269,7 +269,7 @@ async function syncItems<TInputItem extends SyncItem, TWrite>(
               artifactsData.artifacts,
               createdItem.id,
               artifactsData.artifactWrapperParentField,
-              userId,
+              null,
             );
           });
         }

@@ -442,7 +442,7 @@ describe("processIntegrationSync — hooks", () => {
       [{ artifactType: "Source" }],
       "item-42",
       "remediationId",
-      "user-1",
+      null,
     );
   });
 });

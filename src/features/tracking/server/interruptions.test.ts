@@ -62,7 +62,7 @@ describe("interruptions scope", () => {
     const detail = await getInterruptionDetail("u1", "wo-1");
     const { select } = mockPrisma.workOrderTicket.findFirst.mock.calls[0][0];
     expect(select.assignee.select.phone).toBe(true);
-    expect(detail.contact.phone).toBe("Ext. 3104");
+    expect(detail.contact?.phone).toBe("Ext. 3104");
   });
 
   it("shows a pending request on the other side of an owner and its device", async () => {

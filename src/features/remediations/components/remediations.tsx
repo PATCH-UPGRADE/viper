@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
+import { ownerName } from "@/features/integrations/owner-name";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { relativeTime } from "@/lib/date-utils";
@@ -394,7 +395,9 @@ export const RemediationCard = ({
         )}
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span>By {remediation.user.name}</span>
+          <span>
+            By {ownerName(remediation.user, remediation.externalMappings)}
+          </span>
           <span>•</span>
           <span>{relativeTime(remediation.createdAt)}</span>
         </div>

@@ -62,7 +62,7 @@ async function ingestRemediations(
       // finalize-sync already records this attempt; a second write double-counts
       // consecutiveFailures.
       shouldRecordSyncOutcome: false,
-      transformInputItem: async (item: MedIsaoRemediationItem, userId) => {
+      transformInputItem: async (item: MedIsaoRemediationItem) => {
         // JSON rather than a joined string: every part is free text, so any
         // separator can appear inside one and let two different identities
         // collide on one cache entry.
@@ -117,8 +117,7 @@ async function ingestRemediations(
         };
 
         return {
-          createData: { ...fields, userId },
-          // Never reassign the creator on re-sync.
+          createData: fields,
           updateData: fields,
           // A remediation has no natural business key, so with no external
           // mapping there is nothing to match on and the record is new.

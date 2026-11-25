@@ -103,7 +103,7 @@ export const remediationResponseSchema = z.object({
   isManufacturerRemediation: z.boolean(),
   impacts: z.array(remediationImpactRowSchema),
   vulnerabilities: z.array(vulnerabilitySchema),
-  user: userSchema,
+  user: userSchema.nullable(),
   artifacts: z.array(artifactWrapperWithUrlsSchema),
   createdAt: z.date(),
   updatedAt: z.date(),

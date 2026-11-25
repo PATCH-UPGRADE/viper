@@ -777,7 +777,8 @@ export async function createArtifactWrappers(
   }>,
   parentId: string,
   parentField: ArtifactWrapperParentFieldOptions,
-  userId: string,
+  /** Null when an integration creates them. */
+  userId: string | null,
 ): Promise<void> {
   for (const artifactInput of artifacts) {
     // Create artifact wrapper
@@ -815,8 +816,8 @@ export async function createArtifactWrappers(
 // ============================================================================
 
 /**
- * Helper: consume an upload token and return its integration, with the shadow
- * user that owns the rows it uploads, or throw an error if invalid
+ * Helper: consume an upload token and return its integration, with its
+ * shadow user, or throw an error if invalid
  */
 export const processIntegrationToken = async (
   token: string,

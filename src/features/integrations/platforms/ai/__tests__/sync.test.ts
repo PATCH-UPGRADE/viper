@@ -124,7 +124,6 @@ describe("aiSync", () => {
 
     expect(mocks.vulnerability).toHaveBeenCalledWith(
       { items: ITEMS },
-      "shadow-1",
       "int-1",
       { shouldRecordSyncOutcome: false, source: "AI" },
     );

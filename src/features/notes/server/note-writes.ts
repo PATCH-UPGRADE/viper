@@ -19,7 +19,7 @@ export async function createNote(
   tx: TransactionClient,
   args: {
     text: string;
-    userId: string;
+    userId: string | null;
     status?: NoteStatus;
     scope?: NoteScope;
   },

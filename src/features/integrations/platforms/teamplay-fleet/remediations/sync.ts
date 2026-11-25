@@ -98,7 +98,7 @@ export async function syncRemediations(
       model: prisma.remediation,
       mappingModel: prisma.externalRemediationMapping,
       shouldRecordSyncOutcome: false,
-      transformInputItem: async (item: FleetRemediationItem, userId) => {
+      transformInputItem: async (item: FleetRemediationItem) => {
         const matchingIds = new Set<string>();
         for (const device of item.devices) {
           const id = await matchingIdFor(device);
@@ -119,7 +119,7 @@ export async function syncRemediations(
         };
 
         return {
-          createData: { ...fields, userId },
+          createData: fields,
           updateData: fields,
           uniqueFieldConditions: [],
           artifactsData: undefined,

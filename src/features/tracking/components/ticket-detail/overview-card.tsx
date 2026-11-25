@@ -89,8 +89,8 @@ const SourceHeader = ({ data }: { data: TicketDetail }) => {
 
 const CreatedFooter = ({ data }: { data: TicketDetail }) => {
   const readOnly = useReadOnly();
-  // An integration work order belongs to the automation. Do not show the
-  // integration user that created the record.
+  // An integration work order belongs to the automation. Do not show its
+  // creator, if it has one.
   const fromAutomation =
     !!data.sourceLabel ||
     data.externalMapping !== null ||
@@ -99,7 +99,7 @@ const CreatedFooter = ({ data }: { data: TicketDetail }) => {
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1">
         Created by{" "}
-        {fromAutomation ? (
+        {fromAutomation || !data.creator ? (
           <span className="inline-flex items-center gap-1">
             <BotIcon className="size-3.5" />
             VIPER Automation

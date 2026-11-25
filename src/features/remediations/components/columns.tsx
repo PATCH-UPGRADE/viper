@@ -1,6 +1,7 @@
 import type { ColumnDef } from "@tanstack/table-core";
 import { SortableHeader } from "@/components/ui/data-table";
 import { resolveUpstreamApi } from "@/features/integrations/core/urls";
+import { ownerName } from "@/features/integrations/owner-name";
 import { relativeTime } from "@/lib/date-utils";
 import type { RemediationResponse } from "../types";
 
@@ -20,7 +21,7 @@ export const columns: ColumnDef<RemediationResponse>[] = [
     accessorKey: "userId",
     meta: { title: "Source Tool" },
     header: "Source Tool",
-    accessorFn: (row) => row.user.name,
+    accessorFn: (row) => ownerName(row.user, row.externalMappings),
   },
   {
     accessorKey: "updatedAt",

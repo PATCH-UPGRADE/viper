@@ -292,7 +292,7 @@ describe("createVulnerabilityRecord", () => {
 
     await expect(createVulnerabilityRecord(ta3())).rejects.toThrow("bad FK");
     expect(db.vulnerability.deleteMany).toHaveBeenCalledWith({
-      where: { id: "v-1" },
+      where: { id: "v-1", records: { none: {} } },
     });
   });
 });

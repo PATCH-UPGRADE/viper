@@ -58,7 +58,7 @@ function toSubmission(
 /**
  * @param options.source Overrides the input's source, for integrations whose records always
  *   come from one source (the AI crawler). Otherwise the input's source rules apply.
- * @param options.userId The record's owner, or null for a record anyone may change.
+ * @param options.userId The record's owner, or null for a record no user created.
  */
 export async function recordDataFromInput(
   input: VulnerabilityRecordInput,

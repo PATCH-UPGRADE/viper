@@ -166,7 +166,7 @@ export function planNoteWrites(
  */
 export async function persistArtifactNotes(args: {
   writes: NoteWrite[];
-  userId: string;
+  userId: string | null;
   matchingIds: string[];
   label: string | null;
 }): Promise<{ createdFilterIds: string[]; created: number; updated: number }> {

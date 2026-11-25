@@ -92,7 +92,7 @@ interface BaseSyncCtx<TConfig, TCreds> {
   integrationId: string;
   config: TConfig;                    // parsed by your configSchema
   creds: TCreds;                      // decrypted, parsed by your credentialSchema
-  integrationUserId: string;          // the shadow user that owns ingested rows
+  integrationUserId: string;          // the shadow user; ingested rows have no owner
   observedAt: Date;                   // when this attempt started: pass it to every write
   cursor: Cursor | null;              // whatever you returned last time
   lastSuccessfulSync: Date | null;    // watermark, if you'd rather use one

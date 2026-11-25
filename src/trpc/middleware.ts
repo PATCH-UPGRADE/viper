@@ -3,9 +3,8 @@ import prisma from "@/lib/db";
 import { formatResourceName } from "@/lib/string-utils";
 
 // Models requireOwnership can check: every one has a `userId` field, which is
-// what the `as typeof prisma.webhook` cast below assumes. On vulnerabilityRecord it is
-// nullable: see `allowUnowned`. Adding a model here
-// that lacks `userId` fails at compile time on its call site, not silently at
+// what the `as typeof prisma.remediation` cast below assumes. It is null on a row that an
+// integration created, and never on a webhook. Adding a model here that lacks `userId` fails at compile time on its call site, not silently at
 // runtime (see PR #227 review: passing a model without `userId` produces a
 // Prisma "Unknown field 'userId'" warning and a broken ownership check).
 type OwnableModel =
@@ -25,7 +24,8 @@ type OwnableModel =
  * @param userId - The ID of the current user
  * @param modelName - The Prisma model name (e.g., 'webhook', 'vulnerabilityRecord')
  * @param options.allowUnowned - Let anyone modify a resource with no owner (a null `userId`),
- *   such as a vulnerability record an integration created
+ *   such as a feed's vulnerability record. An integration's rows have no owner either, so the
+ *   caller must refuse those itself.
  * @returns The resource with userId field
  */
 export async function requireOwnership(
@@ -34,7 +34,7 @@ export async function requireOwnership(
   modelName: OwnableModel,
   { allowUnowned = false }: { allowUnowned?: boolean } = {},
 ) {
-  const model = prisma[modelName] as unknown as typeof prisma.webhook;
+  const model = prisma[modelName] as unknown as typeof prisma.remediation;
 
   const resource = requireExistence(
     await model.findUnique({
@@ -45,7 +45,7 @@ export async function requireOwnership(
   );
 
   // TODO: Is this secure? Double check.
-  const unowned = (resource.userId as string | null) === null;
+  const unowned = resource.userId === null;
   if (resource.userId !== userId && !(allowUnowned && unowned)) {
     throw new TRPCError({
       code: "FORBIDDEN",

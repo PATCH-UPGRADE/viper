@@ -36,6 +36,8 @@ export const ticketBaseInclude = {
   creator: { select: { id: true, name: true, image: true } },
   vulnerabilities: { select: { id: true, displayId: true } },
   assets: { select: { asset: { select: { id: true, hostname: true } } } },
+  // Names the source of a ticket that has no creator.
+  externalMapping: { select: { integration: { select: { name: true } } } },
   // Ingested source artifact(s); the Source column renders by channel (or the
   // creator avatar when there are none — i.e. a manually-created ticket).
   sourceLinks: {
@@ -573,7 +575,7 @@ export const workOrderListItemSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   parentId: z.string().nullable(),
-  creatorId: z.string(),
+  creatorId: z.string().nullable(),
   assigneeId: z.string().nullable(),
   sourceLabel: z.string().nullable(),
   departments: z.array(departmentItemSchema),
@@ -758,7 +760,7 @@ export const workOrderDetailResponseSchema = z.object({
   updatedAt: z.date(),
   lastCommentAt: z.date().nullable(),
   parentId: z.string().nullable(),
-  creatorId: z.string(),
+  creatorId: z.string().nullable(),
   assigneeId: z.string().nullable(),
   sourceLabel: z.string().nullable(),
   body: z.string().nullable(),
@@ -780,7 +782,7 @@ export const workOrderDetailResponseSchema = z.object({
   notificationId: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   assignee: detailAssigneeSchema.nullable(),
-  creator: ticketCreatorSchema,
+  creator: ticketCreatorSchema.nullable(),
   parent: ticketParentRefSchema,
   children: z.array(ticketChildRefSchema),
   relatedTickets: z.array(relatedTicketLinkSchema),

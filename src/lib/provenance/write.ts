@@ -35,6 +35,7 @@ interface WriteParams {
   entityId: string;
   origin: ObservationOrigin;
   sourceRecordId?: string;
+  raw?: Prisma.InputJsonValue;
   reason?: string;
 }
 
@@ -52,6 +53,8 @@ export type ApplyObservationParams<E extends TrackedEntityType> = {
   applyAs?: EntityInputs[E];
   /** The document this came from, when a SourceRecord holds it. */
   sourceRecordId?: string;
+  /** The exact payload. Only for a work order from an integration. */
+  raw?: Prisma.InputJsonValue;
   /** Why the fields changed. Stored on each FieldChange. */
   reason?: string;
 } & (
@@ -97,6 +100,9 @@ export async function applyObservation<E extends TrackedEntityType>(
     { ...stated, ...applyAs },
     fieldsToApply(def, stated, changed, params.apply),
   );
+  for (const field of def.cleared?.(golden, applied) ?? []) {
+    applied[field as string] = null;
+  }
   const delta = pick(applied, changedFields(golden, applied));
 
   const observationId = await insertObservation(
@@ -124,6 +130,7 @@ export async function createWithObservation<
     fields: EntityInputs[E];
     origin: ObservationOrigin;
     sourceRecordId?: string;
+    raw?: Prisma.InputJsonValue;
     reason?: string;
   },
   create: (raw: RawTransactionClient) => Promise<Row>,
@@ -167,12 +174,13 @@ type Write = WriteParams & {
 
 function startWrite(tx: ProvenanceTransaction, params: WriteParams): Write {
   const def: AnyEntityDefinition = ENTITIES[params.entityType];
-  const { entityType, entityId, origin, sourceRecordId, reason } = params;
+  const { entityType, entityId, origin, sourceRecordId, raw, reason } = params;
   return {
     entityType,
     entityId,
     origin,
     sourceRecordId,
+    raw,
     reason,
     tx,
     def,
@@ -246,7 +254,7 @@ async function updateGolden(
 }
 
 async function insertObservation(
-  { tx, entityType, entityId, origin, sourceRecordId, stored }: Write,
+  { tx, entityType, entityId, origin, sourceRecordId, raw, stored }: Write,
   kind: ObservationKind,
   fields: Values,
 ): Promise<string> {
@@ -264,6 +272,7 @@ async function insertObservation(
       observedAt: origin.observedAt,
       sourceRecordId,
       fields: await stored.ofAll(fields),
+      raw,
     },
     select: { id: true },
   });

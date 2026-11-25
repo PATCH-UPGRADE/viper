@@ -171,7 +171,8 @@ export async function processIntegrationSync<TInputItem extends SyncItem>(
   return response;
 }
 
-async function integrationOrigin({
+/** The origin of everything that a sync writes. */
+export async function integrationOrigin({
   integrationId,
   observedAt,
   actorUserId,

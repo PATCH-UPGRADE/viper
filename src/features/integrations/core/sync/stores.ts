@@ -62,11 +62,6 @@ interface Delegate {
 export interface UntrackedTarget {
   model: Delegate;
   mappingModel: Delegate;
-  // The relation on `model` that holds its mapping. Most items can be known by
-  // several integrations (`externalMappings`); a work order has at most one
-  // (`externalMapping`). The model delegates are untyped, so a wrong name only
-  // fails at runtime.
-  mappingRelation?: "externalMappings" | "externalMapping";
 }
 
 export interface UntrackedWrite {
@@ -79,7 +74,6 @@ export interface UntrackedWrite {
 export const untrackedStore = ({
   model,
   mappingModel,
-  mappingRelation = "externalMappings",
 }: UntrackedTarget): SyncStore<UntrackedWrite> => ({
   findMapping: (integrationId, externalId) =>
     mappingModel.findFirst({
@@ -92,7 +86,7 @@ export const untrackedStore = ({
       : null,
   create: ({ createData }, mapping) =>
     model.create({
-      data: { ...createData, [mappingRelation]: { create: mapping } },
+      data: { ...createData, externalMappings: { create: mapping } },
     }),
   update: async ({ updateData }, { id, itemId }, mapping) => {
     await prisma.$transaction([
@@ -108,24 +102,34 @@ export const untrackedStore = ({
   },
 });
 
+/** What an item must state to be created. */
+interface CreateFields {
+  ASSET: EntityInputs["ASSET"];
+  WORK_ORDER: EntityInputs["WORK_ORDER"] & { summary: string };
+}
+
 /** The columns of a new row that a source doesn't state. */
 interface CreateOnly {
   ASSET: Pick<Prisma.AssetUncheckedCreateInput, "id">;
+  WORK_ORDER: never;
 }
 
 interface ItemWhere {
   ASSET: Prisma.AssetWhereInput;
+  WORK_ORDER: Prisma.WorkOrderTicketWhereInput;
 }
 
 export interface TrackedWrite<E extends TrackedEntityType> {
   /** What the item states when it is new. Null if it may not create one. */
-  create: { fields: EntityInputs[E]; only?: CreateOnly[E] } | null;
+  create: { fields: CreateFields[E]; only?: CreateOnly[E] } | null;
   /** What the item states about an existing one, and what may be applied. */
   update: {
     fields: EntityInputs[E];
     apply?: readonly ApplyUnit<E>[];
     applyAs?: EntityInputs[E];
   };
+  /** The exact payload. Only for a work order. */
+  raw?: Prisma.InputJsonValue;
   uniqueFieldConditions: ItemWhere[E][];
 }
 
@@ -172,6 +176,24 @@ const TRACKED_MODELS: { [E in TrackedEntityType]: TrackedModel<E> } = {
     updateMapping: (tx, id, data) =>
       tx.externalAssetMapping.update({ where: { id }, data }),
   },
+  WORK_ORDER: {
+    findMapping: (integrationId, externalId) =>
+      prisma.externalWorkOrderMapping.findFirst({
+        where: { integrationId, externalId },
+        select: { id: true, itemId: true },
+      }),
+    findItem: (OR) =>
+      prisma.workOrderTicket.findFirst({ where: { OR }, select: { id: true } }),
+    createItem: (raw, { fields }, mapping) =>
+      raw.workOrderTicket.create({
+        data: { ...fields, externalMapping: { create: mapping } },
+        select: { id: true },
+      }),
+    createMapping: (tx, itemId, mapping) =>
+      tx.externalWorkOrderMapping.create({ data: { itemId, ...mapping } }),
+    updateMapping: (tx, id, data) =>
+      tx.externalWorkOrderMapping.update({ where: { id }, data }),
+  },
 };
 
 /**
@@ -188,13 +210,14 @@ export function trackedStore<E extends TrackedEntityType>(
   const snapshot = (
     tx: TransactionClient,
     entityId: string,
-    { update }: TrackedWrite<E>,
+    { update, raw }: TrackedWrite<E>,
   ) =>
     applyObservation(tx, {
       entityType,
       entityId,
       kind: "SNAPSHOT",
       origin,
+      raw,
       ...update,
     });
 
@@ -209,7 +232,7 @@ export function trackedStore<E extends TrackedEntityType>(
       return prisma.$transaction((tx) =>
         createWithObservation(
           tx,
-          { entityType, fields: create.fields, origin },
+          { entityType, fields: create.fields, origin, raw: write.raw },
           (raw) => model.createItem(raw, create, mapping),
         ),
       );

@@ -24,6 +24,11 @@ const json = (result: unknown): Response =>
     headers: { "content-type": "application/json" },
   });
 
+const RUN = {
+  integrationId: "int-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
+};
+
 const auditRow = {
   sys_id: "audit-1",
   documentkey: "gone-1",
@@ -37,8 +42,7 @@ const ctxWith = (
   cursor: unknown = { updatedOn: "2026-04-30 00:00:00" },
 ) =>
   ({
-    integrationId: "int-1",
-    observedAt: new Date("2026-11-01T00:00:00Z"),
+    ...RUN,
     cursor,
     session: {
       request: vi.fn(async (path: string) => {
@@ -72,7 +76,7 @@ describe("syncWorkOrders delete pass", () => {
       ctxWith(() => json([auditRow]), notFound),
     );
 
-    expect(mocks.deleteTickets).toHaveBeenCalledWith("int-1", ["gone-1"]);
+    expect(mocks.deleteTickets).toHaveBeenCalledWith(RUN, ["gone-1"]);
     expect(outcome.cursor).toMatchObject({
       deletedOn: "2026-05-01 08:00:00",
     });
@@ -87,7 +91,7 @@ describe("syncWorkOrders delete pass", () => {
       ),
     );
 
-    expect(mocks.deleteTickets).toHaveBeenCalledWith("int-1", []);
+    expect(mocks.deleteTickets).toHaveBeenCalledWith(RUN, []);
   });
 
   it("does not look up a deleted record that VIPER never mapped", async () => {

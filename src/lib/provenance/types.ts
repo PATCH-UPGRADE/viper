@@ -113,6 +113,11 @@ export interface EntityDefinition<M extends Prisma.ModelName> {
       id: string,
     ) => Promise<string | undefined>;
   };
+  /** Fields to clear, because what is applied makes their values invalid. */
+  cleared?(
+    golden: Record<string, Prisma.JsonValue>,
+    applied: Record<string, Prisma.JsonValue>,
+  ): (keyof ModelScalars<M>)[];
   /** Locks the row until the transaction ends. */
   lock(tx: ProvenanceTransaction, id: string): Promise<unknown>;
   /** The lock of a transaction that deletes the row. */

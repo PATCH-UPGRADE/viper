@@ -22,6 +22,7 @@ const NO_DEVICE = {
 /** An in-memory transaction, with the column defaults of `asset`. */
 function makeTx() {
   const assets = new Map<string, Row>();
+  const tickets = new Map<string, Row>();
   const observations: Row[] = [];
   const fieldChanges: Row[] = [];
   const names: Record<string, string> = {
@@ -71,6 +72,13 @@ function makeTx() {
         return row;
       },
     },
+    workOrderTicket: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        tickets.get(where.id) ?? null,
+      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
+        Object.assign(tickets.get(where.id)!, data);
+      },
+    },
     observation: {
       create: async ({ data }: { data: Row }) => {
         const seq = observations.length + 1;
@@ -101,6 +109,7 @@ function makeTx() {
   return {
     tx: tx as unknown as Parameters<typeof applyObservation>[0],
     assets,
+    tickets,
     observations,
     fieldChanges,
     names,
@@ -466,6 +475,47 @@ describe("the device field group", () => {
     expect(last().fields).toMatchObject({
       productId: { id: "gone", label: "gone" },
     });
+  });
+});
+
+describe("the schedule field group", () => {
+  const END = "2026-12-01T12:00:00.000Z";
+  const PAYLOAD = { id: "WO-1" };
+
+  /** A source that states no end moves the start of a ticket that has one. */
+  const moveStart = (scheduledAt: Date | null) =>
+    applyObservation(db.tx, {
+      entityType: "WORK_ORDER",
+      entityId: "ticket_1",
+      kind: "SNAPSHOT",
+      origin: fleet,
+      fields: { scheduledAt },
+      raw: PAYLOAD,
+    });
+
+  beforeEach(() => {
+    db.tickets.set("ticket_1", {
+      scheduledAt: new Date("2026-12-01T10:00:00Z"),
+      scheduledEndTime: new Date(END),
+    });
+  });
+
+  it.each([
+    ["at the end", new Date(END)],
+    ["nowhere", null],
+  ])("clears the end when a source puts the start %s", async (_, start) => {
+    await moveStart(start);
+    expect(db.tickets.get("ticket_1")?.scheduledEndTime).toBeNull();
+    expect(lastChanges()).toContainEqual(["scheduledEndTime", END, null]);
+    expect(last()).toMatchObject({
+      fields: { scheduledAt: start?.toISOString() ?? null },
+      raw: PAYLOAD,
+    });
+  });
+
+  it("keeps an end that is after the new start", async () => {
+    await moveStart(new Date("2026-12-01T11:00:00Z"));
+    expect(lastChanges().map(([field]) => field)).toEqual(["scheduledAt"]);
   });
 });
 

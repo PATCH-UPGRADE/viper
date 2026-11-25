@@ -494,17 +494,6 @@ export const workOrderIntegrationItemSchema = z.object({
   // should append the request's UTC offset, but we accept both offset and local
   // forms so one un-offset value can't reject the entire batch.
   scheduledAt: z.string().datetime({ offset: true, local: true }).nullish(),
-  // Optional ingested-source metadata. When present, a NotificationSource is
-  // attached to the created ticket so it shows a source badge (by channel).
-  // `raw` holds the upstream record.
-  source: z
-    .object({
-      channel: z.enum(SourceChannel),
-      externalId: z.string().nullish(),
-      markdown: z.string().nullish(),
-      raw: z.any().optional(),
-    })
-    .optional(),
 });
 
 export const integrationWorkOrderInputSchema = createIntegrationInputSchema(

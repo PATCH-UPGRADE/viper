@@ -23,6 +23,8 @@ function normalizeValue(
   value: unknown,
 ): Prisma.JsonValue {
   if (value === "" && def.emptyIsNull.includes(field)) return null;
+  // Throws on an invalid Date, which JSON would turn into null.
+  if (value instanceof Date) return value.toISOString();
   return JSON.parse(JSON.stringify(value ?? null));
 }
 

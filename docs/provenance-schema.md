@@ -31,14 +31,18 @@ Not every field needs a provenance history, so every field on a tracked entity i
 | `Asset` | `networkSegment`, `role`, `status` | `ignored` | Likely to change significantly, so not worth a history yet |
 | `Asset` | `id`, `createdAt` | `ignored` | Set by the database |
 | `Asset` | `updatedAt` | `ignored` | Changes on every write |
-| `WorkOrderTicket` | `status` | `tracked` | A source or user states it |
+| `WorkOrderTicket` | `summary`, `body`, `status`, `category`, `priority`, `assigneeId`, `scheduledAt`, `scheduledEndTime` | `tracked` | A source or user states it |
+| `WorkOrderTicket` | departments, assets, children, links | `tracked` | A user changes them, see "rules" for set-valued fields |
+| `WorkOrderTicket` | `sourceLabel`, `suggestedAssignee`, `priorityReasonWhy` | `ignored` | Nobody can edit them |
+| `WorkOrderTicket` | `creatorId` | `ignored` | The `CREATE` says who made it |
 | `WorkOrderTicket` | `submissionState` | `ignored` | Internal state of the submission job |
 
 For example, if a sync changes an asset's `location`, Prisma also bumps `updatedAt`, but only `location`
 gets a `FieldChange`.
 
 An `ignored` field isn't compared to anything, so every write that includes it overwrites it, as today. A partner
-upload or AI crawl that states an asset's `role` replaces a user's edit of it on each sync.
+upload or AI crawl that states an asset's `role` replaces a user's edit of it on each sync. A ServiceNow or Fleet pull
+states `sourceLabel`, so it still bumps a ticket's `updatedAt` when nothing changed.
 
 Each entity has one exhaustive map of its fields, typed from Prisma's generated field names. There is
 no default in either direction, so:
@@ -597,17 +601,15 @@ the code.
 
 | Temporary behavior | Added or kept in | Changed in |
 |---|---|---|
-| `processIntegrationToken` returns the shadow user's id | 1 | 7 |
-| Only `ASSET` has a field map, so the write functions don't accept `WORK_ORDER` or `NOTIFICATION` | 2 | 8, 9 |
+| `NOTIFICATION` has no field map, so the write functions don't accept it | 2 | 9 |
+| The set-valued fields of `WORK_ORDER` are `ignored` | 8 | 9 |
+| The write functions write rows for a draft too. No caller passes one | 8 | 9 |
 | The callbacks of `createWithObservation` and `deleteWithObservation` get `tx` itself, and not `asRaw(tx)` | 2 | 4 |
 | `Asset.userId` and `Asset.user` are in the asset map | 2 | 5 |
 | Asset writes and syncs still set `Asset.userId` | 3, 4 | 5 |
 | `fleetCreatedEquipmentKeys` reads who created an asset from `Asset.userId` | 4 | 5 |
 | `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
 | The asset seeds use `applyObservation` to update only `utilization`, and not `updateIgnoredFields` | 3 | 10 |
-| `processIntegrationSync` still takes a `userId` | 4 | 7 |
-| Syncs still pass the shadow user around, but nothing stores it | 6 | 7 |
-| `processIntegrationSync` skips provenance for work orders, which still pass their delegate | 4 | 8 |
 | `WorkOrderTicket` isn't narrowed | 4 | 11 |
 | `Notification` isn't narrowed | 4 | 13 |
 | `recordCreationActivity` returns early when `creatorId` is null, so synced tickets show no "created" entry. Those created after the reset get one from their `CREATE` | 6 | 12 |
@@ -630,7 +632,7 @@ the code.
 - [ ] Add an exhaustive `tracked` / `ignored` map for each `ProvenanceEntityType`, typed from Prisma's
       generated field names so a missing or stale key fails to compile. `applyObservation` reads
       this map to decide which fields get a `FieldChange`
-- [ ] Add the field groups. Require all `device` fields or none in a write's type. Test that a source changing
+- [x] Add the field groups. Require all `device` fields or none in a write's type. Test that a source changing
       the product clears a version that a user set on the old product, and that a source moving the start past
       the end clears the end
 - [x] Add a type test proving that a missing key fails. CI already runs `tsc --noEmit`, which
@@ -640,7 +642,7 @@ the code.
       serves untracked models like remediations and must skip provenance for them. Replace its
       own `lastSynced = new Date()` with a required `observedAt` parameter, used for `lastSynced` and for every
       item's observation
-- [ ] Route the work order syncs through that path too. Pass the same `observedAt` for a sync's `TOMBSTONE`s
+- [x] Route the work order syncs through that path too. Pass the same `observedAt` for a sync's `TOMBSTONE`s
 - [x] In `processAssetIntegrationSync`, leave out the device fields when `device` is missing, like `assets.update`
       does. Test that a missing `device` keeps the asset's device, and that an explicit null clears it
 - [x] Route asset writes: `assets.create`, `createBulk`, `update`, `remove`, `enrichAssetIdentifiers`
@@ -650,7 +652,7 @@ the code.
       `CsvImport.createdAt` as `observedAt` for every row of every chunk. The observation holds the whole row,
       and only the fields missing from a matched device may be applied. Test that the rows of one import share
       one `observedAt`
-- [ ] Write a `TOMBSTONE` for each ticket `deletePulledWorkOrders` deletes, including asset sub-tickets
+- [x] Write a `TOMBSTONE` for each ticket `deletePulledWorkOrders` deletes, including asset sub-tickets
 - [ ] Promote drafts with `createWithObservation` (`approveWorkOrder`, `mitigation.accept`), one call per
       ticket, also for asset sub-tickets. `mitigation.accept` must promote before it applies the person's edits, so the edits
       are a `MANUAL` `PATCH`
@@ -685,11 +687,11 @@ the code.
 
 ### work orders and SourceRecord
 
-- [ ] Remove `recordWorkOrderSources` and the `ExternalSourceRecordMapping` rows it creates. Fold
+- [x] Remove `recordWorkOrderSources` and the `ExternalSourceRecordMapping` rows it creates. Fold
       `WorkOrderSourceItem` into `PulledWorkOrder`, whose `raw` now goes to `applyObservation`
-- [ ] Remove `source` from `integrationWorkOrderInputSchema`, and the `SourceRecord` that
+- [x] Remove `source` from `integrationWorkOrderInputSchema`, and the `SourceRecord` that
       `workOrders.integrationUpload` creates from it
-- [ ] Update `dev/work-orders.ts`, so only emailed demo tickets have a `SourceRecord`
+- [x] Update `dev/work-orders.ts`, so only emailed demo tickets have a `SourceRecord`
 
 ### removing shadow users
 
@@ -750,7 +752,8 @@ the code.
 - [ ] `/api/v1` breaking changes to list in the PR: `user` and `userId` removed from assets; nullable `user`
       on remediations and device artifacts; nullable `creator` and `creatorId` on work orders; `integrationUser` on the
       `user` of ticket activities; `activities` on tickets; `source` on the work order `integrationUpload` input; a
-      missing `device` on the asset `integrationUpload` input no longer clears an existing asset's device
+      missing `device` on the asset `integrationUpload` input no longer clears an existing asset's device, and a missing
+      `scheduledAt` on the work order one no longer clears the ticket's
 - [ ] Update `CLAUDE.md` (key models, background jobs, how to write tracked models, and no nested writes to them), `src/features/integrations/CLAUDE.md`, and the shadow user comments in `vulnerability-schema.md`
 
 ## Out of scope

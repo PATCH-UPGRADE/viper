@@ -7,7 +7,7 @@ import {
   workOrderLlmSelect,
 } from "@/features/tracking/types";
 import type { Prisma } from "@/generated/prisma";
-import { AUTOMATION_USER_ID } from "@/lib/automation-user";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user-id";
 import prisma from "@/lib/db";
 import { createAgentCaller } from "@/trpc/agent-caller";
 

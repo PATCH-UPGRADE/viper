@@ -24,7 +24,7 @@ export function processRemediationIntegrationSync(
       model: prisma.remediation,
       mappingModel: prisma.externalRemediationMapping,
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
-      transformInputItem: async (item: IntegrationRemediationItem, userId) => {
+      transformInputItem: async (item: IntegrationRemediationItem) => {
         const {
           externalId: _externalId,
           artifacts,
@@ -45,7 +45,6 @@ export function processRemediationIntegrationSync(
         return {
           createData: {
             ...itemData,
-            userId,
             impacts: { create: impacts ?? [] },
             deviceGroupMatchings: { connect: matchingConnect },
             vulnerabilities: { connect: vulnerabilities ?? [] },

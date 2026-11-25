@@ -436,13 +436,12 @@ export const remediationsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const observedAt = new Date();
       // Validate provided token or throw error
-      const { userId, integrationId } = await processIntegrationToken(
+      const integrationId = await processIntegrationToken(
         input.token,
         ResourceType.Remediation,
       );
 
       return processRemediationIntegrationSync(input, {
-        userId,
         integrationId,
         observedAt,
       });

@@ -442,8 +442,8 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
     const mapping1 = await findMapped(item1.externalId);
     const mapping2 = await findMapped(item2.externalId);
 
-    // Integration records are owned by the integration, and follow the API's source rules.
-    expect(mapping1.item.userId).toBe(createdIntegration.integrationUserId);
+    // Integration records have no owner, and follow the API's source rules.
+    expect(mapping1.item.userId).toBeNull();
     expect(mapping1.item.source).toBe("TA3");
     expect(mapping1.item.details).toBe(item1.details);
     expect(mapping1.item.ta3Submission?.sarif).toStrictEqual(
@@ -491,6 +491,16 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
         where: { id: { in: [mapping1.itemId, mapping2.itemId] } },
       }),
     ).toBe(2);
+
+    // No user may change a record that an integration synced.
+    const recordUrl = `/vulnerabilityRecords/${mapping2.itemId}`;
+    const update = await request(BASE_URL)
+      .put(recordUrl)
+      .set(authHeader)
+      .send({ data: { summary: "Not mine" } });
+    expect(update.status).toBe(403);
+    const remove = await request(BASE_URL).delete(recordUrl).set(authHeader);
+    expect(remove.status).toBe(403);
   });
 });
 

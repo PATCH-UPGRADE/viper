@@ -41,12 +41,10 @@ export async function ingestPulledWorkOrders(
   allItems: PulledWorkOrder[],
   {
     integrationId,
-    integrationUserId,
     observedAt,
     sourceLabel,
   }: {
     integrationId: string;
-    integrationUserId: string;
     observedAt: Date;
     sourceLabel: string;
   },
@@ -61,13 +59,11 @@ export async function ingestPulledWorkOrders(
       model: prisma.workOrderTicket,
       mappingModel: prisma.externalWorkOrderMapping,
       mappingRelation: "externalMapping",
-      // Every other ingest path records this, so a synced work order gets the
-      // same "created" entry in its timeline.
       onItemCreated: (id: string) => recordCreationActivity(prisma, id),
       // finalize-sync already records this attempt. A second write
       // double-counts consecutiveFailures.
       shouldRecordSyncOutcome: false,
-      transformInputItem: async (item: PulledWorkOrder, userId: string) => {
+      transformInputItem: async (item: PulledWorkOrder) => {
         const fields = {
           summary: item.summary,
           body: item.body,
@@ -83,9 +79,7 @@ export async function ingestPulledWorkOrders(
           createData: {
             category: TicketCategory.OTHER,
             ...fields,
-            creatorId: userId,
           },
-          // Never reassign the creator on re-sync. Only refresh mutable fields.
           updateData: fields,
           // A work order has no natural business key, so with no external
           // mapping there is nothing to match on and the ticket is new.
@@ -95,7 +89,7 @@ export async function ingestPulledWorkOrders(
       },
     },
     { items },
-    { userId: integrationUserId, integrationId, observedAt },
+    { integrationId, observedAt },
     ResourceType.WorkOrder,
   );
   await recordWorkOrderSources(items, integrationId);

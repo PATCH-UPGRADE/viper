@@ -30,7 +30,6 @@ const item = (deviceType: string | null) => ({
 });
 
 const RUN = {
-  userId: "shadow-1",
   integrationId: "int-1",
   observedAt: new Date("2026-11-01T00:00:00Z"),
 };
@@ -68,10 +67,11 @@ describe("processAssetIntegrationSync", () => {
     const transform = async (device?: null) => {
       await processAssetIntegrationSync({ items: [] }, RUN, async () => {});
       const [config] = mocks.processIntegrationSync.mock.lastCall!;
-      const { update } = await config.transformInputItem(
-        { ...item(null), upstreamApi: null, device },
-        "shadow-1",
-      );
+      const { update } = await config.transformInputItem({
+        ...item(null),
+        upstreamApi: null,
+        device,
+      });
       return update.fields;
     };
 
@@ -90,10 +90,7 @@ describe("processAssetIntegrationSync", () => {
       const applyDeviceType = vi.fn(async () => {});
       await processAssetIntegrationSync({ items: [] }, RUN, applyDeviceType);
       const [config] = mocks.processIntegrationSync.mock.lastCall!;
-      await config.transformInputItem(
-        { ...item("infusion-pump"), ...fields },
-        "shadow-1",
-      );
+      await config.transformInputItem({ ...item("infusion-pump"), ...fields });
       expect(applyDeviceType).toHaveBeenCalledOnce();
       return applyDeviceType.mock.lastCall;
     };

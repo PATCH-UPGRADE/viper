@@ -6,7 +6,6 @@ import type { MedIsaoConfig, MedIsaoCreds } from "../config";
 vi.mock("server-only", () => ({}));
 
 const prismaMock = {
-  integration: { findUniqueOrThrow: vi.fn() },
   vulnerabilityIdentifier: { findMany: vi.fn() },
   remediation: {},
   externalRemediationMapping: {},
@@ -110,10 +109,6 @@ const serve = (
 
 beforeEach(() => {
   vi.clearAllMocks();
-  prismaMock.integration.findUniqueOrThrow.mockResolvedValue({
-    integrationUserId: "shadow-user",
-    observedAt: new Date("2026-11-01T00:00:00Z"),
-  });
   prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([]);
   createVulnerabilityRecord.mockImplementation(({ sourceId }) =>
     Promise.resolve({
@@ -312,7 +307,7 @@ describe("the ingest mapping", () => {
     serve([{ id: "chan-1" }], { "chan-1": page([remediation(over)]) });
     await syncRemediations(ctx());
     const [config, input] = processIntegrationSync.mock.calls[0];
-    return config.transformInputItem(input.items[0], "shadow-user");
+    return config.transformInputItem(input.items[0]);
   };
 
   it("carries the manufacturer impact onto the row", async () => {
@@ -377,8 +372,8 @@ describe("the ingest mapping", () => {
 
     await syncRemediations(ctx());
     const [config, input] = processIntegrationSync.mock.calls[0];
-    const first = await config.transformInputItem(input.items[0], "u");
-    const second = await config.transformInputItem(input.items[1], "u");
+    const first = await config.transformInputItem(input.items[0]);
+    const second = await config.transformInputItem(input.items[1]);
 
     expect(createVulnerabilityRecord).toHaveBeenCalledTimes(1);
     expect(prismaMock.vulnerabilityIdentifier.findMany).toHaveBeenCalledTimes(
@@ -429,8 +424,8 @@ describe("the ingest mapping", () => {
 
     await syncRemediations(ctx());
     const [config, input] = processIntegrationSync.mock.calls[0];
-    const first = await config.transformInputItem(input.items[0], "u");
-    const second = await config.transformInputItem(input.items[1], "u");
+    const first = await config.transformInputItem(input.items[0]);
+    const second = await config.transformInputItem(input.items[1]);
 
     expect(resolveMatchingId).toHaveBeenCalledTimes(2);
     expect(first.createData.deviceGroupMatchings).toEqual({

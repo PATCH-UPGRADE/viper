@@ -1560,7 +1560,7 @@ export const trackingRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       const observedAt = new Date();
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const integrationId = await processIntegrationToken(
         input.token,
         ResourceType.WorkOrder,
       );
@@ -1571,10 +1571,7 @@ export const trackingRouter = createTRPCRouter({
           model: prisma.workOrderTicket,
           mappingModel: prisma.externalWorkOrderMapping,
           mappingRelation: "externalMapping",
-          transformInputItem: async (
-            item: (typeof input)["items"][number],
-            creatorId,
-          ) => {
+          transformInputItem: async (item: (typeof input)["items"][number]) => {
             const {
               externalId,
               scheduledAt,
@@ -1585,12 +1582,9 @@ export const trackingRouter = createTRPCRouter({
             } = item;
             const scheduled = scheduledAt ? new Date(scheduledAt) : null;
             return {
-              // The integration user (resolved from the token) owns tickets it
-              // creates; WorkOrderTicket requires a creator.
               createData: {
                 ...fields,
                 scheduledAt: scheduled,
-                creator: { connect: { id: creatorId } },
                 // Attach an ingested-source record (created once with the
                 // ticket) so it shows a source badge. Re-syncs take the update
                 // path and leave sources alone.
@@ -1615,7 +1609,6 @@ export const trackingRouter = createTRPCRouter({
                     }
                   : {}),
               },
-              // Never reassign creator on re-sync; only refresh mutable fields.
               updateData: {
                 ...fields,
                 scheduledAt: scheduled,
@@ -1629,8 +1622,8 @@ export const trackingRouter = createTRPCRouter({
           onItemCreated: (id) => recordCreationActivity(prisma, id),
         },
         input,
-        { userId, integrationId, observedAt },
-        resource,
+        { integrationId, observedAt },
+        ResourceType.WorkOrder,
       );
     }),
 });

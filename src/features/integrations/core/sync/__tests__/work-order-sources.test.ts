@@ -181,7 +181,6 @@ describe("ingestPulledWorkOrders", () => {
   };
   const options = {
     integrationId: "int-1",
-    integrationUserId: "user-1",
     observedAt: new Date("2026-11-01T00:00:00Z"),
     sourceLabel: "ServiceNow",
   };
@@ -203,7 +202,6 @@ describe("ingestPulledWorkOrders", () => {
       mockProcessIntegrationSync.mock.calls[0];
     expect(input).toEqual({ items: [pulled] });
     expect(run).toEqual({
-      userId: "user-1",
       integrationId: "int-1",
       observedAt: options.observedAt,
     });
@@ -218,10 +216,8 @@ describe("ingestPulledWorkOrders", () => {
       scheduledEndTime: null,
       sourceLabel: "ServiceNow",
     };
-    await expect(
-      config.transformInputItem(pulled, "user-1"),
-    ).resolves.toMatchObject({
-      createData: { ...fields, creatorId: "user-1" },
+    await expect(config.transformInputItem(pulled)).resolves.toMatchObject({
+      createData: fields,
       updateData: fields,
     });
   });
@@ -231,10 +227,8 @@ describe("ingestPulledWorkOrders", () => {
     await ingestPulledWorkOrders([withoutCategory], options);
 
     const [config] = mockProcessIntegrationSync.mock.calls[0];
-    const { createData, updateData } = await config.transformInputItem(
-      withoutCategory,
-      "user-1",
-    );
+    const { createData, updateData } =
+      await config.transformInputItem(withoutCategory);
     expect(createData.category).toBe(TicketCategory.OTHER);
     expect(updateData).not.toHaveProperty("category");
   });

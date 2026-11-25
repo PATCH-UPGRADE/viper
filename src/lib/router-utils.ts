@@ -777,7 +777,8 @@ export async function createArtifactWrappers(
   }>,
   parentId: string,
   parentField: ArtifactWrapperParentFieldOptions,
-  userId: string,
+  /** Null when an integration creates them. */
+  userId: string | null,
 ): Promise<void> {
   for (const artifactInput of artifacts) {
     // Create artifact wrapper
@@ -815,8 +816,8 @@ export async function createArtifactWrappers(
 // ============================================================================
 
 /**
- * Helper: consume an upload token and return its integration, with the shadow
- * user that owns the rows it uploads, or throw an error if invalid
+ * Helper: consume an upload token and return the id of its integration, or
+ * throw an error if invalid
  */
 export const processIntegrationToken = async (
   token: string,
@@ -830,10 +831,5 @@ export const processIntegrationToken = async (
       message: `Invalid token (couldn't find it, expired, or wrong resource)`,
     });
   }
-  const integration = await prisma.integration.findUnique({
-    where: { id: integrationId },
-    select: { integrationUserId: true },
-  });
-  const userId = requireExistence(integration, "Integration").integrationUserId;
-  return { userId, integrationId, resource };
+  return integrationId;
 };

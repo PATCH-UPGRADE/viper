@@ -43,11 +43,6 @@ async function ingestRemediations(
   integrationId: string,
   observedAt: Date,
 ): Promise<IntegrationResponse> {
-  const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
-    where: { id: integrationId },
-    select: { integrationUserId: true },
-  });
-
   // Items from one channel share a manufacturer and product, so the same
   // identity resolves many times over a sync. Each miss is several round trips.
   const matchingIdCache = new Map<string, string>();
@@ -62,7 +57,7 @@ async function ingestRemediations(
       // finalize-sync already records this attempt; a second write double-counts
       // consecutiveFailures.
       shouldRecordSyncOutcome: false,
-      transformInputItem: async (item: MedIsaoRemediationItem, userId) => {
+      transformInputItem: async (item: MedIsaoRemediationItem) => {
         // JSON rather than a joined string: every part is free text, so any
         // separator can appear inside one and let two different identities
         // collide on one cache entry.
@@ -117,8 +112,7 @@ async function ingestRemediations(
         };
 
         return {
-          createData: { ...fields, userId },
-          // Never reassign the creator on re-sync.
+          createData: fields,
           updateData: fields,
           // A remediation has no natural business key, so with no external
           // mapping there is nothing to match on and the record is new.
@@ -128,7 +122,7 @@ async function ingestRemediations(
       },
     },
     { items },
-    { userId: integrationUserId, integrationId, observedAt },
+    { integrationId, observedAt },
     ResourceType.Remediation,
   );
 }

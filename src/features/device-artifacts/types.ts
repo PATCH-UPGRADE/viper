@@ -64,7 +64,7 @@ export const deviceArtifactResponseSchema = z.object({
   description: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
-  user: userSchema,
+  user: userSchema.nullable(),
   deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   artifacts: z.array(artifactWrapperWithUrlsSchema),
 });

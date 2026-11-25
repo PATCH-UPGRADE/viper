@@ -201,7 +201,7 @@ Other models keep their owner column, which is null for rows that an integration
 Integrations still update their own rows through sync, which doesn't go through `requireOwnership`.
 
 One accepted change: deleting an integration deletes its mappings, so its records then have no owner
-and no mapping, and anyone can edit them. Today they stay locked to the shadow user.
+and no mapping, and anyone can edit them. Before PR 6 they stayed locked to the shadow user.
 
 ### what source a write has
 
@@ -606,6 +606,7 @@ the code.
 | `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
 | The asset seeds use `applyObservation` to update only `utilization`, and not `updateIgnoredFields` | 3 | 10 |
 | `processIntegrationSync` still takes a `userId` | 4 | 7 |
+| Syncs still pass the shadow user around, but nothing stores it | 6 | 7 |
 | `processIntegrationSync` skips provenance for work orders, which still pass their delegate | 4 | 8 |
 | `WorkOrderTicket` isn't narrowed | 4 | 11 |
 | `Notification` isn't narrowed | 4 | 13 |
@@ -694,32 +695,34 @@ the code.
 
 - [x] Replace `createUserToken` and `consumeUserToken` with integration versions, and update `purgeExpiredTokens`
 - [x] `createCallback` takes an `integrationId`
-- [ ] `processIntegrationToken` returns only `integrationId`
-- [ ] Remove `integrationUserId` from `ResourceSyncCtx`, and the `userId` parameter from
+- [x] `processIntegrationToken` returns only `integrationId`
+- [x] Remove `integrationUserId` from `ResourceSyncCtx`, and the `userId` parameter from
       `processIntegrationSync` and `transformInputItem`
-- [ ] Drop `Integration.integrationUserId`, and make `Integration.userId` nullable
+- [x] Drop `Integration.integrationUserId`, and make `Integration.userId` nullable
 - [ ] Reset staging and local databases after PR 9, see "existing rows"
-- [ ] Stop creating shadow users in `create-integration.ts`, and remove the name sync in the integrations router
-- [ ] Update `csaf-integration.ts`, `dev/fleet-integration.ts`, `create-blueflow-integration.ts`,
+- [x] Stop creating shadow users in `create-integration.ts`, and remove the name sync in the integrations router
+- [x] Update `csaf-integration.ts`, `dev/fleet-integration.ts`, `create-blueflow-integration.ts`,
       `seed-csaf-advisories.ts`
-- [ ] Handle null `creatorId` in `asset-tickets.ts`, `interruptions.ts`, `tracking/types.ts`, tracking
+- [x] Handle null `creatorId` in `asset-tickets.ts`, `interruptions.ts`, `tracking/types.ts`, tracking
       `columns.tsx` and `overview-card.tsx`
-- [ ] Show the source name when the owner is null: remediation and device artifact columns,
-      `remediations.tsx`, `vulnerabilities/utils.ts`, `vulnerability-drawer.tsx`
-- [ ] In `recordCreationActivity`, return early when `creatorId` is null, because `TicketActivity.userId` is required
-- [ ] Change `isAutomationActor` in `activity-timeline.tsx`, which checks for a shadow user, to compare with
-      `AUTOMATION_USER_ID`. Replace that with `source = AUTOMATION` when the ticket timeline switches to
-      `FieldChange`, and do the same for `isAgent` in the inbox router when the notification timeline does
-- [ ] Filter the automation user out of `listAssignable`. Shadow users leave that list on their own
+- [x] Show the source name when the owner is null: remediation and device artifact columns,
+      `remediations.tsx`. `vulnerabilities/utils.ts` and `vulnerability-drawer.tsx` already check the mapping first
+- [x] In `recordCreationActivity`, return early when `creatorId` is null, because `TicketActivity.userId` is required
+- [x] Change `isAutomationActor` in `activity-timeline.tsx`, which checks for a shadow user, to compare with
+      `AUTOMATION_USER_ID`
+- [ ] Replace that with `source = AUTOMATION` when the ticket timeline switches to `FieldChange`, and do the
+      same for `isAgent` in the inbox router when the notification timeline does
+- [x] Filter the automation user out of `listAssignable`. Shadow users leave that list on their own
 
 ### changing ownership
 
 - [x] Remove `requireOwnership` from `assets.update` and `assets.remove`, and `asset` from `OwnableModel`
-- [ ] Records router: `allowUnowned` would let anyone edit integration records once they have a null
-      `userId`, so also refuse null-owner records with an external mapping
+- [x] Records router: `allowUnowned` would let anyone edit integration records once they have a null
+      `userId`, so also refuse null-owner records with an external mapping. The sync saves a record and its
+      mapping in one write, so a record is never unowned and unmapped in between
 - [x] Update the OpenAPI descriptions of those asset routes
 - [x] Stop setting `userId` on assets
-- [ ] Stop setting `userId` on rows an integration creates in the `*IntegrationSync` functions
+- [x] Stop setting `userId` on rows an integration creates in the `*IntegrationSync` functions
 - [x] Remove `user` from `assetInclude` and the asset schemas
 - [x] Show every source of an asset in the Sources column, and its creator in the drawer, from its
       observations. List pages need a batched query per page
@@ -745,9 +748,9 @@ the code.
 ### API and docs
 
 - [ ] `/api/v1` breaking changes to list in the PR: `user` and `userId` removed from assets; nullable `user`
-      and `userId` on remediations, device artifacts and artifacts; nullable `creator`; `activities` on
-      tickets; `source` on the work order `integrationUpload` input; a missing `device` on the asset
-      `integrationUpload` input no longer clears an existing asset's device
+      on remediations and device artifacts; nullable `creator` and `creatorId` on work orders; `integrationUser` on the
+      `user` of ticket activities; `activities` on tickets; `source` on the work order `integrationUpload` input; a
+      missing `device` on the asset `integrationUpload` input no longer clears an existing asset's device
 - [ ] Update `CLAUDE.md` (key models, background jobs, how to write tracked models, and no nested writes to them), `src/features/integrations/CLAUDE.md`, and the shadow user comments in `vulnerability-schema.md`
 
 ## Out of scope

@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -33,6 +34,31 @@ async function createRecord(input: VulnerabilityRecordInput, userId: string) {
     await recordDataFromInput(input, { userId }),
   );
   return readRecord(record.id);
+}
+
+/**
+ * Only its owner may change a record that has one. No user may change one an integration synced,
+ * and anyone may change the rest (feed records and MedISAO stubs).
+ */
+async function requireEditableRecord(id: string, userId: string) {
+  const { userId: ownerId } = await requireOwnership(
+    id,
+    userId,
+    "vulnerabilityRecord",
+    { allowUnowned: true },
+  );
+  if (ownerId !== null) return;
+
+  const mapping = await prisma.externalVulnerabilityRecordMapping.findUnique({
+    where: { itemId: id },
+    select: { id: true },
+  });
+  if (mapping) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "An integration synced this record, so you can't change it",
+    });
+  }
 }
 
 export const vulnerabilityRecordsRouter = createTRPCRouter({
@@ -74,7 +100,7 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
       return created;
     }),
 
-  // PUT /api/vulnerabilityRecords/{id} - Update a record (only its owner, if it has one)
+  // PUT /api/vulnerabilityRecords/{id} - Update a record (see requireEditableRecord)
   update: protectedProcedure
     .input(
       z.object({
@@ -94,14 +120,7 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
     })
     .output(vulnerabilityRecordResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireOwnership(
-        input.id,
-        ctx.auth.user.id,
-        "vulnerabilityRecord",
-        {
-          allowUnowned: true,
-        },
-      );
+      await requireEditableRecord(input.id, ctx.auth.user.id);
       await updateVulnerabilityRecord(
         input.id,
         await recordPatchFromInput(input.data),
@@ -109,7 +128,7 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
       return readRecord(input.id);
     }),
 
-  // DELETE /api/vulnerabilityRecords/{id} - Delete a record (only its owner, if it has one)
+  // DELETE /api/vulnerabilityRecords/{id} - Delete a record (see requireEditableRecord)
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .meta({
@@ -124,14 +143,7 @@ export const vulnerabilityRecordsRouter = createTRPCRouter({
     })
     .output(vulnerabilityRecordDeleteResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireOwnership(
-        input.id,
-        ctx.auth.user.id,
-        "vulnerabilityRecord",
-        {
-          allowUnowned: true,
-        },
-      );
+      await requireEditableRecord(input.id, ctx.auth.user.id);
       const result = await deleteVulnerabilityRecord(input.id);
       return { id: input.id, ...result };
     }),

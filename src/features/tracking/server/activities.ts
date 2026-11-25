@@ -218,8 +218,7 @@ export async function recordUpdateActivities(
  * Records the WORK_ORDER_CREATED activity for a new ticket. Writes one row.
  * This function reads the creator, source, advisory, category, and priority
  * from the ticket, so the caller passes no fields. The activity belongs to
- * the ticket creator. For an automation-sourced ticket, the creator is the
- * integration user, and the UI shows an "AI Agent" badge. Call this function
+ * the ticket creator, so a ticket without one gets no activity. Call this function
  * after the external mappings and sources exist. A caller outside a
  * transaction passes the Prisma client as `tx`.
  */
@@ -245,6 +244,9 @@ export async function recordCreationActivity(
     },
   });
   if (!t) return;
+  // TODO VW-605 (PR 12): a synced ticket has no creator, so it gets no "created" entry here. Its
+  // CREATE observation replaces this.
+  if (!t.creatorId) return;
 
   const mapping = t.externalMapping;
   await tx.ticketActivity.create({

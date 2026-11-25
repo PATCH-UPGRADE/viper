@@ -65,12 +65,14 @@ export interface VulnerabilityRecordData {
   deviceGroupMatchingIds?: string[];
   /** Only on a TA3 record. */
   ta3Submission?: Ta3SubmissionInput | null;
-  /** The record's owner. When null, anyone may update or delete the record. */
+  /** The record's owner. When null, see `requireEditableRecord` for who may change it. */
   userId?: string | null;
+  /** The integration that sent the record. Saved with it, so it is never open to everyone. */
+  externalMapping?: Prisma.ExternalVulnerabilityRecordMappingUncheckedCreateWithoutItemInput;
 }
 
 export type VulnerabilityRecordPatch = Partial<
-  Omit<VulnerabilityRecordData, "source" | "userId">
+  Omit<VulnerabilityRecordData, "source" | "userId" | "externalMapping">
 >;
 
 const isCvss = (type: MetricType) => CVSS_METRIC_TYPES.includes(type);
@@ -158,14 +160,18 @@ export async function createVulnerabilityRecord(data: VulnerabilityRecordData) {
                 },
               }
             : {}),
+          ...(data.externalMapping
+            ? { externalMapping: { create: data.externalMapping } }
+            : {}),
         },
       });
     })
     .catch(async (error) => {
-      // Don't leave behind a vulnerability with no records.
+      // Don't leave behind a vulnerability with no records. A concurrent sync of the same item can
+      // have added one, and its mapping is why this one failed.
       if (created) {
         await prisma.vulnerability
-          .deleteMany({ where: { id: vulnerabilityId } })
+          .deleteMany({ where: { id: vulnerabilityId, records: { none: {} } } })
           .catch(() => undefined);
       }
       throw error;

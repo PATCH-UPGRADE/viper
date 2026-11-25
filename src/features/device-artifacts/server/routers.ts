@@ -222,13 +222,12 @@ export const deviceArtifactsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const observedAt = new Date();
       // Validate provided token or throw error
-      const { userId, integrationId } = await processIntegrationToken(
+      const integrationId = await processIntegrationToken(
         input.token,
         ResourceType.DeviceArtifact,
       );
 
       return processDeviceArtifactIntegrationSync(input, {
-        userId,
         integrationId,
         observedAt,
       });

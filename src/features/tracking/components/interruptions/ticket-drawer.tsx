@@ -188,34 +188,36 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           </ul>
         </Section>
       )}
-      <Section title="Questions about this update">
-        <div className="flex items-center gap-3 rounded-lg border p-3">
-          <UserAvatar user={data.contact} />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <span className="font-medium">{data.contact.name}</span>
-            {data.contact.department && (
-              <span className="text-xs text-muted-foreground">
-                {data.contact.department.name}
-              </span>
-            )}
+      {data.contact && (
+        <Section title="Questions about this update">
+          <div className="flex items-center gap-3 rounded-lg border p-3">
+            <UserAvatar user={data.contact} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="font-medium">{data.contact.name}</span>
+              {data.contact.department && (
+                <span className="text-xs text-muted-foreground">
+                  {data.contact.department.name}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              {data.contact.phone && (
+                <span className="flex items-center gap-1.5">
+                  <PhoneIcon className="size-4" aria-hidden />
+                  {data.contact.phone}
+                </span>
+              )}
+              <a
+                href={`mailto:${data.contact.email}`}
+                className="flex items-center gap-1.5 text-primary hover:underline"
+              >
+                <MailIcon className="size-4" aria-hidden />
+                {data.contact.email}
+              </a>
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            {data.contact.phone && (
-              <span className="flex items-center gap-1.5">
-                <PhoneIcon className="size-4" aria-hidden />
-                {data.contact.phone}
-              </span>
-            )}
-            <a
-              href={`mailto:${data.contact.email}`}
-              className="flex items-center gap-1.5 text-primary hover:underline"
-            >
-              <MailIcon className="size-4" aria-hidden />
-              {data.contact.email}
-            </a>
-          </div>
-        </div>
-      </Section>
+        </Section>
+      )}
       <Tabs defaultValue="comments">
         <TabsList variant="line-primary">
           <TabsTrigger value="comments">

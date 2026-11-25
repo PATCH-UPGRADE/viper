@@ -19,21 +19,14 @@ export async function seedCsafIntegration() {
     return;
   }
 
-  const cisaIntegration = await prisma.$transaction(async (transaction) => {
-    const cisaIntegrationUser = await transaction.user.create({
-      data: { id: crypto.randomUUID(), name: "CISA" },
-    });
-    return transaction.integration.create({
-      data: {
-        name: "CISA",
-        platform: PlatformEnum.CSAF,
-        config: { providerMetadataUrl: CISA_PROVIDER_METADATA_URL },
-        syncEvery: SECONDS_IN_ONE_DAY,
-        userId: cisaIntegrationUser.id,
-        integrationUserId: cisaIntegrationUser.id,
-        resourceSyncs: { create: [{ resource: ResourceType.SourceRecord }] },
-      },
-    });
+  const cisaIntegration = await prisma.integration.create({
+    data: {
+      name: "CISA",
+      platform: PlatformEnum.CSAF,
+      config: { providerMetadataUrl: CISA_PROVIDER_METADATA_URL },
+      syncEvery: SECONDS_IN_ONE_DAY,
+      resourceSyncs: { create: [{ resource: ResourceType.SourceRecord }] },
+    },
   });
 
   console.log(`✅ Created the CISA CSAF integration ${cisaIntegration.id}`);

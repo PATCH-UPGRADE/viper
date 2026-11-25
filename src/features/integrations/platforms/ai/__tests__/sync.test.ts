@@ -59,14 +59,12 @@ const CREDS: AiCreds = {
 };
 
 const RUN = {
-  userId: "shadow-1",
   integrationId: "int-1",
   observedAt: new Date("2026-11-01T00:00:00Z"),
 };
 
 const makeCtx = (resource: ResourceType): SyncCtx<AiConfig, AiCreds> => ({
   integrationId: "int-1",
-  integrationUserId: "shadow-1",
   observedAt: RUN.observedAt,
   config: {
     integrationUri: "https://vendor.example.com/api/items",
@@ -99,32 +97,28 @@ describe("aiSync", () => {
     [ResourceType.Asset, mocks.asset],
     [ResourceType.Remediation, mocks.remediation],
     [ResourceType.DeviceArtifact, mocks.deviceArtifact],
-  ])(
-    "upserts crawled %s items as the shadow user",
-    async (resource, ingest) => {
-      const outcome = await aiSync(makeCtx(resource));
+  ])("upserts crawled %s items", async (resource, ingest) => {
+    const outcome = await aiSync(makeCtx(resource));
 
-      expect(mocks.runAiCrawler).toHaveBeenCalledWith({
-        resource,
-        integrationUri: "https://vendor.example.com/api/items",
-        additionalInstructions: "Only items from 2026.",
-        creds: CREDS,
-        knownExternalIds: [],
-      });
-      // finalize-sync records the attempt, so the helper must not record it too.
-      expect(ingest).toHaveBeenCalledWith({ items: ITEMS }, RUN, {
-        shouldRecordSyncOutcome: false,
-      });
-      expect(outcome).toEqual({ cursor: "cursor-1" });
-    },
-  );
+    expect(mocks.runAiCrawler).toHaveBeenCalledWith({
+      resource,
+      integrationUri: "https://vendor.example.com/api/items",
+      additionalInstructions: "Only items from 2026.",
+      creds: CREDS,
+      knownExternalIds: [],
+    });
+    // finalize-sync records the attempt, so the helper must not record it too.
+    expect(ingest).toHaveBeenCalledWith({ items: ITEMS }, RUN, {
+      shouldRecordSyncOutcome: false,
+    });
+    expect(outcome).toEqual({ cursor: "cursor-1" });
+  });
 
   it("records crawled vulnerabilities with the AI source", async () => {
     await aiSync(makeCtx(ResourceType.Vulnerability));
 
     expect(mocks.vulnerability).toHaveBeenCalledWith(
       { items: ITEMS },
-      "shadow-1",
       "int-1",
       { shouldRecordSyncOutcome: false, source: "AI" },
     );

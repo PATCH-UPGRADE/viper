@@ -16,7 +16,7 @@ interface ParentFields {
   body: string | null;
   category: TicketCategory;
   priority: Priority;
-  creatorId: string;
+  creatorId: string | null;
   scheduledAt: Date | null;
   sourceLabel: string | null;
   isDraft: boolean;
@@ -125,7 +125,9 @@ export async function createAssetTicket(
       // A child is as visible as its parent. A child of a draft that stayed
       // visible would put an unapproved proposal on the asset's work orders.
       isDraft: parent.isDraft,
-      creator: { connect: { id: parent.creatorId } },
+      ...(parent.creatorId && {
+        creator: { connect: { id: parent.creatorId } },
+      }),
       parent: { connect: { id: parentTicketId } },
       ticket: { create: { assetId, parentTicketId } },
       ...(externalMapping && {

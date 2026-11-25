@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { ownerName } from "@/features/integrations/owner-name";
 import { type SourceChannel, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import type { TrackingTicketChildRow } from "../types";
@@ -232,8 +233,9 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     cell: ({ row }) => {
       const t = row.original;
       const source = t.sourceLinks[0]?.sourceRecord;
-      // No ingested source and no label ⇒ manually created: show the creator.
-      if (!source && !t.sourceLabel) {
+      // No ingested source and no label ⇒ manually created: show the creator. An integration's
+      // ticket has none.
+      if (!source && !t.sourceLabel && t.creator) {
         return (
           <div className="flex items-center gap-2">
             <UserAvatar user={t.creator} className="size-5 text-[10px]" />
@@ -247,7 +249,9 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
         <div className="flex items-center gap-2 text-muted-foreground">
           <Icon className="size-3.5 shrink-0" />
           <span className="text-sm truncate">
-            {t.sourceLabel ?? source?.channel}
+            {t.sourceLabel ??
+              source?.channel ??
+              ownerName(null, t.externalMapping ? [t.externalMapping] : [])}
           </span>
         </div>
       );

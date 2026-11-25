@@ -41,8 +41,8 @@ const CRAWLER_RESOURCES: {
   [ResourceType.Vulnerability]: {
     recentExternalIds: (query) =>
       prisma.externalVulnerabilityRecordMapping.findMany(query),
-    ingest: (input, { userId, integrationId }, options) =>
-      processVulnerabilityIntegrationSync(input, userId, integrationId, {
+    ingest: (input, { integrationId }, options) =>
+      processVulnerabilityIntegrationSync(input, integrationId, {
         ...options,
         source: VulnerabilitySource.AI,
       }),
@@ -91,7 +91,6 @@ async function crawlAndIngest<R extends CrawlerResource>(
   const response = await ingest(
     { items },
     {
-      userId: ctx.integrationUserId,
       integrationId: ctx.integrationId,
       observedAt: ctx.observedAt,
     },

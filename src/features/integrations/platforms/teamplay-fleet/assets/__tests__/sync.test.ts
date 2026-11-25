@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const db = vi.hoisted(() => ({
-  integration: { findUniqueOrThrow: vi.fn() },
   asset: { findMany: vi.fn() },
   externalAssetMapping: { findMany: vi.fn() },
   observation: { findMany: vi.fn() },
@@ -92,7 +91,6 @@ const makeCtx = (
   overrides: Partial<ResourceSyncCtx<FleetConfig, FleetCreds>> = {},
 ): ResourceSyncCtx<FleetConfig, FleetCreds> => ({
   integrationId: "int-1",
-  integrationUserId: "shadow-1",
   observedAt: new Date("2026-11-01T00:00:00Z"),
   config: {},
   creds: { username: "svc@example.com", password: "pw" },
@@ -113,9 +111,6 @@ const device = {
 };
 
 beforeEach(() => {
-  db.integration.findUniqueOrThrow.mockResolvedValue({
-    integrationUserId: "shadow-1",
-  });
   db.asset.findMany.mockReset().mockResolvedValue([]);
   // By default Fleet created none of the mapped assets; individual tests opt in.
   db.externalAssetMapping.findMany.mockReset().mockResolvedValue([
@@ -154,7 +149,7 @@ const lastSyncCall = () => {
 type SyncItem = Parameters<typeof processIntegrationSync>[1]["items"][number];
 
 describe("syncAssets", () => {
-  it("ingests the mapped inventory under the shadow user", async () => {
+  it("ingests the mapped inventory", async () => {
     const outcome = await syncAssets(makeCtx());
 
     const { config, input, run, resource } = lastSyncCall();
@@ -166,7 +161,6 @@ describe("syncAssets", () => {
       softwareVersion: "VA11A",
     });
     expect(run).toEqual({
-      userId: "shadow-1",
       integrationId: "int-1",
       observedAt: new Date("2026-11-01T00:00:00Z"),
     });
@@ -179,10 +173,7 @@ describe("syncAssets", () => {
     await syncAssets(makeCtx());
 
     const { config, input } = lastSyncCall();
-    const out = await config.transformInputItem(
-      input.items[0] as SyncItem,
-      "shadow-1",
-    );
+    const out = await config.transformInputItem(input.items[0] as SyncItem);
     expect(resolveDevice).toHaveBeenCalledWith({
       manufacturer: "Siemens Healthineers",
       product: "syngo WebSpace",
@@ -197,10 +188,7 @@ describe("syncAssets", () => {
     await syncAssets(makeCtx());
 
     const { config, input } = lastSyncCall();
-    const out = await config.transformInputItem(
-      input.items[0] as SyncItem,
-      "shadow-1",
-    );
+    const out = await config.transformInputItem(input.items[0] as SyncItem);
     expect(out.create?.fields).not.toHaveProperty("role");
     expect(out.update.fields).not.toHaveProperty("role");
   });
@@ -211,10 +199,7 @@ describe("syncAssets", () => {
     await syncAssets(makeCtx());
 
     const { config, input } = lastSyncCall();
-    const out = await config.transformInputItem(
-      input.items[0] as SyncItem,
-      "shadow-1",
-    );
+    const out = await config.transformInputItem(input.items[0] as SyncItem);
     expect(out.update.fields).toMatchObject(device);
     expect(out.update.apply).toBeUndefined();
   });
@@ -225,10 +210,7 @@ describe("syncAssets", () => {
     await syncAssets(makeCtx());
 
     const { config, input } = lastSyncCall();
-    const out = await config.transformInputItem(
-      input.items[0] as SyncItem,
-      "shadow-1",
-    );
+    const out = await config.transformInputItem(input.items[0] as SyncItem);
     expect(out.update.fields).toMatchObject(device);
     expect(out.update.apply).toEqual(["serialNumber", "location"]);
   });
@@ -253,10 +235,7 @@ describe("syncAssets", () => {
     await syncAssets(makeCtx());
 
     const { config, input } = lastSyncCall();
-    const out = await config.transformInputItem(
-      input.items[0] as SyncItem,
-      "shadow-1",
-    );
+    const out = await config.transformInputItem(input.items[0] as SyncItem);
     expect(out.uniqueFieldConditions).toEqual([]);
   });
 
@@ -267,10 +246,7 @@ describe("syncAssets", () => {
     const gateway = input.items.find(
       (i: { externalId: string }) => i.externalId === "US_1064970627",
     );
-    const out = await config.transformInputItem(
-      gateway as SyncItem,
-      "shadow-1",
-    );
+    const out = await config.transformInputItem(gateway as SyncItem);
     expect(out.uniqueFieldConditions).toEqual([]);
   });
 
@@ -326,7 +302,7 @@ describe("product device type", () => {
     await syncAssets(ctx);
     const { config, input } = lastSyncCall();
     for (const item of input.items) {
-      await config.transformInputItem(item as SyncItem, "shadow-1");
+      await config.transformInputItem(item as SyncItem);
     }
   };
 

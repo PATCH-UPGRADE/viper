@@ -11,7 +11,6 @@ import type { integrationVulnerabilityInputSchema } from "../types";
 import { recordDataFromInput, recordPatchFromInput } from "./record-input";
 import {
   createVulnerabilityRecord,
-  deleteVulnerabilityRecord,
   updateVulnerabilityRecord,
 } from "./records";
 
@@ -27,13 +26,11 @@ type IntegrationVulnerabilityItem = z.infer<
  * Not the generic processIntegrationSync: records go through the record service, which finds the
  * vulnerability and opens Issues for new devices.
  *
- * @param integrationUserId The integration's shadow user, who owns created VulnerabilityRecord's
  * @param options.source Every record's source, for integrations with one (the AI crawler).
  *   Otherwise each item's source follows the API rules.
  */
 export async function processVulnerabilityIntegrationSync(
   input: { items: IntegrationVulnerabilityItem[] },
-  integrationUserId: string,
   integrationId: string,
   options: {
     source?: VulnerabilitySource;
@@ -84,26 +81,13 @@ export async function processVulnerabilityIntegrationSync(
         continue;
       }
 
-      const { record } = await createVulnerabilityRecord(
-        await recordDataFromInput(recordInput, {
+      await createVulnerabilityRecord({
+        ...(await recordDataFromInput(recordInput, {
           source: options.source,
-          userId: integrationUserId,
-        }),
-      );
-      try {
-        await prisma.externalVulnerabilityRecordMapping.create({
-          data: {
-            itemId: record.id,
-            integrationId,
-            externalId,
-            ...mappingFields,
-          },
-        });
-      } catch (error) {
-        // A concurrent sync mapped this item first; drop the duplicate record.
-        await deleteVulnerabilityRecord(record.id);
-        throw error;
-      }
+          userId: null,
+        })),
+        externalMapping: { integrationId, externalId, ...mappingFields },
+      });
       response.createdItemsCount++;
     } catch (error) {
       console.error("vulnerability record sync failed", { externalId, error });

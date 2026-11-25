@@ -6,13 +6,11 @@ const mocks = vi.hoisted(() => ({
   mapping: {
     findUnique: vi.fn(),
     update: vi.fn(async () => ({})),
-    create: vi.fn(async () => ({})),
   },
   createVulnerabilityRecord: vi.fn(async () => ({
     record: { id: "rec-new" },
   })),
   updateVulnerabilityRecord: vi.fn(async () => ({})),
-  deleteVulnerabilityRecord: vi.fn(async () => ({})),
   recordDataFromInput: vi.fn(async (_input: unknown, options: unknown) => ({
     data: true,
     options,
@@ -28,7 +26,6 @@ vi.mock("@/lib/db", () => ({
 vi.mock("../records", () => ({
   createVulnerabilityRecord: mocks.createVulnerabilityRecord,
   updateVulnerabilityRecord: mocks.updateVulnerabilityRecord,
-  deleteVulnerabilityRecord: mocks.deleteVulnerabilityRecord,
 }));
 vi.mock("../record-input", () => ({
   recordDataFromInput: mocks.recordDataFromInput,
@@ -62,10 +59,9 @@ beforeEach(() => {
 });
 
 describe("processVulnerabilityIntegrationSync", () => {
-  it("creates a record owned by the integration and maps it for a new item", async () => {
+  it("creates an unowned record with its mapping for a new item", async () => {
     const response = await processVulnerabilityIntegrationSync(
       { items: [item("v-1")] },
-      "shadow-1",
       "int-1",
     );
 
@@ -74,20 +70,19 @@ describe("processVulnerabilityIntegrationSync", () => {
         identifiers: ["CVE-2024-1234"],
         devices: [DEVICE],
       },
-      { source: undefined, userId: "shadow-1" },
+      { source: undefined, userId: null },
     );
     expect(mocks.createVulnerabilityRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ data: true }),
-    );
-    expect(mocks.mapping.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        itemId: "rec-new",
-        integrationId: "int-1",
-        externalId: "v-1",
-        upstreamApi: "https://partner.example.com/vulns/v-1",
-        webUrl: null,
+      expect.objectContaining({
+        data: true,
+        externalMapping: expect.objectContaining({
+          integrationId: "int-1",
+          externalId: "v-1",
+          upstreamApi: "https://partner.example.com/vulns/v-1",
+          webUrl: null,
+        }),
       }),
-    });
+    );
     expect(response).toMatchObject({
       message: "success",
       createdItemsCount: 1,
@@ -104,7 +99,6 @@ describe("processVulnerabilityIntegrationSync", () => {
 
     const response = await processVulnerabilityIntegrationSync(
       { items: [item("v-1")] },
-      "shadow-1",
       "int-1",
     );
 
@@ -127,30 +121,14 @@ describe("processVulnerabilityIntegrationSync", () => {
   it("passes a fixed source through to every record", async () => {
     await processVulnerabilityIntegrationSync(
       { items: [item("v-1")] },
-      "shadow-1",
       "int-1",
       { source: "AI" },
     );
 
     expect(mocks.recordDataFromInput).toHaveBeenCalledWith(expect.anything(), {
       source: "AI",
-      userId: "shadow-1",
+      userId: null,
     });
-  });
-
-  it("deletes the new record when a concurrent sync mapped the item first", async () => {
-    mocks.mapping.create.mockRejectedValueOnce(
-      Object.assign(new Error("Unique constraint"), { code: "P2002" }),
-    );
-
-    const response = await processVulnerabilityIntegrationSync(
-      { items: [item("v-1")] },
-      "shadow-1",
-      "int-1",
-    );
-
-    expect(mocks.deleteVulnerabilityRecord).toHaveBeenCalledWith("rec-new");
-    expect(response).toMatchObject({ createdItemsCount: 0, shouldRetry: true });
   });
 
   it("keeps going after a failed item, and reports it", async () => {
@@ -160,7 +138,6 @@ describe("processVulnerabilityIntegrationSync", () => {
 
     const response = await processVulnerabilityIntegrationSync(
       { items: [item("v-1"), item("v-2")] },
-      "shadow-1",
       "int-1",
     );
 
@@ -180,7 +157,6 @@ describe("processVulnerabilityIntegrationSync", () => {
   it("leaves the sync outcome to the caller when asked", async () => {
     await processVulnerabilityIntegrationSync(
       { items: [item("v-1")] },
-      "shadow-1",
       "int-1",
       { shouldRecordSyncOutcome: false },
     );

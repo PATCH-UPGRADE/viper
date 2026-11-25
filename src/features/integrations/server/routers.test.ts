@@ -30,7 +30,6 @@ const {
       update: vi.fn(),
       updateMany: vi.fn(),
     },
-    user: { create: vi.fn() },
     workOrderTicket: { count: vi.fn() },
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
@@ -348,7 +347,6 @@ describe("integrationsRouter.create", () => {
   };
 
   beforeEach(() => {
-    mockPrisma.user.create.mockResolvedValue({ id: "integration-user" });
     mockPrisma.integration.create.mockResolvedValue({ id: "integration-2" });
   });
 
@@ -403,7 +401,6 @@ describe("integrationsRouter.update", () => {
     mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
     mockPrisma.integration.update.mockResolvedValue({
       id: "integration-1",
-      integrationUserId: null,
     });
   });
 

@@ -33,7 +33,6 @@ model User {
 
   apikeys           Apikey[]
   integration       Integration[]
-  integrationUser   Integration?       @relation("integration_user")
   webhooks          Webhook[]
   threads           ChatThread[]
   notificationReads NotificationRead[]
@@ -610,8 +609,8 @@ model ArtifactWrapper {
 
   artifacts Artifact[] @relation("ArtifactWrapper") // back of fk relation
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -643,8 +642,8 @@ model Artifact {
 
   latestForWrapper ArtifactWrapper? @relation("LatestArtifact") // opposite side of ArtifactWrapper.latestArtifact
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -669,8 +668,8 @@ model DeviceArtifact {
 
   deviceGroupMatchings DeviceGroupMatching[] @relation("DeviceArtifactMatchings")
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   artifacts      ArtifactWrapper[]
   ta3Submissions TA3Submission[]
@@ -803,9 +802,9 @@ model VulnerabilityRecord {
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
-  /// Who created this record: an API user, or an integration's shadow user for the records it
-  /// syncs. When set, only this user may update or delete it; when null (feed records and
-  /// MedISAO stubs), anyone may.
+  /// The API user who created this record. When set, only this user may update or delete it.
+  /// When null, no user may if it has an external mapping (an integration synced it), and anyone
+  /// may if it has none (feed records and MedISAO stubs).
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -1062,8 +1061,8 @@ model Remediation {
   workOrderTickets     WorkOrderTicket[]                @relation("WorkOrderTicketRemediations")
   sourceRecordMappings SourceRecordRemediationMapping[]
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   alohaStatus AlohaStatus?
   alohaLog    Json         @default("{}")
@@ -1167,13 +1166,10 @@ model Integration {
   // ^if we're polling, that's how often to poll
   enabled   Boolean @default(true)
 
-  // The user who created the integration
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // the shadow user this integration owns; ingested rows are attributed to it
-  integrationUserId String @unique
-  integrationUser   User   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  /// The user who created the integration. Null for system integrations with no human creator,
+  /// like CISA CSAF.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   resourceSyncs IntegrationResourceSync[]
   tokens        IntegrationToken[]
@@ -1196,7 +1192,6 @@ model Integration {
   csvImports               CsvImport[]
 
   @@index([userId])
-  @@index([integrationUserId])
   @@map("integration")
 }
 
@@ -1548,8 +1543,8 @@ model WorkOrderTicket {
   parent   WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: SetNull)
   children WorkOrderTicket[] @relation("WorkOrderTicketChildren")
 
-  creatorId  String
-  creator    User    @relation("WorkOrderTicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId  String?
+  creator    User?   @relation("WorkOrderTicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   assigneeId String?
   assignee   User?   @relation("WorkOrderTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 

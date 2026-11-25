@@ -216,6 +216,23 @@ describe("processIntegrationSync — tracked models", () => {
     );
   });
 
+  it("uses the run's integration name, if it has one", async () => {
+    await processIntegrationSync(
+      config as never,
+      { items: items(1) },
+      { ...RUN, integrationName: "Spreadsheet Upload" },
+      ResourceType.Asset,
+    );
+
+    expect(provenance.createWithObservation).toHaveBeenCalledWith(
+      mockPrisma,
+      expect.objectContaining({
+        origin: { ...origin, integrationName: "Spreadsheet Upload" },
+      }),
+      expect.any(Function),
+    );
+  });
+
   it("updates a mapped item with a SNAPSHOT, and syncs its mapping", async () => {
     mockPrisma.externalAssetMapping.findFirst.mockResolvedValue({
       id: "map-1",

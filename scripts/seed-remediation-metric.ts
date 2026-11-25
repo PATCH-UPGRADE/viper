@@ -209,7 +209,6 @@ async function seedFixture(userId: string) {
       ...spec,
       status: "Active" as AssetStatus,
       ...device,
-      userId,
     };
     const existing = await prisma.asset.findFirst({
       where: { serialNumber: spec.serialNumber },

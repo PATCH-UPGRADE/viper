@@ -96,6 +96,8 @@ export interface SyncRun {
   observedAt: Date;
   /** The person who started it. Only a CSV import has one. */
   actorUserId?: string;
+  /** The name on its observations. Defaults to the integration's name. */
+  integrationName?: string;
 }
 
 interface BaseSyncConfig {
@@ -179,6 +181,7 @@ async function integrationOrigin({
   integrationId,
   observedAt,
   actorUserId,
+  integrationName,
 }: SyncRun): Promise<IntegrationOrigin> {
   const { name } = await prisma.integration.findUniqueOrThrow({
     where: { id: integrationId },
@@ -187,7 +190,7 @@ async function integrationOrigin({
   return {
     source: "INTEGRATION",
     integrationId,
-    integrationName: name,
+    integrationName: integrationName ?? name,
     observedAt,
     actorUserId,
   };

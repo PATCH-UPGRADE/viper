@@ -243,6 +243,9 @@ async function writeRow(
         integrationId: input.integrationId,
         observedAt: input.observedAt,
         actorUserId: input.userId,
+        // Each import is its own integration, so its own name would show once
+        // the import is removed and its platform is unknown.
+        integrationName: CSV_UPLOAD_DISPLAY_NAME,
       },
       ResourceType.Asset,
     );

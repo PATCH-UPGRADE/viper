@@ -140,6 +140,8 @@ field on every sync.
   observation points at it with `sourceRecordId`. This also traces an LLM-extracted value back to the document
   it read. Deleting an integration deletes its `SourceRecord`s, so those observations lose the exact payload
   but keep `fields`, `source` and `integrationName`.
+* **`integrationName` is the integration's name at the time of the write, except for CSV imports,** which all use
+  "Spreadsheet Upload". Each import is its own integration, and removing one leaves only this name.
 * **Foreign key fields are stored as `{ id, label }`,** so history stays readable after the referenced
   row is deleted (the reason `TicketActivity.data` snapshots names today). Only the `id` is
   compared, so renaming a product isn't a change to its assets.

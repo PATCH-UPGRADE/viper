@@ -97,13 +97,14 @@ beforeEach(() => {
 });
 
 describe("applyChunk", () => {
-  it("gives each row the time of the import, with the uploader as the actor", async () => {
+  it("gives each row the time of the import, with the uploader as the actor, under one name", async () => {
     const { runs } = await apply();
     const run = {
       userId: "uploader",
       integrationId: "int-1",
       observedAt,
       actorUserId: "uploader",
+      integrationName: "Spreadsheet Upload",
     };
     expect(runs).toEqual([run, run]);
   });

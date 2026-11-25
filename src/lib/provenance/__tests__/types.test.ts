@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, it, vi } from "vitest";
+import type { Prisma } from "@/generated/prisma";
 import type prisma from "@/lib/db";
-import type { TransactionClient } from "@/lib/db";
+import type { RawPrismaClient, TransactionClient } from "@/lib/db";
+import { asRaw } from "@/lib/db-raw";
 import { assetEntity } from "../asset";
 import type { ApplyUnit } from "../entities";
 import type { FieldMap, ObservationOrigin } from "../types";
@@ -89,5 +91,36 @@ describe("provenance types", () => {
     ((tx: TransactionClient): Tx => tx) satisfies unknown;
     // @ts-expect-error a lock needs a transaction
     ((client: typeof prisma): Tx => client) satisfies unknown;
+  });
+
+  it("has no direct write to a tracked model", () => {
+    type Client = typeof prisma;
+    ((client: Client) => client.asset.findMany()) satisfies unknown;
+    // @ts-expect-error a write on the client
+    ((client: Client) => client.asset.create) satisfies unknown;
+    // @ts-expect-error a write on a transaction
+    ((tx: TransactionClient) => tx.asset.updateMany) satisfies unknown;
+    ((client: Client) =>
+      // @ts-expect-error a write in an inline transaction
+      client.$transaction((tx) => tx.asset.deleteMany())) satisfies unknown;
+    ((tx: TransactionClient, model: "asset" | "issue") =>
+      // @ts-expect-error a write through a dynamic model name
+      tx[model].delete) satisfies unknown;
+
+    type Writable = { upsert: unknown };
+    // @ts-expect-error a delegate that can't write
+    ((client: Client): Writable => client.asset) satisfies unknown;
+    ((client: Client): Writable => asRaw(client).asset) satisfies unknown;
+    ((tx: TransactionClient): Writable => asRaw(tx).asset) satisfies unknown;
+  });
+
+  it("keeps the types inferred from a narrowed delegate", () => {
+    type Args = { include: { product: true } };
+    type Row<D> = Prisma.Result<D, Args, "findFirstOrThrow">;
+    type Narrowed = Row<typeof prisma.asset>;
+    type Raw = Row<RawPrismaClient["asset"]>;
+    ((row: Narrowed): Raw => row) satisfies unknown;
+    ((row: Raw): Narrowed => row) satisfies unknown;
+    ((row: Narrowed): string => row.vulnerabilitiesUrl) satisfies unknown;
   });
 });

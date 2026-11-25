@@ -24,7 +24,8 @@ import {
 import { sourceContentHash } from "@/lib/source-hash";
 import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
 import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
-import prisma from "../src/lib/db";
+import prisma, { type RawPrismaClient } from "../src/lib/db";
+import { asRaw } from "../src/lib/db-raw";
 
 const SEED_USER = {
   email: "user@example.com",
@@ -171,7 +172,7 @@ async function seedSyngoPlazaVexScenario(userId: string) {
         where: { serialNumber: asset.serialNumber },
       });
       if (existing) return existing;
-      return prisma.asset.create({
+      return asRaw(prisma).asset.create({
         data: {
           ...asset,
           status: "Active" as AssetStatus,
@@ -639,7 +640,7 @@ async function seedDeserializationScenario(userId: string) {
   // Assets, keyed to their exact-version DeviceGroups. Sequential for the same
   // reason as the matchings: multiple assets share a product/version DeviceGroup
   // (3× syngo.via VB50, 2× VB60), whose canonical entities race under Promise.all.
-  const assets: Awaited<ReturnType<typeof prisma.asset.create>>[] = [];
+  const assets: Awaited<ReturnType<RawPrismaClient["asset"]["create"]>>[] = [];
   for (const spec of DESERIALIZATION_ASSETS) {
     const existing = await prisma.asset.findFirst({
       where: { serialNumber: spec.serialNumber },
@@ -660,7 +661,7 @@ async function seedDeserializationScenario(userId: string) {
       ...assetFields
     } = spec;
     assets.push(
-      await prisma.asset.create({
+      await asRaw(prisma).asset.create({
         data: {
           ...assetFields,
           status: "Active" as AssetStatus,

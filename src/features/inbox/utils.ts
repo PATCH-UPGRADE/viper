@@ -7,6 +7,12 @@ import { CVSS_METRIC_TYPES } from "@/features/vulnerabilities/utils";
 import { VulnerabilitySource } from "@/generated/prisma";
 import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
+import { assetEntity } from "@/lib/provenance/asset";
+import type {
+  ObservationOrigin,
+  ProvenanceTransaction,
+} from "@/lib/provenance/types";
+import { applyObservation } from "@/lib/provenance/write";
 import { fillVersionUdi, normalizeName } from "@/lib/router-utils";
 import {
   downloadBufferFromS3,
@@ -264,25 +270,43 @@ export async function recordInboxCvss({
   });
 }
 
+/**
+ * Records the identifiers that a source record states for an asset, and fills
+ * the ones that the asset doesn't have yet.
+ */
 export async function enrichAssetIdentifiers(
-  assetId: string,
-  updates: { macAddress?: string | null; serialNumber?: string | null },
+  tx: ProvenanceTransaction,
+  {
+    assetId,
+    identifiers,
+    origin,
+    sourceRecordId,
+  }: {
+    assetId: string;
+    identifiers: { macAddress?: string; serialNumber?: string };
+    origin: ObservationOrigin;
+    sourceRecordId: string;
+  },
 ): Promise<void> {
-  const asset = await prisma.asset.findUnique({
+  // Lock first, so a value that is set meanwhile isn't overwritten.
+  await assetEntity.lock(tx, assetId);
+  const asset = await tx.asset.findUniqueOrThrow({
     where: { id: assetId },
     select: { macAddress: true, serialNumber: true },
   });
-  if (!asset) return;
 
-  const needsMac = !!updates.macAddress && !asset.macAddress;
-  const needsSerial = !!updates.serialNumber && !asset.serialNumber;
-  if (!needsMac && !needsSerial) return;
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      ...(needsMac ? { macAddress: updates.macAddress } : {}),
-      ...(needsSerial ? { serialNumber: updates.serialNumber } : {}),
-    },
+  await applyObservation(tx, {
+    entityType: "ASSET",
+    entityId: assetId,
+    // Not a SNAPSHOT, also from an integration: the next sync would be compared
+    // to these two fields, and would overwrite every user edit.
+    kind: "PATCH",
+    origin,
+    sourceRecordId,
+    fields: identifiers,
+    apply: (["macAddress", "serialNumber"] as const).filter(
+      (field) => !asset[field],
+    ),
   });
 }
 

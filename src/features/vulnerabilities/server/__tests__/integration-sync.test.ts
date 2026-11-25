@@ -34,9 +34,11 @@ vi.mock("../record-input", () => ({
   recordDataFromInput: mocks.recordDataFromInput,
   recordPatchFromInput: mocks.recordPatchFromInput,
 }));
-vi.mock("@/features/integrations/core/sync/upsert", () => ({
+vi.mock("@/features/integrations/core/sync/upsert", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/integrations/core/sync/upsert")
+  >()),
   upsertResourceSync: mocks.upsertResourceSync,
-  handlePrismaError: () => "Internal Server Error",
 }));
 
 import { processVulnerabilityIntegrationSync } from "../integration-sync";

@@ -4,7 +4,10 @@ import {
   type ApplyDeviceType,
   prepareDeviceTypeSlugs,
 } from "@/features/device-types/server/apply-device-type";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import {
+  processIntegrationSync,
+  type SyncRun,
+} from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceInputToAsset } from "@/lib/router-utils";
@@ -14,31 +17,50 @@ type IntegrationAssetItem = z.infer<
   typeof integrationAssetInputSchema
 >["items"][number];
 
+/** The product of the asset that a synced item is about, if VIPER has it. */
+async function currentProductId(
+  integrationId: string,
+  externalId: string,
+  uniqueFieldConditions: Prisma.AssetWhereInput[],
+): Promise<string | null> {
+  const mapping = await prisma.externalAssetMapping.findFirst({
+    where: { integrationId, externalId },
+    select: { item: { select: { productId: true } } },
+  });
+  if (mapping) return mapping.item.productId;
+  if (uniqueFieldConditions.length === 0) return null;
+
+  const asset = await prisma.asset.findFirst({
+    where: { OR: uniqueFieldConditions },
+    select: { productId: true },
+  });
+  return asset?.productId ?? null;
+}
+
 export function processAssetIntegrationSync(
   input: { items: IntegrationAssetItem[] },
-  userId: string,
-  integrationId: string,
+  run: SyncRun,
   applyDeviceType: ApplyDeviceType,
   options: { shouldRecordSyncOutcome?: boolean } = {},
 ) {
   return processIntegrationSync(
-    prisma,
     {
-      model: prisma.asset,
-      mappingModel: prisma.externalAssetMapping,
+      entityType: "ASSET",
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
-      transformInputItem: async (item, userId) => {
+      transformInputItem: async (item: IntegrationAssetItem, userId) => {
         const {
           device: deviceInput,
-          externalId: _externalId,
-          utilization,
+          externalId,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           deviceType,
           ...itemData
         } = item;
-        const device = await deviceInputToAsset(deviceInput);
-        await applyDeviceType(device.productId, deviceType);
+        // A missing device keeps the one that the asset has, and null clears it.
+        const device =
+          deviceInput === undefined
+            ? undefined
+            : await deviceInputToAsset(deviceInput);
 
         const uniqueFields = [
           "hostname",
@@ -49,27 +71,27 @@ export function processAssetIntegrationSync(
           .filter((field) => itemData[field])
           .map((field) => ({ [field]: itemData[field] }));
 
+        if (deviceType) {
+          const productId = device
+            ? device.productId
+            : await currentProductId(
+                run.integrationId,
+                externalId,
+                uniqueFieldConditions,
+              );
+          await applyDeviceType(productId, deviceType);
+        }
+
+        const fields = { ...itemData, ...device };
         return {
-          createData: {
-            ...itemData,
-            utilization: utilization as Prisma.InputJsonValue | undefined,
-            ...device,
-            userId,
-          },
-          updateData: {
-            ...itemData,
-            utilization: utilization as Prisma.InputJsonValue | undefined,
-            ...device,
-          },
+          create: { fields, only: { userId } },
+          update: { fields },
           uniqueFieldConditions,
-          artifactsData: undefined,
-          // ^asset integrations do not include artifacts
         };
       },
     },
     input,
-    userId,
-    integrationId,
+    run,
     ResourceType.Asset,
   );
 }
@@ -81,8 +103,7 @@ export function processAssetIntegrationSync(
  */
 export async function processCrawledAssetIntegrationSync(
   input: { items: IntegrationAssetItem[] },
-  userId: string,
-  integrationId: string,
+  run: SyncRun,
   options: { shouldRecordSyncOutcome?: boolean } = {},
 ) {
   const knownSlugs = new Set(
@@ -93,7 +114,7 @@ export async function processCrawledAssetIntegrationSync(
   const items = input.items.map((item) => {
     if (!item.deviceType || knownSlugs.has(item.deviceType)) return item;
     console.warn("AI crawler sent an unknown deviceType, dropped it", {
-      integrationId,
+      integrationId: run.integrationId,
       deviceType: item.deviceType,
     });
     return { ...item, deviceType: null };
@@ -103,8 +124,7 @@ export async function processCrawledAssetIntegrationSync(
   );
   return processAssetIntegrationSync(
     { ...input, items },
-    userId,
-    integrationId,
+    run,
     applyDeviceType,
     options,
   );

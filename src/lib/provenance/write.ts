@@ -1,6 +1,7 @@
 import "server-only";
 import { type ObservationKind, Prisma } from "@/generated/prisma";
-import type { TransactionClient } from "@/lib/db";
+import type { RawTransactionClient } from "@/lib/db";
+import { asRaw } from "@/lib/db-raw";
 import { requireExistence } from "@/trpc/middleware";
 import {
   type ApplyUnit,
@@ -44,6 +45,11 @@ export type ApplyObservationParams<E extends TrackedEntityType> = {
   fields: EntityInputs[E];
   /** The fields and field groups that may be applied. Defaults to all. */
   apply?: readonly ApplyUnit<E>[];
+  /**
+   * The value to write for an applied field, where it isn't the stated one: a
+   * location whose stated parts are merged into the one the asset has.
+   */
+  applyAs?: EntityInputs[E];
   /** The document this came from, when a SourceRecord holds it. */
   sourceRecordId?: string;
   /** Why the fields changed. Stored on each FieldChange. */
@@ -86,8 +92,9 @@ export async function applyObservation<E extends TrackedEntityType>(
     return;
   }
 
+  const applyAs = splitInput(def, { ...params.applyAs }).stated;
   const applied = pick(
-    stated,
+    { ...stated, ...applyAs },
     fieldsToApply(def, stated, changed, params.apply),
   );
   const delta = pick(applied, changedFields(golden, applied));
@@ -119,10 +126,9 @@ export async function createWithObservation<
     sourceRecordId?: string;
     reason?: string;
   },
-  create: (raw: TransactionClient) => Promise<Row>,
+  create: (raw: RawTransactionClient) => Promise<Row>,
 ): Promise<Row> {
-  // TODO VW-605 (PR 4): pass asRaw(tx), because a `tx` can no longer write.
-  const row = await create(tx);
+  const row = await create(asRaw(tx));
 
   const write = startWrite(tx, { ...params, entityId: row.id });
   const { stated } = splitInput(write.def, { ...params.fields });
@@ -143,13 +149,13 @@ export async function deleteWithObservation<E extends TrackedEntityType, Row>(
     origin: ObservationOrigin;
     sourceRecordId?: string;
   },
-  remove: (raw: TransactionClient) => Promise<Row>,
+  remove: (raw: RawTransactionClient) => Promise<Row>,
 ): Promise<Row> {
   const write = startWrite(tx, params);
-  await lockAndRead(write);
+  await write.def.lockForDelete(tx, params.entityId);
+  await readGolden(write);
   await insertObservation(write, "TOMBSTONE", {});
-  // TODO VW-605 (PR 4): pass asRaw(tx), because a `tx` can no longer write.
-  return remove(tx);
+  return remove(asRaw(tx));
 }
 
 /** One write to one entity: its params, and what they resolve to. */

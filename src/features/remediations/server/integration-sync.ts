@@ -1,6 +1,9 @@
 import "server-only";
 import type { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import {
+  processIntegrationSync,
+  type SyncRun,
+} from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { devicesToMatchingConnect } from "@/lib/router-utils";
@@ -13,17 +16,15 @@ type IntegrationRemediationItem = z.infer<
 
 export function processRemediationIntegrationSync(
   input: { items: IntegrationRemediationItem[] },
-  userId: string,
-  integrationId: string,
+  run: SyncRun,
   options: { shouldRecordSyncOutcome?: boolean } = {},
 ) {
   return processIntegrationSync(
-    prisma,
     {
       model: prisma.remediation,
       mappingModel: prisma.externalRemediationMapping,
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
-      transformInputItem: async (item, userId) => {
+      transformInputItem: async (item: IntegrationRemediationItem, userId) => {
         const {
           externalId: _externalId,
           artifacts,
@@ -68,8 +69,7 @@ export function processRemediationIntegrationSync(
       },
     },
     input,
-    userId,
-    integrationId,
+    run,
     ResourceType.Remediation,
   );
 }

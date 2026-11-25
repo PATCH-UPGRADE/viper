@@ -8,6 +8,7 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { asRaw } from "@/lib/db-raw";
 import { createIntegrationToken } from "@/lib/tokens";
 import {
   AUTH_TOKEN,
@@ -365,7 +366,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
+      await asRaw(prisma).asset.deleteMany({
         where: {
           networkSegment: {
             contains: "mock",
@@ -481,7 +482,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     onTestFinished(async () => {
       // this won't cause an error if it misses which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
+      await asRaw(prisma).asset.deleteMany({
         where: {
           networkSegment: {
             contains: "mock",
@@ -610,7 +611,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
+      await asRaw(prisma).asset.deleteMany({
         where: {
           networkSegment: {
             contains: "mock",
@@ -739,7 +740,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     onTestFinished(async () => {
       // this won't cause an error if it misses which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
+      await asRaw(prisma).asset.deleteMany({
         where: {
           networkSegment: {
             contains: "mock",
@@ -841,7 +842,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
+      await asRaw(prisma).asset.deleteMany({
         where: {
           OR: [
             {
@@ -915,7 +916,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
+      await asRaw(prisma).asset.deleteMany({
         where: {
           OR: [
             {

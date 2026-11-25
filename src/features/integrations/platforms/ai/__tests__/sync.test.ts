@@ -58,9 +58,16 @@ const CREDS: AiCreds = {
   authentication: { token: "s3cret" },
 };
 
+const RUN = {
+  userId: "shadow-1",
+  integrationId: "int-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
+};
+
 const makeCtx = (resource: ResourceType): SyncCtx<AiConfig, AiCreds> => ({
   integrationId: "int-1",
   integrationUserId: "shadow-1",
+  observedAt: RUN.observedAt,
   config: {
     integrationUri: "https://vendor.example.com/api/items",
     // SourceRecord is not a valid config resource. aiSync reads ctx.resource.
@@ -105,14 +112,9 @@ describe("aiSync", () => {
         knownExternalIds: [],
       });
       // finalize-sync records the attempt, so the helper must not record it too.
-      expect(ingest).toHaveBeenCalledWith(
-        { items: ITEMS },
-        "shadow-1",
-        "int-1",
-        {
-          shouldRecordSyncOutcome: false,
-        },
-      );
+      expect(ingest).toHaveBeenCalledWith({ items: ITEMS }, RUN, {
+        shouldRecordSyncOutcome: false,
+      });
       expect(outcome).toEqual({ cursor: "cursor-1" });
     },
   );
@@ -137,12 +139,9 @@ describe("aiSync", () => {
     await expect(aiSync(makeCtx(ResourceType.Asset))).rejects.toThrow(
       "The AI crawler reached its step limit.",
     );
-    expect(mocks.asset).toHaveBeenCalledWith(
-      { items: ITEMS },
-      "shadow-1",
-      "int-1",
-      { shouldRecordSyncOutcome: false },
-    );
+    expect(mocks.asset).toHaveBeenCalledWith({ items: ITEMS }, RUN, {
+      shouldRecordSyncOutcome: false,
+    });
   });
 
   it("reports both a partial crawl and failed items", async () => {

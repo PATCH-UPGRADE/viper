@@ -20,6 +20,7 @@ import {
 import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
 import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 import prisma from "../src/lib/db";
+import { asRaw } from "../src/lib/db-raw";
 
 const SEED_USER_EMAIL = "user@example.com";
 
@@ -122,13 +123,13 @@ async function upsertAsset(spec: AssetSpec, device: Device, userId: string) {
   });
 
   if (existing) {
-    return prisma.asset.update({
+    return asRaw(prisma).asset.update({
       where: { id: existing.id },
       data: { ...spec, ...device },
     });
   }
 
-  return prisma.asset.create({
+  return asRaw(prisma).asset.create({
     data: {
       ...spec,
       status: "Active" as AssetStatus,

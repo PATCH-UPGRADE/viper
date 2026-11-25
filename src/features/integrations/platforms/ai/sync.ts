@@ -1,6 +1,7 @@
 import "server-only";
 import { processCrawledAssetIntegrationSync } from "@/features/assets/server/integration-sync";
 import { processDeviceArtifactIntegrationSync } from "@/features/device-artifacts/server/integration-sync";
+import type { SyncRun } from "@/features/integrations/core/sync/upsert";
 import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
 import { processRemediationIntegrationSync } from "@/features/remediations/server/integration-sync";
 import { processVulnerabilityIntegrationSync } from "@/features/vulnerabilities/server/integration-sync";
@@ -28,8 +29,7 @@ const CRAWLER_RESOURCES: {
     ) => Promise<{ externalId: string }[]>;
     ingest: (
       input: { items: CrawledItem<R>[] },
-      userId: string,
-      integrationId: string,
+      run: SyncRun,
       options: { shouldRecordSyncOutcome: boolean },
     ) => Promise<IntegrationResponse>;
   };
@@ -41,7 +41,7 @@ const CRAWLER_RESOURCES: {
   [ResourceType.Vulnerability]: {
     recentExternalIds: (query) =>
       prisma.externalVulnerabilityRecordMapping.findMany(query),
-    ingest: (input, userId, integrationId, options) =>
+    ingest: (input, { userId, integrationId }, options) =>
       processVulnerabilityIntegrationSync(input, userId, integrationId, {
         ...options,
         source: VulnerabilitySource.AI,
@@ -90,8 +90,11 @@ async function crawlAndIngest<R extends CrawlerResource>(
 
   const response = await ingest(
     { items },
-    ctx.integrationUserId,
-    ctx.integrationId,
+    {
+      userId: ctx.integrationUserId,
+      integrationId: ctx.integrationId,
+      observedAt: ctx.observedAt,
+    },
     // finalize-sync already records this attempt. A second write double-counts consecutiveFailures.
     { shouldRecordSyncOutcome: false },
   );

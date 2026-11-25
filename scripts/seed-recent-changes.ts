@@ -22,6 +22,7 @@ import {
 } from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
 import prisma from "../src/lib/db";
+import { asRaw } from "../src/lib/db-raw";
 
 const TAG = "[recent-changes-test]";
 const SEED_USER_EMAIL = "user@example.com";
@@ -43,7 +44,7 @@ async function clean() {
   const notifications = await prisma.notification.deleteMany({
     where: { title: { startsWith: TAG } },
   });
-  const assets = await prisma.asset.deleteMany({
+  const assets = await asRaw(prisma).asset.deleteMany({
     where: { hostname: { startsWith: TAG } },
   });
   // Activities are keyed by the marker we stored in their JSON payload.
@@ -250,7 +251,7 @@ async function seed() {
   const perGroup = [3, 2];
   for (const [groupIndex, group] of groups.entries()) {
     for (let i = 0; i < perGroup[groupIndex]; i++) {
-      await prisma.asset.create({
+      await asRaw(prisma).asset.create({
         data: {
           ip: `10.90.${groupIndex}.${i + 10}`,
           hostname: `${TAG} seeded-${groupIndex}-${i}`,

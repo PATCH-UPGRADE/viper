@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
+import { asRaw } from "@/lib/db-raw";
 import type {
   EntityDefinition,
   FieldMap,
@@ -90,10 +91,14 @@ export const assetEntity = {
   // so two transactions that each add a mapping first would deadlock.
   lock: (tx, id) =>
     tx.$queryRaw`SELECT 1 FROM asset WHERE id = ${id} FOR NO KEY UPDATE`,
+  // The lock that DELETE takes. Upgrading to it later would deadlock with a
+  // transaction that adds a mapping and then locks the asset.
+  lockForDelete: (tx, id) =>
+    tx.$queryRaw`SELECT 1 FROM asset WHERE id = ${id} FOR UPDATE`,
   read: (tx, id) =>
     tx.asset.findUnique({ where: { id }, omit: { utilization: true } }),
   update: (tx, id, data) =>
-    tx.asset.update({
+    asRaw(tx).asset.update({
       where: { id },
       data: data as Prisma.AssetUncheckedUpdateInput,
       select: { id: true },
@@ -116,3 +121,10 @@ export type AssetInput = Partial<
     | Pick<AssetScalars, DeviceField>
     | { [K in DeviceField]?: undefined }
   );
+
+/** The columns of a new asset. A JSON column is left out when it is null. */
+export const assetColumns = (fields: AssetInput) => ({
+  ...fields,
+  location: fields.location ?? undefined,
+  utilization: fields.utilization ?? undefined,
+});

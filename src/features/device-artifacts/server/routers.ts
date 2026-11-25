@@ -220,13 +220,18 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
+      const observedAt = new Date();
       // Validate provided token or throw error
       const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.DeviceArtifact,
       );
 
-      return processDeviceArtifactIntegrationSync(input, userId, integrationId);
+      return processDeviceArtifactIntegrationSync(input, {
+        userId,
+        integrationId,
+        observedAt,
+      });
     }),
 
   // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)

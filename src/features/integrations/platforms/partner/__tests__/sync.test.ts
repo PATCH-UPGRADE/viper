@@ -22,6 +22,7 @@ const makeCtx = (
 ): SyncCtx<PartnerConfig, PartnerCreds> => ({
   integrationId: "int-1",
   integrationUserId: "shadow-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
   config: {
     integrationUri: "http://blueflow:8000/api/viper/webhook/",
     resource: ResourceType.Asset,

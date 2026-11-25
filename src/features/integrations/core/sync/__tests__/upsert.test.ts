@@ -3,15 +3,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma, mockCreateArtifactWrappers } = vi.hoisted(() => ({
-  mockPrisma: {
-    $transaction: vi.fn(),
-    integrationResourceSync: { upsert: vi.fn() },
-  },
-  mockCreateArtifactWrappers: vi.fn(),
-}));
+const { mockPrisma, mockCreateArtifactWrappers, provenance } = vi.hoisted(
+  () => ({
+    mockPrisma: {
+      $transaction: vi.fn(),
+      integrationResourceSync: { upsert: vi.fn() },
+      integration: {
+        findUniqueOrThrow: vi.fn(async () => ({ name: "Fleet" })),
+      },
+      asset: { findFirst: vi.fn() },
+      externalAssetMapping: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    },
+    mockCreateArtifactWrappers: vi.fn(),
+    provenance: { applyObservation: vi.fn(), createWithObservation: vi.fn() },
+  }),
+);
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
+vi.mock("@/lib/provenance/write", () => provenance);
 vi.mock("@/lib/router-utils", () => ({
   createArtifactWrappers: mockCreateArtifactWrappers,
 }));
@@ -70,17 +83,15 @@ const makeConfig = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const RUN = {
+  userId: "user-1",
+  integrationId: "integration-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
+};
+
 // biome-ignore lint/suspicious/noExplicitAny: the helper is generic over prisma delegates
 const run = (config: any, items: Item[]) =>
-  processIntegrationSync(
-    // biome-ignore lint/suspicious/noExplicitAny: test stub for the prisma client
-    mockPrisma as any,
-    config,
-    { items },
-    "user-1",
-    "integration-1",
-    ResourceType.Asset,
-  );
+  processIntegrationSync(config, { items }, RUN, ResourceType.Asset);
 
 const items = (n: number): Item[] =>
   Array.from({ length: n }, (_, i) => ({
@@ -167,6 +178,114 @@ describe("processIntegrationSync — the three branches", () => {
         externalId: "v1",
       }),
     });
+  });
+});
+
+describe("processIntegrationSync — tracked models", () => {
+  const update = { fields: { hostname: "h" }, apply: ["hostname"] };
+  const config = {
+    entityType: "ASSET",
+    transformInputItem: async () => ({
+      create: { fields: { hostname: "h" }, only: { userId: "user-1" } },
+      update,
+      uniqueFieldConditions: [{ hostname: "h" }],
+    }),
+  };
+  const origin = {
+    source: "INTEGRATION",
+    integrationId: "integration-1",
+    integrationName: "Fleet",
+    observedAt: RUN.observedAt,
+  };
+  const mapping = { integrationId: "integration-1", externalId: "v1" };
+
+  beforeEach(() => {
+    mockPrisma.externalAssetMapping.findFirst.mockResolvedValue(null);
+    mockPrisma.asset.findFirst.mockResolvedValue(null);
+    provenance.createWithObservation.mockResolvedValue({ id: "item-1" });
+  });
+
+  it("creates with a CREATE observation", async () => {
+    const response = await run(config, items(1));
+
+    expect(response.createdItemsCount).toBe(1);
+    expect(provenance.createWithObservation).toHaveBeenCalledWith(
+      mockPrisma,
+      { entityType: "ASSET", fields: { hostname: "h" }, origin },
+      expect.any(Function),
+    );
+  });
+
+  it("updates a mapped item with a SNAPSHOT, and syncs its mapping", async () => {
+    mockPrisma.externalAssetMapping.findFirst.mockResolvedValue({
+      id: "map-1",
+      itemId: "item-9",
+    });
+
+    await run(config, items(1));
+
+    expect(provenance.applyObservation).toHaveBeenCalledWith(mockPrisma, {
+      entityType: "ASSET",
+      entityId: "item-9",
+      kind: "SNAPSHOT",
+      origin,
+      ...update,
+    });
+    expect(mockPrisma.externalAssetMapping.update).toHaveBeenCalledWith({
+      where: { id: "map-1" },
+      data: expect.objectContaining({ lastSynced: RUN.observedAt }),
+    });
+  });
+
+  it.each([
+    { name: "updates", mapped: true, write: "update" },
+    { name: "maps", mapped: false, write: "create" },
+  ] as const)(
+    "locks the item before it $name it, as a delete does",
+    async ({ mapped, write }) => {
+      mockPrisma.externalAssetMapping.findFirst.mockResolvedValue(
+        mapped ? { id: "map-1", itemId: "item-9" } : null,
+      );
+      mockPrisma.asset.findFirst.mockResolvedValue({ id: "item-9" });
+
+      await run(config, items(1));
+
+      expect(provenance.applyObservation).toHaveBeenCalledBefore(
+        mockPrisma.externalAssetMapping[write],
+      );
+    },
+  );
+
+  it("says why an item that may not be created failed", async () => {
+    const response = await run(
+      {
+        ...config,
+        transformInputItem: async () => ({
+          create: null,
+          update,
+          uniqueFieldConditions: [],
+        }),
+      },
+      items(1),
+    );
+
+    expect(response.message).toBe("1 of 1 items failed: Asset not found");
+    expect(provenance.createWithObservation).not.toHaveBeenCalled();
+  });
+
+  it("maps an item that the same properties identify", async () => {
+    mockPrisma.asset.findFirst.mockResolvedValue({ id: "item-9" });
+
+    const response = await run(config, items(1));
+
+    expect(response.updatedItemsCount).toBe(1);
+    expect(mockPrisma.externalAssetMapping.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ ...mapping, itemId: "item-9" }),
+    });
+    expect(provenance.applyObservation).toHaveBeenCalledWith(
+      mockPrisma,
+      expect.objectContaining({ kind: "SNAPSHOT", entityId: "item-9" }),
+    );
   });
 });
 

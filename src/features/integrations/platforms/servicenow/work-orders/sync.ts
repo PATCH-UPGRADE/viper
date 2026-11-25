@@ -69,6 +69,7 @@ export async function syncWorkOrders(
   const response = await ingestPulledWorkOrders([...byExternalId.values()], {
     integrationId: ctx.integrationId,
     integrationUserId: ctx.integrationUserId,
+    observedAt: ctx.observedAt,
     sourceLabel: SERVICENOW_SOURCE_LABEL,
   });
 

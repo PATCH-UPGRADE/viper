@@ -1559,18 +1559,22 @@ export const trackingRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
+      const observedAt = new Date();
       const { userId, integrationId, resource } = await processIntegrationToken(
         input.token,
         ResourceType.WorkOrder,
       );
 
       return processIntegrationSync(
-        prisma,
         {
+          // TODO VW-605 (PR 8): `entityType: "WORK_ORDER"` in place of the delegates.
           model: prisma.workOrderTicket,
           mappingModel: prisma.externalWorkOrderMapping,
           mappingRelation: "externalMapping",
-          transformInputItem: async (item, creatorId) => {
+          transformInputItem: async (
+            item: (typeof input)["items"][number],
+            creatorId,
+          ) => {
             const {
               externalId,
               scheduledAt,
@@ -1625,8 +1629,7 @@ export const trackingRouter = createTRPCRouter({
           onItemCreated: (id) => recordCreationActivity(prisma, id),
         },
         input,
-        userId,
-        integrationId,
+        { userId, integrationId, observedAt },
         resource,
       );
     }),

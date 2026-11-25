@@ -17,7 +17,7 @@ import {
   ResourceType,
   Severity,
 } from "@/generated/prisma";
-import prisma from "@/lib/db";
+import prisma, { type TransactionClient } from "@/lib/db";
 import {
   type DeviceIdentity,
   deviceIdentitySelect,
@@ -29,6 +29,13 @@ import {
   type PaginationInput,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { assetColumns } from "@/lib/provenance/asset";
+import { requestOrigin } from "@/lib/provenance/origin";
+import {
+  applyObservation,
+  createWithObservation,
+  deleteWithObservation,
+} from "@/lib/provenance/write";
 import {
   buildUpdatedAtFilter,
   deviceInputToAsset,
@@ -120,6 +127,34 @@ export const ASSET_SORT_KEYS = new Set<string>([
 
 /** The `sort` documentation for assets.getMany, shared by OpenAPI and the agent catalog. */
 export const ASSET_SORT_DESCRIPTION = `Comma-separated sort fields, with "-" in front of a field for descending. Fields: ${[...ASSET_SORT_KEYS].join(", ")}. affectedIssues and severity_Critical to severity_Low count the vulnerabilities that affect each asset, by severity. Unknown fields are ignored.`;
+
+// Creating an asset takes about seven sequential queries, and a bulk create has
+// no maximum size.
+const CREATE_TIMEOUT_MS = 5_000;
+const CREATE_TIMEOUT_PER_ASSET_MS = 300;
+
+function createAsset(
+  tx: TransactionClient,
+  auth: Parameters<typeof requestOrigin>[0],
+  {
+    device: _device,
+    deviceType: _deviceType,
+    ...input
+  }: z.infer<typeof assetInputSchema>,
+  device: Awaited<ReturnType<typeof deviceInputToAsset>>,
+) {
+  const fields = { ...input, ...device };
+  return createWithObservation(
+    tx,
+    { entityType: "ASSET", fields, origin: requestOrigin(auth) },
+    (raw) =>
+      raw.asset.create({
+        // TODO VW-605 (PR 5): `userId` goes, with the column.
+        data: { ...assetColumns(fields), userId: auth.user.id },
+        include: assetInclude,
+      }),
+  );
+}
 
 const affectedIssueCountInclude = {
   vulnerability: { select: { severity: true } },
@@ -544,24 +579,14 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const {
-        device: deviceInput,
-        utilization,
-        deviceType,
-        ...dataInput
-      } = input;
+      const { deviceType } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
-      const device = await deviceInputToAsset(deviceInput);
+      const device = await deviceInputToAsset(input.device);
       await applyDeviceType(device.productId, deviceType);
-      return prisma.asset.create({
-        data: {
-          ...dataInput,
-          utilization: utilization as Prisma.InputJsonValue | undefined,
-          ...device,
-          userId: ctx.auth.user.id,
-        },
-        include: assetInclude,
-      });
+
+      return prisma.$transaction((tx) =>
+        createAsset(tx, ctx.auth, input, device),
+      );
     }),
 
   // POST /api/assets/bulk - Create one or more assets
@@ -592,23 +617,20 @@ export const assetsRouter = createTRPCRouter({
 
       // create all assets in a transaction
       return prisma.$transaction(
-        input.assets.map((asset, index) => {
-          const {
-            device: _device,
-            utilization,
-            deviceType: _deviceType,
-            ...dataInput
-          } = asset;
-          return prisma.asset.create({
-            data: {
-              ...dataInput,
-              utilization: utilization as Prisma.InputJsonValue | undefined,
-              ...devices[index],
-              userId: ctx.auth.user.id,
-            },
-            include: assetInclude,
-          });
-        }),
+        async (tx) => {
+          const created: Awaited<ReturnType<typeof createAsset>>[] = [];
+          for (const [index, asset] of input.assets.entries()) {
+            created.push(
+              await createAsset(tx, ctx.auth, asset, devices[index]),
+            );
+          }
+          return created;
+        },
+        {
+          timeout:
+            CREATE_TIMEOUT_MS +
+            input.assets.length * CREATE_TIMEOUT_PER_ASSET_MS,
+        },
       );
     }),
 
@@ -625,6 +647,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
+      const observedAt = new Date();
       // The token is one-time: reject unknown slugs before it is spent, so
       // the partner can retry the batch with the same token.
       const applyDeviceType = await prepareDeviceTypeSlugs(
@@ -638,8 +661,7 @@ export const assetsRouter = createTRPCRouter({
 
       return processAssetIntegrationSync(
         input,
-        userId,
-        integrationId,
+        { userId, integrationId, observedAt },
         applyDeviceType,
       );
     }),
@@ -696,13 +718,23 @@ export const assetsRouter = createTRPCRouter({
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
       return prisma.$transaction(async (tx) => {
+        // TODO VW-605 (PR 10): write a TOMBSTONE for each of these tickets.
         await tx.workOrderTicket.deleteMany({
           where: { ticket: { assetId: input.id } },
         });
-        return tx.asset.delete({
-          where: { id: input.id },
-          include: assetInclude,
-        });
+        return deleteWithObservation(
+          tx,
+          {
+            entityType: "ASSET",
+            entityId: input.id,
+            origin: requestOrigin(ctx.auth),
+          },
+          (raw) =>
+            raw.asset.delete({
+              where: { id: input.id },
+              include: assetInclude,
+            }),
+        );
       });
     }),
 
@@ -723,13 +755,7 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      const {
-        id,
-        device: deviceInput,
-        utilization,
-        deviceType,
-        ...updateData
-      } = input;
+      const { id, device: deviceInput, deviceType, ...updateData } = input;
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
       const current = await prisma.asset.findUniqueOrThrow({
         where: { id },
@@ -741,14 +767,18 @@ export const assetsRouter = createTRPCRouter({
           ? undefined
           : await deviceInputToAsset(deviceInput);
       await applyDeviceType(device?.productId ?? current.productId, deviceType);
-      return prisma.asset.update({
-        where: { id },
-        data: {
-          ...device,
-          ...updateData,
-          utilization: utilization as Prisma.InputJsonValue | undefined,
-        },
-        include: assetInclude,
+      return prisma.$transaction(async (tx) => {
+        await applyObservation(tx, {
+          entityType: "ASSET",
+          entityId: id,
+          kind: "PATCH",
+          origin: requestOrigin(ctx.auth),
+          fields: { ...updateData, ...device },
+        });
+        return tx.asset.findUniqueOrThrow({
+          where: { id },
+          include: assetInclude,
+        });
       });
     }),
 });

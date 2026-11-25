@@ -434,13 +434,18 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
+      const observedAt = new Date();
       // Validate provided token or throw error
       const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Remediation,
       );
 
-      return processRemediationIntegrationSync(input, userId, integrationId);
+      return processRemediationIntegrationSync(input, {
+        userId,
+        integrationId,
+        observedAt,
+      });
     }),
 
   // GET /api/remediations/{id}/aloha - Get aloha data for a remediation

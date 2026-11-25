@@ -19,6 +19,7 @@ import {
 } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
+// TODO VW-605 (PR 5): read who created the asset from its CREATE observation.
 /**
  * The equipment whose device ids an update may change: the assets that Fleet
  * created. An asset that another source created keeps that source's device.
@@ -63,6 +64,7 @@ async function typeProductFromModality(
 async function ingestFleetAssets(
   items: FleetAssetItem[],
   integrationId: string,
+  observedAt: Date,
 ): Promise<IntegrationResponse> {
   const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
     where: { id: integrationId },
@@ -91,10 +93,8 @@ async function ingestFleetAssets(
   }
 
   return processIntegrationSync(
-    prisma,
     {
-      model: prisma.asset,
-      mappingModel: prisma.externalAssetMapping,
+      entityType: "ASSET",
       // finalize-sync already records this attempt; a second write double-counts consecutiveFailures.
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetAssetItem, userId: string) => {
@@ -111,23 +111,25 @@ async function ingestFleetAssets(
         const fields = {
           serialNumber: item.serialNumber,
           location: item.location,
+          ...device,
         };
         return {
-          createData: { ...fields, ...device, userId },
-          updateData: fleetCreatedKeys.has(item.externalId)
-            ? { ...fields, ...device }
-            : fields,
+          create: { fields, only: { userId } },
+          update: {
+            fields,
+            apply: fleetCreatedKeys.has(item.externalId)
+              ? undefined
+              : ["serialNumber", "location"],
+          },
           uniqueFieldConditions:
             item.serialNumber && !weakSerials.has(item.serialNumber)
               ? [{ serialNumber: item.serialNumber }]
               : [],
-          artifactsData: undefined,
         };
       },
     },
     { items },
-    integrationUserId,
-    integrationId,
+    { userId: integrationUserId, integrationId, observedAt },
     ResourceType.Asset,
   );
 }
@@ -141,7 +143,11 @@ export async function syncAssets(
     items.push(...page.items.map((raw) => toCanonical(raw)));
   }
 
-  const response = await ingestFleetAssets(items, ctx.integrationId);
+  const response = await ingestFleetAssets(
+    items,
+    ctx.integrationId,
+    ctx.observedAt,
+  );
   const contracts = await syncFleetContracts(session, ctx.integrationId);
   await connectUncontractedAssets(
     ctx.integrationId,

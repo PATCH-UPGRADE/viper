@@ -112,6 +112,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.integration.findUniqueOrThrow.mockResolvedValue({
     integrationUserId: "shadow-user",
+    observedAt: new Date("2026-11-01T00:00:00Z"),
   });
   prismaMock.vulnerabilityIdentifier.findMany.mockResolvedValue([]);
   createVulnerabilityRecord.mockImplementation(({ sourceId }) =>
@@ -132,7 +133,7 @@ describe("syncRemediations", () => {
     await syncRemediations(ctx());
 
     expect(processIntegrationSync).toHaveBeenCalledTimes(1);
-    const [, , input] = processIntegrationSync.mock.calls[0];
+    const [, input] = processIntegrationSync.mock.calls[0];
     expect(input.items).toHaveLength(1);
     expect(input.items[0].externalId).toBe("rem-1");
   });
@@ -197,7 +198,7 @@ describe("syncRemediations", () => {
 
     const outcome = await syncRemediations(ctx());
 
-    const [, , input] = processIntegrationSync.mock.calls[0];
+    const [, input] = processIntegrationSync.mock.calls[0];
     expect(
       input.items.map((i: { externalId: string }) => i.externalId),
     ).toEqual(["still-here"]);
@@ -310,7 +311,7 @@ describe("the ingest mapping", () => {
   const transformOf = async (over: Record<string, unknown> = {}) => {
     serve([{ id: "chan-1" }], { "chan-1": page([remediation(over)]) });
     await syncRemediations(ctx());
-    const [, config, input] = processIntegrationSync.mock.calls[0];
+    const [config, input] = processIntegrationSync.mock.calls[0];
     return config.transformInputItem(input.items[0], "shadow-user");
   };
 
@@ -375,7 +376,7 @@ describe("the ingest mapping", () => {
     });
 
     await syncRemediations(ctx());
-    const [, config, input] = processIntegrationSync.mock.calls[0];
+    const [config, input] = processIntegrationSync.mock.calls[0];
     const first = await config.transformInputItem(input.items[0], "u");
     const second = await config.transformInputItem(input.items[1], "u");
 
@@ -427,7 +428,7 @@ describe("the ingest mapping", () => {
       .mockResolvedValueOnce("matching-b");
 
     await syncRemediations(ctx());
-    const [, config, input] = processIntegrationSync.mock.calls[0];
+    const [config, input] = processIntegrationSync.mock.calls[0];
     const first = await config.transformInputItem(input.items[0], "u");
     const second = await config.transformInputItem(input.items[1], "u");
 

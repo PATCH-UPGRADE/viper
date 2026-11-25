@@ -1,5 +1,10 @@
 import type { AssetStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { ObservationOrigin } from "@/lib/provenance/types";
+import {
+  applyObservation,
+  createWithObservation,
+} from "@/lib/provenance/write";
 import { deviceForSampleCpe } from "./device-groups";
 
 // Used to simulate imaging device utilization throughout the week
@@ -437,38 +442,45 @@ const SAMPLE_ASSETS = [
 export async function seedAssets(userId: string) {
   console.log("\n🌱 Seeding assets...");
 
-  const assets = await Promise.all(
-    SAMPLE_ASSETS.map(async (asset) => {
-      const device = await deviceForSampleCpe(asset.cpe);
-      if (!device) {
-        console.warn(`⚠️  No sample device found for CPE: ${asset.cpe}`);
-        return null;
+  const origin: ObservationOrigin = { source: "MANUAL", actorUserId: userId };
+  let seeded = 0;
+
+  // One at a time: each is its own transaction, and together they would wait
+  // too long for a connection.
+  for (const asset of SAMPLE_ASSETS) {
+    const device = await deviceForSampleCpe(asset.cpe);
+    if (!device) {
+      console.warn(`⚠️  No sample device found for CPE: ${asset.cpe}`);
+      continue;
+    }
+    seeded++;
+
+    const { id, cpe: _cpe, status, ...rest } = asset;
+    const existing = await prisma.asset.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    await prisma.$transaction(async (tx) => {
+      if (existing) {
+        // TODO VW-605 (PR 10): use updateIgnoredFields.
+        await applyObservation(tx, {
+          entityType: "ASSET",
+          entityId: id,
+          kind: "PATCH",
+          origin,
+          fields: { utilization: asset.utilization },
+        });
+        return;
       }
+      const fields = { ...rest, status: status as AssetStatus, ...device };
+      await createWithObservation(
+        tx,
+        { entityType: "ASSET", fields, origin },
+        // TODO VW-605 (PR 5): `userId` goes, with the column.
+        (raw) => raw.asset.create({ data: { id, ...fields, userId } }),
+      );
+    });
+  }
 
-      return prisma.asset.upsert({
-        where: {
-          id: "id" in asset && asset.id ? asset.id : "-1",
-        },
-        update: { utilization: asset.utilization },
-        create: {
-          ...("id" in asset && asset.id ? { id: asset.id } : {}),
-          ip: asset.ip,
-          networkSegment: asset.networkSegment,
-          role: asset.role,
-          hostname: asset.hostname,
-          macAddress: asset.macAddress,
-          serialNumber: asset.serialNumber,
-          location: asset.location,
-          status: asset.status as AssetStatus,
-          utilization: asset.utilization,
-          ...device,
-          userId,
-        },
-      });
-    }),
-  );
-
-  const successfulAssets = assets.filter((a) => a !== null);
-  console.log(`✅ Seeded ${successfulAssets.length} assets`);
-  return successfulAssets;
+  console.log(`✅ Seeded ${seeded} assets`);
 }

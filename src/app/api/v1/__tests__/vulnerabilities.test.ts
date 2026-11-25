@@ -8,6 +8,7 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { asRaw } from "@/lib/db-raw";
 import { createIntegrationToken } from "@/lib/tokens";
 import {
   authHeader,
@@ -137,7 +138,7 @@ describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
     expect(postAssetRes.body).toHaveProperty("id");
 
     onTestFinished(async () => {
-      await prisma.asset.delete({
+      await asRaw(prisma).asset.delete({
         where: { id: postAssetRes.body.id },
       });
     });

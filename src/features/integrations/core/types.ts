@@ -76,6 +76,8 @@ export interface BaseSyncCtx<TConfig = unknown, TCreds = unknown>
   extends SessionInput<TConfig, TCreds> {
   /** The shadow user that owns what this integration ingests. */
   integrationUserId: string;
+  /** When this attempt started. Everything it ingests gets this time. */
+  observedAt: Date;
   cursor: Cursor | null;
   /** Where `partner`'s `since` comes from. */
   lastSuccessfulSync: Date | null;

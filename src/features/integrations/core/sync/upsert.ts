@@ -1,5 +1,5 @@
-// biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import {
   type ArtifactType,
   type ResourceType,
@@ -10,33 +10,30 @@ import {
   PrismaClientValidationError,
 } from "@/generated/prisma/runtime/library";
 import prisma from "@/lib/db";
+import type { TrackedEntityType } from "@/lib/provenance/entities";
+import type { IntegrationOrigin } from "@/lib/provenance/types";
 import {
   type ArtifactWrapperParentFieldOptions,
   createArtifactWrappers,
 } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
+import {
+  type MappingData,
+  type SyncStore,
+  type TrackedWrite,
+  trackedStore,
+  type UntrackedTarget,
+  type UntrackedWrite,
+  untrackedStore,
+} from "./stores";
 
 /**
  * Dedup + upsert data we get in from platforms against the `External*Mapping` tables.
  */
 
-// so we can take in `prisma` into functions and work with it
-type PrismaDelegate<T = any> = {
-  count: (args?: any) => Promise<number | any>;
-  findFirst: (args?: any) => Promise<T | null>;
-  findMany: (args?: any) => Promise<T[]>;
-  create: (args: any) => Promise<T>;
-  update: (args: any) => Promise<T>;
-  upsert: (args: any) => Promise<T>;
-};
-
-interface PrismaClientLike {
-  $transaction: (...args: any[]) => Promise<any>;
-  integrationResourceSync: Pick<PrismaDelegate, "upsert">;
-}
-
 export const handlePrismaError = (e: unknown): string => {
   if (
+    e instanceof TRPCError ||
     e instanceof PrismaClientKnownRequestError ||
     e instanceof PrismaClientValidationError
   ) {
@@ -90,43 +87,18 @@ export interface ArtifactsContent {
   artifactWrapperParentField: ArtifactWrapperParentFieldOptions;
 }
 
-/**
- * Configuration for the sync helper
- */
-export interface SyncConfig<
-  TInputItem,
-  TCreateData,
-  TUpdateData,
-  TModel extends { id: string },
-  TMappingModel extends { id: string; itemId: string },
-> {
-  // Prisma model delegates
-  model: Pick<PrismaDelegate<TModel>, "findFirst" | "create" | "update">;
-  mappingModel: Pick<
-    PrismaDelegate<TMappingModel>,
-    "findFirst" | "create" | "update"
-  >;
+/** Where a sync's writes come from. */
+export interface SyncRun {
+  integrationId: string;
+  // TODO VW-605 (PR 7): goes, with the shadow users.
+  userId: string;
+  /** When the sync started or its request arrived, for all of its items. */
+  observedAt: Date;
+  /** The person who started it. Only a CSV import has one. */
+  actorUserId?: string;
+}
 
-  // The relation on `model` that holds its mapping. Most items can be known by
-  // several integrations (`externalMappings`); a work order has at most one
-  // (`externalMapping`). The model delegates are untyped, so a wrong name only
-  // fails at runtime.
-  mappingRelation?: "externalMappings" | "externalMapping";
-
-  // Transform functions
-  transformInputItem: (
-    item: TInputItem,
-    userId: string,
-  ) => Promise<{
-    createData: TCreateData;
-    updateData: TUpdateData;
-    uniqueFieldConditions: Array<Record<string, any>>;
-    artifactsData: ArtifactsContent | undefined;
-  }>;
-
-  // Optional: Additional fields to include in create
-  additionalCreateFields?: (userId: string) => Record<string, any>;
-
+interface BaseSyncConfig {
   // Optional: fired once after a NEW item (and its artifacts) is created, not on
   // re-sync updates. Used e.g. to kick off deviceArtifact note extraction.
   // Hook failures are logged, not propagated, so they never fail the sync.
@@ -137,34 +109,101 @@ export interface SyncConfig<
   shouldRecordSyncOutcome?: boolean;
 }
 
+/** A sync of a model without provenance, through its delegates. */
+export interface UntrackedSyncConfig<TInputItem>
+  extends BaseSyncConfig,
+    UntrackedTarget {
+  entityType?: undefined;
+  transformInputItem: (
+    item: TInputItem,
+    userId: string,
+  ) => Promise<
+    UntrackedWrite & { artifactsData: ArtifactsContent | undefined }
+  >;
+}
+
+/** A sync of a tracked model, through the provenance functions. */
+export interface TrackedSyncConfig<TInputItem, E extends TrackedEntityType>
+  extends BaseSyncConfig {
+  entityType: E;
+  transformInputItem: (
+    item: TInputItem,
+    userId: string,
+  ) => Promise<TrackedWrite<E>>;
+}
+
+export type SyncConfig<TInputItem> =
+  | UntrackedSyncConfig<TInputItem>
+  | {
+      [E in TrackedEntityType]: TrackedSyncConfig<TInputItem, E>;
+    }[TrackedEntityType];
+
+interface SyncItem {
+  externalId: string;
+  upstreamApi?: string | null;
+  webUrl?: string | null;
+}
+
 /**
  * Generic helper function for processing integration syncs
  */
-export async function processIntegrationSync<
-  TInputItem extends {
-    externalId: string;
-    upstreamApi?: string | null;
-    webUrl?: string | null;
-  },
-  TCreateData extends Record<string, any>,
-  TUpdateData extends Record<string, any>,
-  TModel extends { id: string },
-  TMappingModel extends { id: string; itemId: string },
->(
-  prisma: PrismaClientLike,
-  config: SyncConfig<
-    TInputItem,
-    TCreateData,
-    TUpdateData,
-    TModel,
-    TMappingModel
-  >,
+export async function processIntegrationSync<TInputItem extends SyncItem>(
+  config: SyncConfig<TInputItem>,
   input: { items: TInputItem[] },
-  userId: string,
-  integrationId: string,
+  run: SyncRun,
   resource: ResourceType,
 ): Promise<IntegrationResponse> {
-  const lastSynced = new Date();
+  const response =
+    config.entityType === undefined
+      ? await syncItems(untrackedStore(config), config, input.items, run)
+      : await syncItems(
+          trackedStore(config.entityType, await integrationOrigin(run)),
+          config,
+          input.items,
+          run,
+        );
+
+  if (config.shouldRecordSyncOutcome ?? true) {
+    await upsertResourceSync(
+      run.integrationId,
+      resource,
+      response,
+      run.observedAt,
+    );
+  }
+
+  return response;
+}
+
+async function integrationOrigin({
+  integrationId,
+  observedAt,
+  actorUserId,
+}: SyncRun): Promise<IntegrationOrigin> {
+  const { name } = await prisma.integration.findUniqueOrThrow({
+    where: { id: integrationId },
+    select: { name: true },
+  });
+  return {
+    source: "INTEGRATION",
+    integrationId,
+    integrationName: name,
+    observedAt,
+    actorUserId,
+  };
+}
+
+async function syncItems<TInputItem extends SyncItem, TWrite>(
+  store: SyncStore<TWrite>,
+  config: BaseSyncConfig & {
+    transformInputItem: (
+      item: TInputItem,
+      userId: string,
+    ) => Promise<TWrite & { artifactsData?: ArtifactsContent }>;
+  },
+  items: TInputItem[],
+  { integrationId, userId, observedAt }: SyncRun,
+): Promise<IntegrationResponse> {
   const errors: string[] = [];
 
   const response: IntegrationResponse = {
@@ -172,42 +211,29 @@ export async function processIntegrationSync<
     createdItemsCount: 0,
     updatedItemsCount: 0,
     shouldRetry: false,
-    syncedAt: lastSynced.toISOString(),
+    syncedAt: observedAt.toISOString(),
   };
 
-  for (const item of input.items) {
+  for (const item of items) {
     const { externalId, upstreamApi = null, webUrl = null } = item;
-    const mappingUrls = { upstreamApi, webUrl };
+    const mapping: MappingData = {
+      integrationId,
+      externalId,
+      lastSynced: observedAt,
+      upstreamApi,
+      webUrl,
+    };
 
     // Look for an existing mapping first
-    const foundMapping = await config.mappingModel.findFirst({
-      where: {
-        integrationId,
-        externalId,
-      },
-      select: {
-        id: true,
-        itemId: true,
-      },
-    });
+    const foundMapping = await store.findMapping(integrationId, externalId);
 
     // Transform the input item to get create/update data and unique conditions
-    const { createData, updateData, uniqueFieldConditions, artifactsData } =
-      await config.transformInputItem(item, userId);
+    const write = await config.transformInputItem(item, userId);
 
     // If we have a ExternalItemMapping, update the sync time and item
     if (foundMapping) {
       try {
-        await prisma.$transaction([
-          config.mappingModel.update({
-            where: { id: foundMapping.id },
-            data: { lastSynced, ...mappingUrls },
-          }) as any,
-          config.model.update({
-            where: { id: (foundMapping as any).itemId },
-            data: updateData,
-          }) as any,
-        ]);
+        await store.update(write, foundMapping, mapping);
       } catch (error: unknown) {
         console.error("mapping + item update failed", { externalId, error });
         errors.push(handlePrismaError(error));
@@ -219,39 +245,22 @@ export async function processIntegrationSync<
     }
 
     // Try to find existing item by unique identifying properties
-    let foundItem: TModel | null = null;
-    if (uniqueFieldConditions.length > 0) {
-      foundItem = await config.model.findFirst({
-        where: { OR: uniqueFieldConditions },
-      });
-    }
+    const foundItem = await store.findItem(write);
 
     // If no Item, we need to create the Item and ExternalItemMapping
     if (!foundItem) {
       let createdItemId: string | null = null;
       try {
-        const createdItem = await config.model.create({
-          data: {
-            ...createData,
-            ...(config.additionalCreateFields?.(userId) || {}),
-            [config.mappingRelation ?? "externalMappings"]: {
-              create: {
-                integrationId,
-                externalId,
-                lastSynced,
-                ...mappingUrls,
-              },
-            },
-          },
-        });
+        const createdItem = await store.create(write, mapping);
         createdItemId = createdItem.id;
 
         // Remediation and DeviceArtifacts integrations contain artifacts that need processing
+        const { artifactsData } = write;
         if (
           artifactsData?.artifacts &&
           artifactsData.artifactWrapperParentField
         ) {
-          await prisma.$transaction(async (tx: any) => {
+          await prisma.$transaction(async (tx) => {
             await createArtifactWrappers(
               tx,
               artifactsData.artifacts,
@@ -283,21 +292,7 @@ export async function processIntegrationSync<
 
     // If we have an item but no mapping, create the mapping and update the item
     try {
-      await prisma.$transaction([
-        config.mappingModel.create({
-          data: {
-            itemId: foundItem.id,
-            integrationId,
-            externalId,
-            lastSynced,
-            ...mappingUrls,
-          },
-        }),
-        config.model.update({
-          where: { id: foundItem.id },
-          data: updateData,
-        }) as any,
-      ]);
+      await store.link(write, foundItem.id, mapping);
     } catch (error: unknown) {
       console.error("Item but no mapping", { externalId, error });
       errors.push(handlePrismaError(error));
@@ -311,11 +306,7 @@ export async function processIntegrationSync<
     // `message` doubles as `IntegrationResourceSync.errorMessage`: the
     // `<N> of <TOTAL>` prefix carries the scale, the first error the symptom.
     response.shouldRetry = true;
-    response.message = `${errors.length} of ${input.items.length} items failed: ${errors[0]}`;
-  }
-
-  if (config.shouldRecordSyncOutcome ?? true) {
-    await upsertResourceSync(integrationId, resource, response, lastSynced);
+    response.message = `${errors.length} of ${items.length} items failed: ${errors[0]}`;
   }
 
   return response;

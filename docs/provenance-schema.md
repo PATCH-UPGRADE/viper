@@ -128,6 +128,12 @@ field on every sync.
   rules don't shape the observation. For example, `ingestFleetAssets` doesn't apply the device on an
   asset Fleet didn't create, but the observation still records it. A `PATCH` holds only the fields it
   changed. Its input can have more, like all four `device` fields, and the unchanged ones aren't stored.
+* **The value that is applied can differ from the stated one,** with `applyAs`. A CSV row fills only the missing parts
+  of a matched device's `location`, so the observation holds the row's `location`, and the golden record gets the
+  merged one.
+* **A CSV row that matches a device also states its device,** if it has a manufacturer and a model. The names are
+  resolved like those of an added device, so a name that the uploader confirmed as new is created. The device is never
+  applied to a matched asset.
 * **`raw` is stored only for work orders from an integration.** Every other observation leaves it null. When a
   `SourceRecord` already holds the payload, as it does for notifications and emailed work orders, the
   observation points at it with `sourceRecordId`. This also traces an LLM-extracted value back to the document
@@ -210,10 +216,14 @@ Email isn't an integration and won't become one, so it has its own source.
 | An LLM extracting from an integration's source record | `INTEGRATION` | Automation user |
 | An LLM extracting from a TA4 source record | `API_CLIENT` | Automation user |
 | Work order or values extracted from an email | `EMAIL` | Automation user |
+| Demo seeds | `MANUAL` | Seed user |
 
 An LLM is how a value was produced, not where it came from, so there is no LLM source. If an LLM value
 restates what a source said, it takes that source. If the LLM concluded it, it is `AUTOMATION`.
 `ctx.auth.key` separates `API_CLIENT` from `MANUAL`: it is set for API keys and undefined for sessions.
+
+A value extracted from a source record is always a `PATCH`, also from an integration. A `SNAPSHOT` would become
+that integration's newest one, so its next sync would count every other field as changed and overwrite user edits.
 
 Every write passes its origin, and the type requires what each source needs. A write from an integration
 doesn't compile without `observedAt` and `integrationName`, and a write from any other source doesn't
@@ -259,10 +269,10 @@ createWithObservation(tx, …, (raw) => raw.workOrderTicket.create({ … }));  /
   provenance functions. Platforms never hold a client that can write. Untracked models, like remediations, still
   pass their delegate.
 
-A Biome `noRestrictedImports` rule blocks importing `db-raw`, and importing `PrismaClient` from the generated
-client. Its overrides are `db.ts` for `PrismaClient`, the provenance module for `db-raw`, and tests and `scripts/`
-for both. It must use `patterns`, because `paths` misses relative imports. CI already runs `tsc --noEmit` and
-`biome ci`.
+A Biome `noRestrictedImports` rule blocks importing `db-raw`, and importing `PrismaClient` or a namespace
+(`import * as`) from the generated client. Its overrides are `db.ts` for `PrismaClient`, the provenance module for
+`db-raw`, and tests and `scripts/` for both. It must use `patterns`, because `paths` misses relative imports. CI
+already runs `tsc --noEmit` and `biome ci`.
 
 Two helpers in the provenance module cover the writes that need no observation, so `src/` has no other overrides:
 
@@ -558,7 +568,7 @@ estimates, except for PR 1.
 | 12 | Switch the ticket timeline and overview to `FieldChange`, drop `TicketActivity` | 1,800 | 11 |
 | 13 | Notification edits and timeline, narrowing `Notification`, drop `FieldCorrection` | 700 | 9 |
 
-PR 6 can be worked on alongside 2 to 5, and 13 alongside 10 to 12. If PR 4 gets too big, the typed
+PRs 3 and 4 ship as one GitHub PR. PR 6 can be worked on alongside 2 to 5, and 13 alongside 10 to 12. If PR 4 gets too big, the typed
 writes can be their own PR after it. Each PR makes the doc, `CLAUDE.md` and API changes for what it ships.
 
 * PR 2 adds the whole `Observation` and `FieldChange` schema, including every enum value, `sourceRecordId`,
@@ -589,7 +599,9 @@ the code.
 | The callbacks of `createWithObservation` and `deleteWithObservation` get `tx` itself, and not `asRaw(tx)` | 2 | 4 |
 | `Asset.userId` and `Asset.user` are in the asset map | 2 | 5 |
 | Asset writes and syncs still set `Asset.userId` | 3, 4 | 5 |
+| `fleetCreatedEquipmentKeys` reads who created an asset from `Asset.userId` | 4 | 5 |
 | `assets.remove` deletes tickets without a `TOMBSTONE` | 3 | 10 |
+| The asset seeds use `applyObservation` to update only `utilization`, and not `updateIgnoredFields` | 3 | 10 |
 | `processIntegrationSync` still takes a `userId` | 4 | 7 |
 | `processIntegrationSync` skips provenance for work orders, which still pass their delegate | 4 | 8 |
 | `WorkOrderTicket` isn't narrowed | 4 | 11 |
@@ -607,9 +619,10 @@ the code.
       `applyObservation` takes everything the source said, plus the fields it may apply
 - [x] Add the `ObservationOrigin` type, with a type test proving that an integration write without
       `observedAt` fails to compile
-- [ ] Set the source from `ctx.auth.key` on tRPC writes: `API_CLIENT` with a key, `MANUAL` without one. Do it
+- [x] Set the source from `ctx.auth.key` on tRPC writes: `API_CLIENT` with a key, `MANUAL` without one. Do it
       in one helper, so a source for AI writes can be added there later (see "out of scope")
-- [ ] Record values that are dropped today: `ingestFleetAssets`, `enrichAssetIdentifiers`
+- [x] Record the values that `enrichAssetIdentifiers` drops today
+- [x] Record the values that `ingestFleetAssets` drops today
 - [ ] Add an exhaustive `tracked` / `ignored` map for each `ProvenanceEntityType`, typed from Prisma's
       generated field names so a missing or stale key fails to compile. `applyObservation` reads
       this map to decide which fields get a `FieldChange`
@@ -619,16 +632,17 @@ the code.
 - [x] Add a type test proving that a missing key fails. CI already runs `tsc --noEmit`, which
       turns this into a failed check
 - [ ] Add each read helper for the questions above in the PR that first uses it
-- [ ] Route integration writes for tracked entities through it: `processIntegrationSync`, which also
+- [x] Route integration writes for tracked entities through it: `processIntegrationSync`, which also
       serves untracked models like remediations and must skip provenance for them. Replace its
       own `lastSynced = new Date()` with a required `observedAt` parameter, used for `lastSynced` and for every
-      item's observation. Callers pass the same value for that sync's `TOMBSTONE`s
-- [ ] In `processAssetIntegrationSync`, leave out the device fields when `device` is missing, like `assets.update`
+      item's observation
+- [ ] Route the work order syncs through that path too. Pass the same `observedAt` for a sync's `TOMBSTONE`s
+- [x] In `processAssetIntegrationSync`, leave out the device fields when `device` is missing, like `assets.update`
       does. Test that a missing `device` keeps the asset's device, and that an explicit null clears it
-- [ ] Route asset writes: `assets.create`, `createBulk`, `update`, `remove`, `enrichAssetIdentifiers`
+- [x] Route asset writes: `assets.create`, `createBulk`, `update`, `remove`, `enrichAssetIdentifiers`
 - [ ] Route work order writes: tracking routers, `reschedule.ts`, `asset-tickets.ts`, mitigation
       routers, `work-orders/submit.ts`, `work-order-tools.ts`, `process-inbox-email`
-- [ ] Route CSV imports (`csv-upload/import/apply.ts`) with the uploader as the actor and
+- [x] Route CSV imports (`csv-upload/import/apply.ts`) with the uploader as the actor and
       `CsvImport.createdAt` as `observedAt` for every row of every chunk. The observation holds the whole row,
       and only the fields missing from a matched device may be applied. Test that the rows of one import share
       one `observedAt`
@@ -646,19 +660,22 @@ the code.
 - [ ] Return the PATCH response from `pushEditToPlatforms` and record it as the integration's `SNAPSHOT`
 - [ ] Keep the behavior of `fleetCreatedEquipmentKeys`, reading who created the asset from its `CREATE`
       observation, since `Asset.userId` is gone
-- [ ] Make demo seeds write through `createWithObservation` and `applyObservation`, or their rows have no
-      provenance after the reset
+- [x] Make the asset demo seeds write through `createWithObservation` and `applyObservation`, or their rows have
+      no provenance after the reset
+- [ ] Do the same for the work order and notification demo seeds
 - [x] Add the raw SQL CHECK constraint on `Observation`
-- [ ] Add the narrowed client types to `db.ts`, `asRaw` in `db-raw.ts`, and the Biome rule. Check that the types
+- [x] Add the narrowed client types to `db.ts`, `asRaw` in `db-raw.ts`, and the Biome rule. Check that the types
       inferred from `ExtendedPrismaClient["asset"]` don't change
-- [ ] `processIntegrationSync` takes an entity type instead of a delegate for tracked models. Remove the `any`
+- [x] `processIntegrationSync` takes an entity type instead of a delegate for tracked models. Remove the `any`
       clients from that path
 - [ ] Add `updateIgnoredFields` and `deleteDrafts`. Test that `updateIgnoredFields` rejects a `tracked` field at
       runtime, and that `deleteDrafts` doesn't delete a ticket that isn't a draft
-- [ ] Narrow each model in the PR that routes its last write. Add type tests with `@ts-expect-error` for each one:
+- [x] Narrow `Asset`
+- [ ] Narrow each other model in the PR that routes its last write. Add type tests with `@ts-expect-error` for each one:
       a write on `prisma`, on `tx` and through a dynamic model name, a delegate passed as a value, and
       `updateIgnoredFields` with a `tracked` field once it exists
-- [ ] Use `asRaw` in the tests and `scripts/` that write tracked models directly
+- [x] Use `asRaw` in the tests and `scripts/` that write assets directly
+- [ ] Do the same for work orders and notifications
 - [ ] Route the notification delete in `dev/fleet-integration.ts` too. The seeds in `prisma/seeds/` have no lint
       override
 

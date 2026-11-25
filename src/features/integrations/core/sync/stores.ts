@@ -110,8 +110,7 @@ export const untrackedStore = ({
 
 /** The columns of a new row that a source doesn't state. */
 interface CreateOnly {
-  // TODO VW-605 (PR 5): `userId` goes, with the column.
-  ASSET: Pick<Prisma.AssetUncheckedCreateInput, "id" | "userId">;
+  ASSET: Pick<Prisma.AssetUncheckedCreateInput, "id">;
 }
 
 interface ItemWhere {
@@ -120,7 +119,7 @@ interface ItemWhere {
 
 export interface TrackedWrite<E extends TrackedEntityType> {
   /** What the item states when it is new. Null if it may not create one. */
-  create: { fields: EntityInputs[E]; only: CreateOnly[E] } | null;
+  create: { fields: EntityInputs[E]; only?: CreateOnly[E] } | null;
   /** What the item states about an existing one, and what may be applied. */
   update: {
     fields: EntityInputs[E];

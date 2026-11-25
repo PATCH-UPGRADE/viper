@@ -31,11 +31,6 @@ const fields = {
   createdAt: "ignored",
   updatedAt: "ignored",
 
-  // TODO VW-605 (PR 5): the column and its relation are dropped. The CREATE
-  // observation says who created the asset.
-  userId: "ignored",
-  user: "ignored",
-
   // Tracked through their foreign key.
   manufacturer: "ignored",
   product: "ignored",

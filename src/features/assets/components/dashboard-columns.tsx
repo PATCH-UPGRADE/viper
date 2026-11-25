@@ -17,9 +17,9 @@ import {
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { relativeTime } from "@/lib/date-utils";
-import type { AssetWithIssueRelations } from "../types";
+import type { AssetDashboardRow } from "../types";
 
-type AssetIssue = AssetWithIssueRelations["issues"][number];
+type AssetIssue = AssetDashboardRow["issues"][number];
 
 function countActiveBySeverity(
   issues: AssetIssue[],
@@ -41,7 +41,7 @@ const SEVERITY_COL_COUNT = 4;
 function createSeverityColumn(
   severity: Severity,
   isFirst: boolean,
-): ColumnDef<AssetWithIssueRelations> {
+): ColumnDef<AssetDashboardRow> {
   const config = severityConfig[severity];
   return {
     id: `severity_${severity}`,
@@ -88,7 +88,7 @@ function createSeverityColumn(
  * "Product • Device Type" over "Manufacturer • IP address" in small
  * muted text. An asset with no product shows getAssetTitle instead.
  */
-function DeviceCell({ asset }: { asset: AssetWithIssueRelations }) {
+function DeviceCell({ asset }: { asset: AssetDashboardRow }) {
   const product = asset.product?.canonicalDisplayName;
   const deviceType = getAssetDeviceTypeLabel(asset);
   const details = [asset.manufacturer?.canonicalDisplayName, asset.ip].filter(
@@ -111,7 +111,7 @@ function DeviceCell({ asset }: { asset: AssetWithIssueRelations }) {
   );
 }
 
-export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
+export const dashboardColumns: ColumnDef<AssetDashboardRow>[] = [
   {
     id: "device",
     meta: { title: "Device" },

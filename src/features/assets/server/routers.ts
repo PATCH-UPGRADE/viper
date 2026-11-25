@@ -31,6 +31,7 @@ import {
 } from "@/lib/pagination";
 import { assetColumns } from "@/lib/provenance/asset";
 import { requestOrigin } from "@/lib/provenance/origin";
+import { attachSources } from "@/lib/provenance/read";
 import {
   applyObservation,
   createWithObservation,
@@ -50,7 +51,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "@/trpc/init";
-import { requireExistence, requireOwnership } from "@/trpc/middleware";
+import { requireExistence } from "@/trpc/middleware";
 import {
   assetArrayInputSchema,
   assetArrayResponseSchema,
@@ -149,8 +150,7 @@ function createAsset(
     { entityType: "ASSET", fields, origin: requestOrigin(auth) },
     (raw) =>
       raw.asset.create({
-        // TODO VW-605 (PR 5): `userId` goes, with the column.
-        data: { ...assetColumns(fields), userId: auth.user.id },
+        data: assetColumns(fields),
         include: assetInclude,
       }),
   );
@@ -332,11 +332,15 @@ export const assetsRouter = createTRPCRouter({
 
       const where = createSearchFilter(search);
 
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: where,
         include: { ...assetInclude, issues: true },
         orderBy: assetOrderBy(sort),
       });
+      return {
+        ...result,
+        items: await attachSources("ASSET", result.items),
+      };
     }),
 
   // TODO: VW-82 -- do sorting in SQL, not by loading all assets and doing it manually
@@ -369,13 +373,11 @@ export const assetsRouter = createTRPCRouter({
           result.items,
           assetDashboardInclude.issues.include,
         );
-        return {
-          ...result,
-          items: result.items.map((asset) => ({
-            ...asset,
-            issues: effectiveIssues.get(asset.id) ?? [],
-          })),
-        };
+        const items = result.items.map((asset) => ({
+          ...asset,
+          issues: effectiveIssues.get(asset.id) ?? [],
+        }));
+        return { ...result, items: await attachSources("ASSET", items) };
       }
 
       const fetchedAssets = await prisma.asset.findMany({
@@ -413,7 +415,7 @@ export const assetsRouter = createTRPCRouter({
       );
 
       const items = sortedAssets.slice(meta.skip, meta.skip + meta.take);
-      return createPaginatedResponse(items, meta);
+      return createPaginatedResponse(await attachSources("ASSET", items), meta);
     }),
 
   // TODO: VW-511 -- full table load-and-merge: every asset plus all effective issues,
@@ -573,8 +575,7 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets",
         tags: ["Assets"],
         summary: "Create Asset",
-        description:
-          "Create a new asset. The authenticated user will be recorded as the creator.",
+        description: "Create a new asset.",
       },
     })
     .output(assetResponseSchema)
@@ -598,8 +599,7 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/bulk",
         tags: ["Assets"],
         summary: "Create Bulk Assets",
-        description:
-          "Create one or more new assets from an array. The authenticated user will be recorded as the creator.",
+        description: "Create one or more new assets from an array.",
       },
     })
     .output(assetArrayResponseSchema)
@@ -694,12 +694,15 @@ export const assetsRouter = createTRPCRouter({
       );
 
       return {
-        items: newlyVulnerableAssets.slice(0, input.pageSize),
+        items: await attachSources(
+          "ASSET",
+          newlyVulnerableAssets.slice(0, input.pageSize),
+        ),
         totalCount: newlyVulnerableAssets.length,
       };
     }),
 
-  // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
+  // DELETE /api/assets/{asset_id} - Delete asset (any authenticated user can delete)
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .meta({
@@ -709,14 +712,11 @@ export const assetsRouter = createTRPCRouter({
         tags: ["Assets"],
         summary: "Delete Asset",
         description:
-          "Delete an asset. Only the user who created the asset can delete it.",
+          "Delete an asset. Any authenticated user can delete any asset.",
       },
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "asset");
-
       return prisma.$transaction(async (tx) => {
         // TODO VW-605 (PR 10): write a TOMBSTONE for each of these tickets.
         await tx.workOrderTicket.deleteMany({
@@ -738,7 +738,7 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 
-  // PATCH /api/assets/{asset_id} - Partial update asset (only creator can update)
+  // PATCH /api/assets/{asset_id} - Partial update asset (any authenticated user can update)
   update: protectedProcedure
     .input(updateAssetSchema)
     .meta({
@@ -748,19 +748,20 @@ export const assetsRouter = createTRPCRouter({
         tags: ["Assets"],
         summary: "Update Asset",
         description:
-          "Partially update an asset. Only the user who created the asset can update it.",
+          "Partially update an asset. Any authenticated user can update any asset.",
       },
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireOwnership(input.id, ctx.auth.user.id, "asset");
-
       const { id, device: deviceInput, deviceType, ...updateData } = input;
+      const current = requireExistence(
+        await prisma.asset.findUnique({
+          where: { id },
+          select: { productId: true },
+        }),
+        "Asset",
+      );
       const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
-      const current = await prisma.asset.findUniqueOrThrow({
-        where: { id },
-        select: { productId: true },
-      });
 
       const device =
         deviceInput === undefined

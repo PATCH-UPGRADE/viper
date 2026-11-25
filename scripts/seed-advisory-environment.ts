@@ -117,7 +117,7 @@ async function upsertDevice(product: string, version: string) {
   };
 }
 
-async function upsertAsset(spec: AssetSpec, device: Device, userId: string) {
+async function upsertAsset(spec: AssetSpec, device: Device) {
   const existing = await prisma.asset.findFirst({
     where: { serialNumber: spec.serialNumber },
   });
@@ -134,7 +134,6 @@ async function upsertAsset(spec: AssetSpec, device: Device, userId: string) {
       ...spec,
       status: "Active" as AssetStatus,
       ...device,
-      userId,
     },
   });
 }
@@ -332,7 +331,7 @@ async function seedSyngoPlazaEnvironment(userId: string) {
   for (const spec of SYNGO_PLAZA_ASSETS) {
     const { version, ...assetFields } = spec;
     const device = await upsertDevice(SYNGO_PLAZA_PRODUCT, version);
-    assets.push(await upsertAsset(assetFields, device, userId));
+    assets.push(await upsertAsset(assetFields, device));
   }
 
   const vulnerability = await createAdvisoryVulnerability(
@@ -490,7 +489,7 @@ async function seedDeserializationEnvironment(userId: string) {
   for (const spec of DESERIALIZATION_ASSETS) {
     const { product, version, ...assetFields } = spec;
     const device = await upsertDevice(product, version);
-    assets.push(await upsertAsset(assetFields, device, userId));
+    assets.push(await upsertAsset(assetFields, device));
   }
 
   const vulnerability = await createAdvisoryVulnerability(

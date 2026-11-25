@@ -186,7 +186,7 @@ describe("processIntegrationSync — tracked models", () => {
   const config = {
     entityType: "ASSET",
     transformInputItem: async () => ({
-      create: { fields: { hostname: "h" }, only: { userId: "user-1" } },
+      create: { fields: { hostname: "h" }, only: { id: "asset-1" } },
       update,
       uniqueFieldConditions: [{ hostname: "h" }],
     }),
@@ -212,6 +212,23 @@ describe("processIntegrationSync — tracked models", () => {
     expect(provenance.createWithObservation).toHaveBeenCalledWith(
       mockPrisma,
       { entityType: "ASSET", fields: { hostname: "h" }, origin },
+      expect.any(Function),
+    );
+  });
+
+  it("uses the run's integration name, if it has one", async () => {
+    await processIntegrationSync(
+      config as never,
+      { items: items(1) },
+      { ...RUN, integrationName: "Spreadsheet Upload" },
+      ResourceType.Asset,
+    );
+
+    expect(provenance.createWithObservation).toHaveBeenCalledWith(
+      mockPrisma,
+      expect.objectContaining({
+        origin: { ...origin, integrationName: "Spreadsheet Upload" },
+      }),
       expect.any(Function),
     );
   });

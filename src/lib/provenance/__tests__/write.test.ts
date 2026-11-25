@@ -132,7 +132,7 @@ type Apply = ApplyParams["apply"];
 
 const create = (fields: Fields, origin: ApplyParams["origin"] = fleet) =>
   createWithObservation(db.tx, { entityType: "ASSET", fields, origin }, (raw) =>
-    raw.asset.create({ data: { ...fields, userId: "u" } as never }),
+    raw.asset.create({ data: fields as never }),
   );
 const snapshot = (
   fields: Fields,

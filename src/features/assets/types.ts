@@ -11,11 +11,10 @@ import {
 import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
+import type { EntitySources } from "@/lib/provenance/types";
 import {
   assetDeviceInputSchema,
   createIntegrationInputSchema,
-  userIncludeSelect,
-  userSchema,
   versionStatusSchema,
 } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
@@ -149,10 +148,8 @@ export const assetResponseSchema = z.object({
   location: z.unknown().nullable(),
   status: assetStatusSchema.nullable(),
   utilization: z.unknown().nullable(),
-  userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
-  user: userSchema,
   notes: z.array(scopedNoteSchema).optional(),
   affectedIssueCounts: affectedIssueCountsSchema.optional(),
 });
@@ -217,7 +214,6 @@ export type AssetWithDevice = Prisma.Result<
 >;
 
 export const assetInclude = {
-  user: userIncludeSelect,
   ...assetDeviceInclude,
   externalMappings: externalMappingSelect,
   managedBy: managesRelationshipSelect,
@@ -230,7 +226,6 @@ export type AssetWithRelations = Prisma.Result<
 >;
 
 export const assetDashboardInclude = {
-  user: userIncludeSelect,
   ...assetDeviceInclude,
   externalMappings: externalMappingWithSyncSelect,
   issues: {
@@ -253,6 +248,9 @@ export const assetDashboardInclude = {
 export type AssetWithIssueRelations = Prisma.AssetGetPayload<{
   include: typeof assetDashboardInclude;
 }>;
+
+/** A row of the asset dashboard, which its drawer also shows. */
+export type AssetDashboardRow = AssetWithIssueRelations & EntitySources;
 
 export type AssetIssueMetricsCounts = inferOutput<
   typeof trpc.assets.getIssueMetricsInternal

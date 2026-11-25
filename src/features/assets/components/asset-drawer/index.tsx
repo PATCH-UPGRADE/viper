@@ -19,7 +19,7 @@ import type { UserRole } from "@/features/chat/utils";
 import { DrawerIssuesList } from "@/features/issues/components/issue";
 import { RemediationCardList } from "@/features/remediations/components/remediations";
 import { relativeTime } from "@/lib/date-utils";
-import type { AssetWithIssueRelations } from "../../types";
+import type { AssetDashboardRow } from "../../types";
 import {
   getAssetDeviceTypeLabel,
   getAssetTitle,
@@ -28,7 +28,7 @@ import {
 import { assetStatusVariant, OverviewSection } from "./overview-section";
 
 interface AssetDashboardDrawerProps {
-  asset: AssetWithIssueRelations;
+  asset: AssetDashboardRow;
   open: boolean;
   setOpen: (open: boolean) => void;
   children?: React.ReactNode;
@@ -37,7 +37,7 @@ interface AssetDashboardDrawerProps {
 /**
  * An asset with no product falls back to getAssetTitle (its device type, or "Unknown Asset").
  */
-function AssetDrawerTitle({ asset }: { asset: AssetWithIssueRelations }) {
+function AssetDrawerTitle({ asset }: { asset: AssetDashboardRow }) {
   const product = asset.product?.canonicalDisplayName;
   const deviceType = getAssetDeviceTypeLabel(asset);
   if (!product) return getAssetTitle(asset);

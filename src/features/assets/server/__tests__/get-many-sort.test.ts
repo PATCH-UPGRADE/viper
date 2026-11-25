@@ -24,6 +24,10 @@ vi.mock("@/features/notes/server/get-relevant-notes", () => ({
   attachNote: vi.fn(async (_scope: string, row: unknown) => row),
 }));
 
+vi.mock("@/lib/provenance/read", () => ({
+  attachSources: vi.fn(async (_entityType: string, rows: unknown[]) => rows),
+}));
+
 import { IssueStatus } from "@/generated/prisma";
 import { createCallerFactory } from "@/trpc/init";
 import { assetsRouter } from "../routers";
@@ -69,15 +73,8 @@ const makeAssetRow = (id: string, manufacturerId: string | null) => ({
   location: null,
   status: null,
   utilization: null,
-  userId: FAKE_USER_ID,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-02"),
-  user: {
-    id: FAKE_USER_ID,
-    name: "Test User",
-    email: "test@example.com",
-    image: null,
-  },
   manufacturer: null,
   product: null,
   version: null,

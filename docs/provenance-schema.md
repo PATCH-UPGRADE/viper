@@ -10,6 +10,7 @@
 | What did this sync change? | The `Observation`s with that `entityType`, `integrationId` and `observedAt`, which all observations from one sync share, joined to their `FieldChange`s. `kind` separates created, updated and deleted entities. A `TOMBSTONE` has no `FieldChange`s. |
 | What does this source say now? | For an integration, its newest `CREATE` or `SNAPSHOT` of the entity. Other sources only write a `PATCH` when they change something, so use the `FieldChange`s. |
 | Who created this entity? | The entity's `CREATE` observation: its `source`, `integrationName` and `actorUserId`. |
+| Who has written this entity? | The distinct sources of its `Observation`s. People and API keys count once per actor, and integrations once each. |
 
 "Newest" always means the highest `seq`.
 
@@ -139,6 +140,8 @@ field on every sync.
   observation points at it with `sourceRecordId`. This also traces an LLM-extracted value back to the document
   it read. Deleting an integration deletes its `SourceRecord`s, so those observations lose the exact payload
   but keep `fields`, `source` and `integrationName`.
+* **`integrationName` is the integration's name at the time of the write, except for CSV imports,** which all use
+  "Spreadsheet Upload". Each import is its own integration, and removing one leaves only this name.
 * **Foreign key fields are stored as `{ id, label }`,** so history stays readable after the referenced
   row is deleted (the reason `TicketActivity.data` snapshots names today). Only the `id` is
   compared, so renaming a product isn't a change to its assets.
@@ -658,7 +661,7 @@ the code.
 - [ ] Set `sourceRecordId` on observations for notifications and emailed work orders
 - [ ] Callers using `updateMany` must read the affected rows first to know the old values
 - [ ] Return the PATCH response from `pushEditToPlatforms` and record it as the integration's `SNAPSHOT`
-- [ ] Keep the behavior of `fleetCreatedEquipmentKeys`, reading who created the asset from its `CREATE`
+- [x] Keep the behavior of `fleetCreatedEquipmentKeys`, reading who created the asset from its `CREATE`
       observation, since `Asset.userId` is gone
 - [x] Make the asset demo seeds write through `createWithObservation` and `applyObservation`, or their rows have
       no provenance after the reset
@@ -711,15 +714,15 @@ the code.
 
 ### changing ownership
 
-- [ ] Remove `requireOwnership` from `assets.update` and `assets.remove`, and `asset` from `OwnableModel`
+- [x] Remove `requireOwnership` from `assets.update` and `assets.remove`, and `asset` from `OwnableModel`
 - [ ] Records router: `allowUnowned` would let anyone edit integration records once they have a null
       `userId`, so also refuse null-owner records with an external mapping
-- [ ] Update `requireOwnership`'s tests, API tests that expect `FORBIDDEN` from those asset routes,
-      and their OpenAPI descriptions
-- [ ] Stop setting `userId` on assets, and on rows an integration creates in the `*IntegrationSync` functions
-- [ ] Remove `user` from `assetInclude` and the asset schemas
-- [ ] Read the asset's creator from its `CREATE` observation in `assets/utils.ts`. List pages need a
-      batched query per page
+- [x] Update the OpenAPI descriptions of those asset routes
+- [x] Stop setting `userId` on assets
+- [ ] Stop setting `userId` on rows an integration creates in the `*IntegrationSync` functions
+- [x] Remove `user` from `assetInclude` and the asset schemas
+- [x] Show every source of an asset in the Sources column, and its creator in the drawer, from its
+      observations. List pages need a batched query per page
 
 ### removing TicketActivity and FieldCorrection
 

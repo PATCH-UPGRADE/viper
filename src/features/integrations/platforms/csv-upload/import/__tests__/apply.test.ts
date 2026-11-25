@@ -97,13 +97,14 @@ beforeEach(() => {
 });
 
 describe("applyChunk", () => {
-  it("gives each row the time of the import, with the uploader as the actor", async () => {
+  it("gives each row the time of the import, with the uploader as the actor, under one name", async () => {
     const { runs } = await apply();
     const run = {
       userId: "uploader",
       integrationId: "int-1",
       observedAt,
       actorUserId: "uploader",
+      integrationName: "Spreadsheet Upload",
     };
     expect(runs).toEqual([run, run]);
   });
@@ -120,7 +121,7 @@ describe("applyChunk", () => {
     expect(add).toMatchObject({
       create: {
         fields: { ...tracked, networkSegment: "VLAN-1", status: "Active" },
-        only: { id: addedAssetIdFor("import", 1), userId: "uploader" },
+        only: { id: addedAssetIdFor("import", 1) },
       },
       update: { fields: tracked, apply: [] },
     });

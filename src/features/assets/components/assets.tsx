@@ -60,6 +60,7 @@ import {
   useSuspenseAssetsDashboard,
 } from "../hooks/use-assets";
 import type {
+  AssetDashboardRow,
   AssetIssueMetricsCounts,
   AssetWithIssueRelations,
   AssetWithRelations,
@@ -235,9 +236,9 @@ export const NewVulnerableAssetsAlert = ({
   totalCount,
   onAssetClick,
 }: {
-  items: AssetWithIssueRelations[];
+  items: AssetDashboardRow[];
   totalCount: number;
-  onAssetClick: (asset: AssetWithIssueRelations) => void;
+  onAssetClick: (asset: AssetDashboardRow) => void;
 }) => {
   // Intentionally not persisted - dismissing is a session-only UX convenience
   // In the future I think alerts will take a different form, so it's not worth
@@ -313,12 +314,10 @@ export const AssetDashboardList = () => {
   const { data: metrics } = useSuspenseAssetIssueMetrics();
   const { data: recentVulnData } = useNewVulnerableAssets();
 
-  const [asset, setAsset] = useState<AssetWithIssueRelations | undefined>(
-    undefined,
-  );
+  const [asset, setAsset] = useState<AssetDashboardRow | undefined>(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const openDrawer = (a: AssetWithIssueRelations) => {
+  const openDrawer = (a: AssetDashboardRow) => {
     setAsset(a);
     setDrawerOpen(true);
   };
@@ -327,7 +326,7 @@ export const AssetDashboardList = () => {
     <>
       <AssetIssueMetrics data={metrics} />
       <NewVulnerableAssetsAlert
-        items={(recentVulnData?.items ?? []) as AssetWithIssueRelations[]}
+        items={(recentVulnData?.items ?? []) as AssetDashboardRow[]}
         totalCount={recentVulnData?.totalCount ?? 0}
         onAssetClick={openDrawer}
       />

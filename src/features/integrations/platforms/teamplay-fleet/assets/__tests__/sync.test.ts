@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   integration: { findUniqueOrThrow: vi.fn() },
   asset: { findMany: vi.fn() },
   externalAssetMapping: { findMany: vi.fn() },
+  observation: { findMany: vi.fn() },
   product: { findUniqueOrThrow: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ default: db }));
@@ -116,8 +117,12 @@ beforeEach(() => {
     integrationUserId: "shadow-1",
   });
   db.asset.findMany.mockReset().mockResolvedValue([]);
-  // By default no Fleet asset is safe to re-group; individual tests opt in.
-  db.externalAssetMapping.findMany.mockReset().mockResolvedValue([]);
+  // By default Fleet created none of the mapped assets; individual tests opt in.
+  db.externalAssetMapping.findMany.mockReset().mockResolvedValue([
+    { externalId: "US_1006103273", itemId: "asset-1" },
+    { externalId: "US_other", itemId: "asset-2" },
+  ]);
+  db.observation.findMany.mockReset().mockResolvedValue([]);
   vi.mocked(processIntegrationSync).mockReset().mockResolvedValue(okResponse);
   vi.mocked(resolveDevice).mockReset().mockResolvedValue(device);
   db.product.findUniqueOrThrow
@@ -183,17 +188,12 @@ describe("syncAssets", () => {
       product: "syngo WebSpace",
       version: "VA11A",
     });
-    expect(out.create).toMatchObject({
-      fields: device,
-      only: { userId: "shadow-1" },
-    });
+    expect(out.create).toMatchObject({ fields: device });
     expect(out.uniqueFieldConditions).toEqual([{ serialNumber: "63014" }]);
   });
 
   it("never writes Fleet's modality label into the asset role", async () => {
-    db.externalAssetMapping.findMany.mockResolvedValue([
-      { externalId: "US_1006103273" },
-    ]);
+    db.observation.findMany.mockResolvedValue([{ entityId: "asset-1" }]);
     await syncAssets(makeCtx());
 
     const { config, input } = lastSyncCall();
@@ -206,9 +206,7 @@ describe("syncAssets", () => {
   });
 
   it("updates the device of an asset that Fleet created", async () => {
-    db.externalAssetMapping.findMany.mockResolvedValue([
-      { externalId: "US_1006103273" },
-    ]);
+    db.observation.findMany.mockResolvedValue([{ entityId: "asset-1" }]);
 
     await syncAssets(makeCtx());
 
@@ -222,7 +220,7 @@ describe("syncAssets", () => {
   });
 
   it("records but doesn't apply the device on an asset that another source created", async () => {
-    db.externalAssetMapping.findMany.mockResolvedValue([]);
+    db.observation.findMany.mockResolvedValue([{ entityId: "asset-2" }]);
 
     await syncAssets(makeCtx());
 
@@ -235,12 +233,17 @@ describe("syncAssets", () => {
     expect(out.update.apply).toEqual(["serialNumber", "location"]);
   });
 
-  it("only asks for the assets that the Fleet user created", async () => {
+  it("only asks for the mapped assets that this integration created", async () => {
     await syncAssets(makeCtx());
 
-    expect(db.externalAssetMapping.findMany).toHaveBeenCalledWith({
-      where: { integrationId: "int-1", item: { userId: "shadow-1" } },
-      select: { externalId: true },
+    expect(db.observation.findMany).toHaveBeenCalledWith({
+      where: {
+        entityType: "ASSET",
+        entityId: { in: ["asset-1", "asset-2"] },
+        kind: "CREATE",
+        integrationId: "int-1",
+      },
+      select: { entityId: true },
     });
   });
 

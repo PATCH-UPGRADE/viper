@@ -14,8 +14,9 @@ import { CopyCode } from "@/components/ui/code";
 import { PlatformEnum } from "@/generated/prisma";
 import { formatDateWithAgo, relativeTime } from "@/lib/date-utils";
 import { parseLocation } from "@/lib/markdown";
-import type { AssetWithIssueRelations } from "../../types";
+import type { AssetDashboardRow } from "../../types";
 import {
+  assetSourceBlock,
   getAssetDeviceTypeLabel,
   UNKNOWN_DEVICE_TYPE_STRING,
   VERSION_STATUS_LABELS,
@@ -24,9 +25,7 @@ import { AssetQrPdfLink } from "../asset-qr-pdf-link";
 import { AssetUtilizationHeatMapGridVertical } from "../asset-utilization-grid";
 import { NetworkFlowSection } from "./network-flow-section";
 
-export const assetStatusVariant = (
-  status: AssetWithIssueRelations["status"],
-) =>
+export const assetStatusVariant = (status: AssetDashboardRow["status"]) =>
   status === "Active"
     ? "default"
     : status === "Decommissioned"
@@ -38,7 +37,7 @@ export const assetStatusVariant = (
  * TODO VW-600: list every source from the data provenance models (people, API keys and
  * automations too), with when each last wrote to the asset.
  */
-function AssetSourceList({ asset }: { asset: AssetWithIssueRelations }) {
+function AssetSourceList({ asset }: { asset: AssetDashboardRow }) {
   return (
     <SourceList
       emptyMessage="Not mapped to any integration."
@@ -58,7 +57,7 @@ function AssetSourceList({ asset }: { asset: AssetWithIssueRelations }) {
   );
 }
 
-export function OverviewSection({ asset }: { asset: AssetWithIssueRelations }) {
+export function OverviewSection({ asset }: { asset: AssetDashboardRow }) {
   return (
     <DrawerSections>
       <DrawerSection title="Device Information">
@@ -133,9 +132,11 @@ export function OverviewSection({ asset }: { asset: AssetWithIssueRelations }) {
         <DrawerFieldGrid className="sm:grid-cols-1 lg:grid-cols-1">
           <DrawerField label="Created">
             {formatDateWithAgo(asset.createdAt)}
-            <div className="text-xs text-muted-foreground">
-              By {asset.user.name}
-            </div>
+            {asset.creator && (
+              <div className="text-xs text-muted-foreground">
+                By {assetSourceBlock(asset.creator).name}
+              </div>
+            )}
           </DrawerField>
           <DrawerField label="Last Updated">
             {formatDateWithAgo(asset.updatedAt)}

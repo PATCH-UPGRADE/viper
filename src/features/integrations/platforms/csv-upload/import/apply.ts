@@ -189,7 +189,6 @@ async function deviceFor(
 
 async function toAssetWrite(
   item: CsvSyncItem,
-  userId: string,
   input: ApplyChunkInput,
   fillDeviceType: FillDeviceType,
 ): Promise<TrackedWrite<"ASSET">> {
@@ -204,7 +203,7 @@ async function toAssetWrite(
     return {
       create: {
         fields: { ...fields, ...filledValues(row, IGNORED_FIELDS) },
-        only: { id: item.assetId, userId },
+        only: { id: item.assetId },
       },
       // Only a retry of this import finds the device that it added.
       update: { fields, apply: [] },
@@ -235,8 +234,8 @@ async function writeRow(
       {
         entityType: "ASSET",
         shouldRecordSyncOutcome: false,
-        transformInputItem: (syncItem: CsvSyncItem, userId: string) =>
-          toAssetWrite(syncItem, userId, input, fillDeviceType),
+        transformInputItem: (syncItem: CsvSyncItem) =>
+          toAssetWrite(syncItem, input, fillDeviceType),
       },
       { items: [item] },
       {
@@ -244,6 +243,9 @@ async function writeRow(
         integrationId: input.integrationId,
         observedAt: input.observedAt,
         actorUserId: input.userId,
+        // Each import is its own integration, so its own name would show once
+        // the import is removed and its platform is unknown.
+        integrationName: CSV_UPLOAD_DISPLAY_NAME,
       },
       ResourceType.Asset,
     );

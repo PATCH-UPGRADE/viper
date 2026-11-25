@@ -7,6 +7,7 @@ import {
   type Prisma,
   type VersionStatus,
 } from "@/generated/prisma";
+import type { EntitySource, EntitySources } from "@/lib/provenance/types";
 import { isSecurityRelated } from "../remediations/release";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
@@ -115,50 +116,82 @@ export function getAssetNameForAgent(asset: AgentNameSource): string {
   );
 }
 
-export type AssetSourcesSource = {
-  user: { name: string };
+export type AssetSourcesSource = Pick<EntitySources, "sources"> & {
   externalMappings: ReadonlyArray<{
-    integration: { name: string; platform: PlatformEnum };
+    integration: { id: string; name: string; platform: PlatformEnum };
   }>;
 };
 
+const DELETED_USER_NAME = "Deleted user";
+
+/** One source of an asset. Every CSV import is its own integration, so they share a block. */
+export function assetSourceBlock(source: EntitySource): SourceBlock {
+  switch (source.source) {
+    case "INTEGRATION": {
+      const { integrationId, platform } = source;
+      const isCsv = platform === PlatformEnum.CSV_UPLOAD;
+      return {
+        key: `INTEGRATION:${isCsv ? platform : (integrationId ?? source.name)}`,
+        name: isCsv ? CSV_UPLOAD_DISPLAY_NAME : source.name,
+        kind: "integration",
+        typeLabel: integrationId ? "Integration" : "Integration (removed)",
+      };
+    }
+    case "MANUAL":
+    case "API_CLIENT":
+      return {
+        key: `${source.source}:${source.actor?.id}`,
+        name: source.actor?.name ?? DELETED_USER_NAME,
+        kind: "person",
+        typeLabel: source.source === "API_CLIENT" ? "API key" : "User",
+      };
+    case "AUTOMATION":
+      return {
+        key: source.source,
+        name: "VIPER Automation",
+        kind: "automation",
+        typeLabel: "Automation",
+      };
+    case "EMAIL":
+      return {
+        key: source.source,
+        name: "Email",
+        kind: "integration",
+        typeLabel: "Inbox",
+      };
+  }
+}
+
+const SOURCE_ORDER: EntitySource["source"][] = [
+  "INTEGRATION",
+  "MANUAL",
+  "API_CLIENT",
+  "AUTOMATION",
+  "EMAIL",
+];
+
 /**
- * Where an asset came from, as dashboard blocks: the user who created it as a person, then each
- * integration that reports it. Every CSV import is its own integration, so each shows as one "CSV
- * Upload". An integration's shadow user shares its name, so an asset an integration created lists
- * that integration once, as an integration.
- * TODO VW-600: build these from the data provenance models instead (every source that has written
- * to the asset, not only its creator and current mappings)
+ * Where an asset's information came from, as dashboard blocks: everyone who has written an
+ * observation of it, then any integration that maps it without having written one.
  */
 export function getAssetSourceBlocks(asset: AssetSourcesSource): SourceBlock[] {
-  const integrationBlocks: SourceBlock[] = [];
-  for (const { integration } of asset.externalMappings) {
-    const name =
-      integration.platform === PlatformEnum.CSV_UPLOAD
-        ? CSV_UPLOAD_DISPLAY_NAME
-        : integration.name;
-    if (integrationBlocks.some((block) => block.name === name)) continue;
-    integrationBlocks.push({
-      key: `integration:${name}`,
+  const mapped = asset.externalMappings.map(
+    ({ integration: { id, name, platform } }): EntitySource => ({
+      source: "INTEGRATION",
+      integrationId: id,
       name,
-      kind: "integration",
-      typeLabel: "Integration",
-    });
-  }
-  const creatorIsIntegration = asset.externalMappings.some(
-    ({ integration }) => integration.name === asset.user.name,
+      platform,
+    }),
   );
-  return creatorIsIntegration
-    ? integrationBlocks
-    : [
-        {
-          key: `user:${asset.user.name}`,
-          name: asset.user.name,
-          kind: "person",
-          typeLabel: "Created by",
-        },
-        ...integrationBlocks,
-      ];
+  const byKey = new Map<string, SourceBlock>();
+  for (const type of SOURCE_ORDER) {
+    for (const source of [...asset.sources, ...mapped]) {
+      if (source.source !== type) continue;
+      const block = assetSourceBlock(source);
+      if (!byKey.has(block.key)) byKey.set(block.key, block);
+    }
+  }
+  return [...byKey.values()];
 }
 
 /** getAssetSourceBlocks' names, e.g. for sorting or searching the Sources column. */

@@ -47,7 +47,7 @@ export function processAssetIntegrationSync(
     {
       entityType: "ASSET",
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
-      transformInputItem: async (item: IntegrationAssetItem, userId) => {
+      transformInputItem: async (item: IntegrationAssetItem) => {
         const {
           device: deviceInput,
           externalId,
@@ -84,7 +84,7 @@ export function processAssetIntegrationSync(
 
         const fields = { ...itemData, ...device };
         return {
-          create: { fields, only: { userId } },
+          create: { fields },
           update: { fields },
           uniqueFieldConditions,
         };

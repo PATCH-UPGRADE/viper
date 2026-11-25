@@ -257,7 +257,6 @@ async function seed() {
           hostname: `${TAG} seeded-${groupIndex}-${i}`,
           manufacturerId: group.manufacturerId,
           productId: group.id,
-          userId: user.id,
           createdAt: hoursAgo(groupIndex + 1),
           ...(integration
             ? {

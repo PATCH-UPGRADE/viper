@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PlatformEnum } from "@/generated/prisma";
+import type { EntitySource } from "@/lib/provenance/types";
 import {
   getAssetDeviceTypeLabel,
   getAssetDisplayName,
@@ -115,80 +116,101 @@ describe("getAssetDeviceTypeLabel", () => {
   });
 });
 
-describe("getAssetSources", () => {
-  const mapping = (name: string, platform: PlatformEnum) => ({
-    integration: { name, platform },
+describe("getAssetSourceBlocks", () => {
+  const integration = (
+    id: string | null,
+    name: string,
+    platform: PlatformEnum | null = PlatformEnum.PARTNER,
+  ) => ({ source: "INTEGRATION" as const, integrationId: id, name, platform });
+  const person = (
+    source: "MANUAL" | "API_CLIENT",
+    name: string | null,
+  ): EntitySource => ({ source, actor: name ? { id: name, name } : null });
+  const mapping = (
+    id: string,
+    name: string,
+    platform: PlatformEnum = PlatformEnum.PARTNER,
+  ) => ({ integration: { id, name, platform } });
+  const blocks = (
+    sources: EntitySource[],
+    externalMappings: ReturnType<typeof mapping>[] = [],
+  ) =>
+    getAssetSourceBlocks({ sources, externalMappings }).map(
+      ({ name, kind, typeLabel }) => [name, kind, typeLabel],
+    );
+
+  it("shows every kind of source, integrations first", () => {
+    expect(
+      blocks([
+        { source: "EMAIL" },
+        { source: "AUTOMATION" },
+        person("API_CLIENT", "Blueflow Service"),
+        person("MANUAL", "Ada"),
+        person("MANUAL", "Grace"),
+        integration("i1", "Fleet"),
+      ]),
+    ).toEqual([
+      ["Fleet", "integration", "Integration"],
+      ["Ada", "person", "User"],
+      ["Grace", "person", "User"],
+      ["Blueflow Service", "person", "API key"],
+      ["VIPER Automation", "automation", "Automation"],
+      ["Email", "integration", "Inbox"],
+    ]);
   });
 
-  it("lists the creator, then each integration that reports the asset", () => {
+  it("lists a mapped integration once, matched by id and not by name", () => {
     expect(
-      getAssetSources({
-        user: { name: "Seed User" },
-        externalMappings: [
-          mapping("Blueflow", PlatformEnum.PARTNER),
-          mapping("Hospital ServiceNow", PlatformEnum.SERVICENOW),
-        ],
-      }),
-    ).toEqual(["Seed User", "Blueflow", "Hospital ServiceNow"]);
+      blocks(
+        [integration("i1", "Fleet")],
+        [mapping("i1", "Fleet"), mapping("i2", "Fleet")],
+      ),
+    ).toEqual([
+      ["Fleet", "integration", "Integration"],
+      ["Fleet", "integration", "Integration"],
+    ]);
   });
 
-  it("lists an integration once when its shadow user created the asset", () => {
-    expect(
-      getAssetSources({
-        user: { name: "Blueflow" },
-        externalMappings: [mapping("Blueflow", PlatformEnum.PARTNER)],
-      }),
-    ).toEqual(["Blueflow"]);
+  it("lists a mapped integration that has written no observation", () => {
+    expect(blocks([], [mapping("i1", "Fleet")])).toEqual([
+      ["Fleet", "integration", "Integration"],
+    ]);
   });
 
   it('shows every CSV import as one "Spreadsheet Upload"', () => {
     expect(
-      getAssetSources({
-        user: { name: "Seed User" },
-        externalMappings: [
-          mapping("CSV Assets Upload - Oct 1", PlatformEnum.CSV_UPLOAD),
-          mapping("CSV Assets Upload - Oct 2", PlatformEnum.CSV_UPLOAD),
+      blocks(
+        [integration("c1", "CSV - Oct 1", PlatformEnum.CSV_UPLOAD)],
+        [
+          mapping("c1", "CSV - Oct 1", PlatformEnum.CSV_UPLOAD),
+          mapping("c2", "CSV - Oct 2", PlatformEnum.CSV_UPLOAD),
         ],
-      }),
-    ).toEqual(["Seed User", "Spreadsheet Upload"]);
+      ),
+    ).toEqual([["Spreadsheet Upload", "integration", "Integration"]]);
   });
 
-  it("lists only the creator when no integration reports the asset", () => {
+  it("keeps deleted integrations and deleted users", () => {
     expect(
-      getAssetSources({ user: { name: "Seed User" }, externalMappings: [] }),
-    ).toEqual(["Seed User"]);
+      blocks([integration(null, "Old Fleet", null), person("MANUAL", null)]),
+    ).toEqual([
+      ["Old Fleet", "integration", "Integration (removed)"],
+      ["Deleted user", "person", "User"],
+    ]);
+  });
+
+  it("is empty without sources", () => {
+    expect(blocks([])).toEqual([]);
   });
 });
 
-describe("getAssetSourceBlocks", () => {
-  const mapping = (name: string, platform: PlatformEnum) => ({
-    integration: { name, platform },
-  });
-
-  it("shows the creator as a person, then each integration", () => {
-    const blocks = getAssetSourceBlocks({
-      user: { name: "Seed User" },
-      externalMappings: [
-        mapping("Blueflow", PlatformEnum.PARTNER),
-        mapping("CSV Assets Upload - Oct 1", PlatformEnum.CSV_UPLOAD),
-        mapping("CSV Assets Upload - Oct 2", PlatformEnum.CSV_UPLOAD),
-      ],
-    });
-    expect(blocks.map(({ name, kind }) => [name, kind])).toEqual([
-      ["Seed User", "person"],
-      ["Blueflow", "integration"],
-      ["Spreadsheet Upload", "integration"],
-    ]);
-  });
-
-  it("shows an integration once, as an integration, when its shadow user created the asset", () => {
-    const blocks = getAssetSourceBlocks({
-      user: { name: "Blueflow" },
-      externalMappings: [mapping("Blueflow", PlatformEnum.PARTNER)],
-    });
-    expect(blocks.map(({ name, kind }) => [name, kind])).toEqual([
-      ["Blueflow", "integration"],
-    ]);
+describe("getAssetSources", () => {
+  it("is the names of the blocks", () => {
+    expect(
+      getAssetSources({
+        sources: [{ source: "EMAIL" }, { source: "AUTOMATION" }],
+        externalMappings: [],
+      }),
+    ).toEqual(["VIPER Automation", "Email"]);
   });
 });
 

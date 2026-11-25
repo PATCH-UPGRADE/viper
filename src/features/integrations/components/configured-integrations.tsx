@@ -44,19 +44,20 @@ const STATE_BADGES: Record<
   { label: string; className: string }
 > = {
   healthy: { label: "Healthy", className: getChipClass("emerald") },
+  attention: { label: "Needs attention", className: getChipClass("amber") },
   failing: { label: "Failing", className: getChipClass("red") },
   paused: { label: "Paused", className: getChipClass("zinc") },
   unknown: { label: "Unknown", className: getChipClass("zinc") },
   importing: { label: "Importing", className: getChipClass("sky") },
 };
 
-/** A failing badge with an error message underlines itself, like an <abbr>, and shows the message on hover or focus. */
+/** A badge with a message underlines itself, like an <abbr>, and shows the message on hover or focus. */
 export const StatusBadge = ({
   state,
-  errorMessage,
-}: Pick<ConnectorView, "state" | "errorMessage">) => {
+  message,
+}: Pick<ConnectorView, "state" | "message">) => {
   const { label, className } = STATE_BADGES[state];
-  if (!errorMessage) {
+  if (!message) {
     return <Badge className={className}>{label}</Badge>;
   }
   return (
@@ -72,7 +73,7 @@ export const StatusBadge = ({
           <button type="button">{label}</button>
         </Badge>
       </TooltipTrigger>
-      <TooltipContent className="max-w-xs">{errorMessage}</TooltipContent>
+      <TooltipContent className="max-w-xs">{message}</TooltipContent>
     </Tooltip>
   );
 };
@@ -194,7 +195,7 @@ const ParentRow = ({
       </div>
     </TableCell>
     <TableCell>
-      <StatusBadge state={view.state} errorMessage={view.errorMessage} />
+      <StatusBadge state={view.state} message={view.message} />
     </TableCell>
     <LastSyncCell view={view} />
     <RecordsCell view={view} />
@@ -224,7 +225,7 @@ const ChildRow = ({
       </div>
     </TableCell>
     <TableCell>
-      <StatusBadge state={view.state} errorMessage={view.errorMessage} />
+      <StatusBadge state={view.state} message={view.message} />
     </TableCell>
     <LastSyncCell view={view} />
     <RecordsCell view={view} />

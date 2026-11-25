@@ -8,6 +8,7 @@ import type { Page, Session } from "../../../../core/types";
 import {
   type ChangeRequest,
   changeRequestExists,
+  countHiddenChangeRequests,
   get,
   listChanged,
   listDeleted,
@@ -538,6 +539,48 @@ describe("listDeleted", () => {
       "sys_created_on>=2026-05-01 08:00:00",
     );
     expect(externalIds).toHaveLength(PAGE_SIZE);
+  });
+});
+
+describe("countHiddenChangeRequests", () => {
+  const answering = (rows: unknown[], total: string) => {
+    const urls: URL[] = [];
+    const session: Session = {
+      request: vi.fn(async (path: string) => {
+        urls.push(new URL(path, "https://dev.service-now.com"));
+        return new Response(JSON.stringify({ result: rows }), {
+          headers: {
+            "content-type": "application/json",
+            "x-total-count": total,
+          },
+        });
+      }),
+    };
+    return { session, urls };
+  };
+
+  it("counts the rows that ServiceNow matched but did not return", async () => {
+    const { session, urls } = answering([], "7");
+
+    await expect(
+      countHiddenChangeRequests(session, { updatedOn: "2026-04-30 00:00:00" }),
+    ).resolves.toBe(7);
+    expect(urls[0].searchParams.has("sysparm_no_count")).toBe(false);
+    expect(urls[0].searchParams.get("sysparm_query")).toBe(
+      "sys_updated_on>=2026-04-30 00:00:00^ORDERBYsys_updated_on^ORDERBYsys_id",
+    );
+  });
+
+  it("is 0 when nothing matches", async () => {
+    const { session } = answering([], "0");
+
+    await expect(countHiddenChangeRequests(session, null)).resolves.toBe(0);
+  });
+
+  it("is 0 when the user can read a row", async () => {
+    const { session } = answering([{ sys_id: "a1" }], "7");
+
+    await expect(countHiddenChangeRequests(session, null)).resolves.toBe(0);
   });
 });
 

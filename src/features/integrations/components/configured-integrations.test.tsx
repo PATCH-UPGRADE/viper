@@ -42,6 +42,7 @@ const sync = (
   resource: ResourceType.Asset,
   status: SyncStatusEnum.Success,
   errorMessage: null,
+  warningMessage: null,
   lastAttemptAt: new Date(),
   lastSuccessfulSync: new Date(),
   nextSyncAt: new Date(Date.now() + 10 * 60_000),
@@ -118,19 +119,35 @@ const rowNamed = (name: string) => {
 };
 
 describe("StatusBadge", () => {
-  it("is a tooltip trigger only when there is an error to show", () => {
+  it("is a tooltip trigger only when there is a message to show", () => {
     const { rerender } = render(
-      <StatusBadge state="failing" errorMessage="401 Unauthorized" />,
+      <StatusBadge state="failing" message="401 Unauthorized" />,
     );
     expect(screen.getByRole("button", { name: "Failing" })).toBeInTheDocument();
 
-    rerender(<StatusBadge state="failing" errorMessage={null} />);
+    rerender(<StatusBadge state="failing" message={null} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("Failing")).toBeInTheDocument();
   });
 });
 
 describe("ConfiguredIntegrationsTable", () => {
+  it("shows Needs attention instead of Healthy for a sync with a warning", () => {
+    renderTable([
+      {
+        ...partner,
+        resourceSyncs: [
+          sync({ integrationId: "partner", warningMessage: "no rows" }),
+        ],
+      },
+    ]);
+    const row = rowNamed("Blueflow");
+    expect(
+      row.getByRole("button", { name: "Needs attention" }),
+    ).toBeInTheDocument();
+    expect(row.queryByText("Healthy")).not.toBeInTheDocument();
+  });
+
   it("shows Unknown and zero records for an integration that never synced", () => {
     renderTable([partner]);
     const row = rowNamed("Blueflow");

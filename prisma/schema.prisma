@@ -1233,6 +1233,7 @@ model IntegrationResourceSync {
   cursor              Json? // for pagination — opaque to core, interpreted only by the platform
   status              SyncStatusEnum @default(Pending)
   errorMessage        String?
+  warningMessage      String? // a successful sync that still looks wrong, e.g. hidden rows
   lastAttemptAt       DateTime?
   lastSuccessfulSync  DateTime?
   consecutiveFailures Int            @default(0) // drives the backoff exponent; reset to 0 on success

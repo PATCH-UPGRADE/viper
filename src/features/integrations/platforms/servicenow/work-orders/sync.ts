@@ -4,10 +4,12 @@ import {
   ingestPulledWorkOrders,
   listMappedWorkOrders,
 } from "@/features/integrations/core/sync/work-order-sources";
+import { plural } from "@/lib/utils";
 import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { ServiceNowConfig, ServiceNowCreds } from "../config";
 import {
   changeRequestExists,
+  countHiddenChangeRequests,
   deletedOnOf,
   listChanged,
   listDeleted,
@@ -51,6 +53,23 @@ async function removeDeletedWorkOrders(
   }
 }
 
+/** A failure here must not fail the change request pull, so it gives no warning. */
+async function hiddenRowsWarning(
+  ctx: ResourceSyncCtx<ServiceNowConfig, ServiceNowCreds>,
+): Promise<string | undefined> {
+  try {
+    const hidden = await countHiddenChangeRequests(ctx.session, ctx.cursor);
+    if (hidden === 0) return undefined;
+    return `ServiceNow found ${hidden} ${plural("change request", hidden)} but returned none. Check that the integration user has permission to read change requests, for example with the itil role.`;
+  } catch (error) {
+    console.warn(
+      `ServiceNow integration ${ctx.integrationId} could not check for hidden change requests.`,
+      error,
+    );
+    return undefined;
+  }
+}
+
 export async function syncWorkOrders(
   ctx: ResourceSyncCtx<ServiceNowConfig, ServiceNowCreds>,
 ): Promise<SyncOutcome> {
@@ -79,5 +98,6 @@ export async function syncWorkOrders(
 
   return {
     cursor: withDeletedOn(cursor, await removeDeletedWorkOrders(ctx)),
+    warning: byExternalId.size === 0 ? await hiddenRowsWarning(ctx) : undefined,
   };
 }

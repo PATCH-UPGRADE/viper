@@ -140,6 +140,7 @@ export const syncIntegration = inngest.createFunction(
         update: {
           status: SyncStatusEnum.Pending,
           errorMessage: null,
+          warningMessage: null,
           lastAttemptAt: new Date(),
           nextSyncAt,
         },
@@ -198,6 +199,7 @@ export const syncIntegration = inngest.createFunction(
           ok: true as const,
           cursor: (result.cursor ?? null) as unknown,
           pending: result.pending ?? false,
+          warning: result.warning ?? null,
         };
       } catch (error) {
         return {
@@ -244,6 +246,7 @@ export const syncIntegration = inngest.createFunction(
         data: {
           status: SyncStatusEnum.Success,
           errorMessage: null,
+          warningMessage: outcome.warning,
           lastSuccessfulSync: new Date(),
           consecutiveFailures: 0,
           // Step 2 claimed this attempt with a backed-off `nextSyncAt`, and

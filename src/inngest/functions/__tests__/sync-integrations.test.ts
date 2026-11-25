@@ -321,6 +321,7 @@ describe("syncIntegration — claiming the attempt", () => {
     expect(args.update).toMatchObject({
       status: SyncStatusEnum.Pending,
       errorMessage: null,
+      warningMessage: null,
     });
     expect(args.update.nextSyncAt.getTime()).toBeGreaterThan(Date.now());
   });
@@ -370,6 +371,20 @@ describe("syncIntegration — finalizing", () => {
       consecutiveFailures: 0,
       cursor: { v: 1, offset: 500 },
     });
+  });
+
+  it("records the warning of a successful sync, and clears it without one", async () => {
+    mockStrategy.mockResolvedValueOnce({ cursor: null, warning: "no rows" });
+    await runSync(makeStep());
+    mockStrategy.mockResolvedValueOnce({ cursor: null });
+    await runSync(makeStep());
+
+    const { calls } = mockPrisma.integrationResourceSync.update.mock;
+    expect(calls[0][0].data).toMatchObject({
+      status: SyncStatusEnum.Success,
+      warningMessage: "no rows",
+    });
+    expect(calls[1][0].data).toMatchObject({ warningMessage: null });
   });
 
   it("clears the cursor with DbNull, which is what a Json? column needs", async () => {

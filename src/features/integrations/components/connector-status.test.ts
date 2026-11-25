@@ -20,6 +20,7 @@ const sync = (
   resource: ResourceType.Asset,
   status: SyncStatusEnum.Success,
   errorMessage: null,
+  warningMessage: null,
   lastAttemptAt: null,
   lastSuccessfulSync: new Date("2026-08-20T10:00:00Z"),
   nextSyncAt: new Date("2026-08-20T11:00:00Z"),
@@ -61,7 +62,7 @@ describe("streamView", () => {
     const item = integration([sync()]);
     expect(streamView(item, item.resourceSyncs[0])).toEqual({
       state: "healthy",
-      errorMessage: null,
+      message: null,
       lastAt: new Date("2026-08-20T10:00:00Z"),
       schedule: {
         every: [3600],
@@ -85,8 +86,20 @@ describe("streamView", () => {
     ]);
     expect(streamView(item, item.resourceSyncs[0])).toMatchObject({
       state: "failing",
-      errorMessage: "401 Unauthorized",
+      message: "401 Unauthorized",
     });
+  });
+
+  it("needs attention after a successful sync with a warning, unless paused", () => {
+    const warned = sync({ warningMessage: "check permissions" });
+
+    expect(streamView(integration([warned]), warned)).toMatchObject({
+      state: "attention",
+      message: "check permissions",
+    });
+    expect(
+      streamView(integration([warned], { enabled: false }), warned),
+    ).toMatchObject({ state: "paused", message: null });
   });
 
   it("is paused, with no next sync, when the stream or its integration is off", () => {
@@ -109,7 +122,7 @@ describe("streamView", () => {
         enabled: false,
       }),
     ]);
-    expect(streamView(item, item.resourceSyncs[0]).errorMessage).toBeNull();
+    expect(streamView(item, item.resourceSyncs[0]).message).toBeNull();
   });
 });
 
@@ -145,7 +158,7 @@ describe("integrationView", () => {
       integrationView(integration([assets, workOrders, notifications])),
     ).toEqual({
       state: "failing",
-      errorMessage: "1 of 3 streams failing. 504 Gateway timeout",
+      message: "1 of 3 streams failing. 504 Gateway timeout",
       lastAt: new Date("2026-08-20T10:00:00Z"),
       schedule: {
         every: [3600, 86_400],
@@ -157,6 +170,20 @@ describe("integrationView", () => {
         { resource: ResourceType.WorkOrder, count: 56 },
         { resource: ResourceType.SourceRecord, count: 0 },
       ],
+    });
+  });
+
+  it("needs attention over healthy, but failing comes first", () => {
+    const warned = { ...assets, warningMessage: "check permissions" };
+    const healthy = { ...workOrders, status: SyncStatusEnum.Success };
+
+    expect(integrationView(integration([healthy, warned]))).toMatchObject({
+      state: "attention",
+      message: "check permissions",
+    });
+    expect(integrationView(integration([workOrders, warned]))).toMatchObject({
+      state: "failing",
+      message: "1 of 2 streams failing. 504 Gateway timeout",
     });
   });
 

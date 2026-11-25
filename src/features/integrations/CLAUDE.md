@@ -107,9 +107,13 @@ interface SyncCtx<TConfig, TCreds> extends BaseSyncCtx<TConfig, TCreds> {
 }
 ```
 
-Either returns `{ cursor, pending? }`. **Whether you pull or hand off is your business:** a
+Either returns `{ cursor, pending?, warning? }`. **Whether you pull or hand off is your business:** a
 puller loops and returns the cursor it reached; a pusher fires one request and returns
 `pending: true` so the row stays `Pending` until the callback lands.
+
+Return `warning` when the sync succeeded but its result looks wrong, for example when the platform
+hides rows from the integration user. The connectors page then shows "Needs attention" instead of
+"Healthy", with the warning in a tooltip. The next attempt clears it.
 
 `onCreate?()` runs once, after the row is created (`server/routers.ts`).
 

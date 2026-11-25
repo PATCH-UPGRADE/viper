@@ -107,6 +107,11 @@ export interface SyncCtx<TConfig = unknown, TCreds = unknown>
 export interface SyncOutcome {
   cursor: Cursor | null;
   pending?: boolean;
+  /**
+   * The sync succeeded, but its result looks wrong. The user sees "Needs
+   * attention" with this text in a tooltip. Ignored while `pending`.
+   */
+  warning?: string;
 }
 
 /**

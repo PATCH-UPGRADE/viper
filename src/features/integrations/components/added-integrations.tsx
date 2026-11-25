@@ -27,7 +27,7 @@ const PickRow = ({
   integration: IntegrationListItem;
   onPick: (integration: IntegrationListItem) => void;
 }) => {
-  // The badge sits inside a button, so it gets no error tooltip of its own.
+  // The badge sits inside a button, so it gets no tooltip of its own.
   const { state, records } = integrationView(integration);
   return (
     <li>
@@ -44,7 +44,7 @@ const PickRow = ({
           records={records}
           className="shrink-0 text-right text-xs text-muted-foreground"
         />
-        <StatusBadge state={state} errorMessage={null} />
+        <StatusBadge state={state} message={null} />
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
       </button>
     </li>

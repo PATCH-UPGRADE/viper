@@ -31,6 +31,8 @@ export interface ConnectorView {
   state: ConnectorState;
   /** Only set while failing, and only when there is something to say. */
   errorMessage: string | null;
+  /** Only set while healthy: the last sync succeeded, but its result looks wrong. */
+  warningMessage: string | null;
   /** Last successful sync, or for an upload, when it started. */
   lastAt: Date | null;
   /** Null for an upload, which has no schedule. */
@@ -126,6 +128,7 @@ export const streamView = (
   return {
     state,
     errorMessage: state === "failing" ? sync.errorMessage : null,
+    warningMessage: state === "healthy" ? sync.warningMessage : null,
     lastAt: sync.lastSuccessfulSync,
     schedule: {
       every: [sync.effectiveSyncEvery],
@@ -175,6 +178,11 @@ export const integrationView = (
       state === "failing" && firstError
         ? `${failing.length} of ${streams.length} streams failing. ${firstError}`
         : null,
+    warningMessage:
+      state === "healthy"
+        ? (running.find((stream) => stream.warningMessage)?.warningMessage ??
+          null)
+        : null,
     lastAt: latest(timingSource.map((stream) => stream.lastAt)),
     schedule: {
       every: [...new Set(syncs.map((sync) => sync.effectiveSyncEvery))].sort(
@@ -201,6 +209,7 @@ export const uploadView = (upload: IntegrationListItem): ConnectorView => {
     return {
       state: "unknown",
       errorMessage: null,
+      warningMessage: null,
       lastAt: null,
       schedule: null,
       records: recordsOf(upload, []),
@@ -215,6 +224,7 @@ export const uploadView = (upload: IntegrationListItem): ConnectorView => {
   return {
     state,
     errorMessage: state === "failing" ? sync.errorMessage : null,
+    warningMessage: state === "healthy" ? sync.warningMessage : null,
     lastAt: sync.lastAttemptAt,
     schedule: null,
     records: recordsOf(upload, [sync.resource]),

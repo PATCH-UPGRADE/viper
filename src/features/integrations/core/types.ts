@@ -107,6 +107,11 @@ export interface SyncCtx<TConfig = unknown, TCreds = unknown>
 export interface SyncOutcome {
   cursor: Cursor | null;
   pending?: boolean;
+  /**
+   * Shown to the user next to the healthy status: the sync succeeded, but its
+   * result looks wrong. Ignored while `pending`.
+   */
+  warning?: string;
 }
 
 /**

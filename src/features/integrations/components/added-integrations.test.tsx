@@ -63,6 +63,7 @@ const serviceNow = (
         resource: ResourceType.WorkOrder,
         status,
         errorMessage: status === SyncStatusEnum.Error ? "401" : null,
+        warningMessage: null,
         lastAttemptAt: new Date(),
         lastSuccessfulSync: new Date(),
         nextSyncAt: null,

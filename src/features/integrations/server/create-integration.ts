@@ -19,6 +19,7 @@ export const integrationsInclude = {
       resource: true,
       status: true,
       errorMessage: true,
+      warningMessage: true,
       lastAttemptAt: true,
       lastSuccessfulSync: true,
       nextSyncAt: true,

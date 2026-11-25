@@ -147,6 +147,17 @@ const query = (params: Record<string, string>): string =>
     ...params,
   }).toString();
 
+const updatedSince = (since: string): string =>
+  `sys_updated_on>=${since}^ORDERBYsys_updated_on^ORDERBYsys_id`;
+
+/**
+ * Without a read rule on a row, ServiceNow answers 200 and removes the row, but
+ * `X-Total-Count` still counts it. This is the only sign of the missing access,
+ * because a query that matches nothing has a count of 0.
+ */
+const hiddenRowCount = (res: Response, rows: unknown[]): number =>
+  rows.length === 0 ? Number(res.headers.get("x-total-count")) : 0;
+
 async function fetchPage(
   session: Session,
   since: string,
@@ -154,7 +165,7 @@ async function fetchPage(
 ): Promise<ChangeRequest[]> {
   const res = await session.request(
     `${tableApiPath(CHANGE_REQUEST_TABLE)}?${query({
-      sysparm_query: `sys_updated_on>=${since}^ORDERBYsys_updated_on^ORDERBYsys_id`,
+      sysparm_query: updatedSince(since),
       sysparm_limit: String(PAGE_SIZE),
       sysparm_offset: String(offset),
       sysparm_no_count: "true",
@@ -291,6 +302,26 @@ export async function* listChanged(
   }
 }
 
+/**
+ * How many change requests a pull from `cursor` matches but cannot see. Only for
+ * a pull that returned nothing: the pull itself asks for no count, because a
+ * count on every page is slow on a large table.
+ */
+export async function countHiddenChangeRequests(
+  session: Session,
+  cursor: Cursor | null,
+): Promise<number> {
+  const since = cursorField(cursor, "updatedOn") ?? syncWindow().oldest;
+  const res = await session.request(
+    `${tableApiPath(CHANGE_REQUEST_TABLE)}?${query({
+      sysparm_fields: "sys_id",
+      sysparm_query: updatedSince(since),
+      sysparm_limit: "1",
+    })}`,
+  );
+  return hiddenRowCount(res, z.array(z.unknown()).parse(await readResult(res)));
+}
+
 async function fetchDeletedPage(
   session: Session,
   since: string,
@@ -305,11 +336,8 @@ async function fetchDeletedPage(
     })}`,
   );
   const rows = z.array(deletedChangeRequestSchema).parse(await readResult(res));
-  // Without a read rule on the delete log, ServiceNow answers 200 and removes
-  // every row, but `X-Total-Count` still counts them. This is the only sign of
-  // the missing access, because an empty log has a count of 0.
-  const total = Number(res.headers.get("x-total-count"));
-  if (offset === 0 && rows.length === 0 && total > 0) {
+  const total = hiddenRowCount(res, rows);
+  if (offset === 0 && total > 0) {
     throw new Error(
       `${DELETE_LOG_TABLE} returned no rows, but X-Total-Count is ${total}. The integration user does not have read access to the rows.`,
     );

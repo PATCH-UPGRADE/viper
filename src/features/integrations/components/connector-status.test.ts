@@ -20,6 +20,7 @@ const sync = (
   resource: ResourceType.Asset,
   status: SyncStatusEnum.Success,
   errorMessage: null,
+  warningMessage: null,
   lastAttemptAt: null,
   lastSuccessfulSync: new Date("2026-08-20T10:00:00Z"),
   nextSyncAt: new Date("2026-08-20T11:00:00Z"),
@@ -62,6 +63,7 @@ describe("streamView", () => {
     expect(streamView(item, item.resourceSyncs[0])).toEqual({
       state: "healthy",
       errorMessage: null,
+      warningMessage: null,
       lastAt: new Date("2026-08-20T10:00:00Z"),
       schedule: {
         every: [3600],
@@ -87,6 +89,17 @@ describe("streamView", () => {
       state: "failing",
       errorMessage: "401 Unauthorized",
     });
+  });
+
+  it("carries the warning only while healthy", () => {
+    const warned = sync({ warningMessage: "check permissions" });
+    const healthy = integration([warned]);
+    const paused = integration([warned], { enabled: false });
+
+    expect(streamView(healthy, warned).warningMessage).toBe(
+      "check permissions",
+    );
+    expect(streamView(paused, warned).warningMessage).toBeNull();
   });
 
   it("is paused, with no next sync, when the stream or its integration is off", () => {
@@ -146,6 +159,7 @@ describe("integrationView", () => {
     ).toEqual({
       state: "failing",
       errorMessage: "1 of 3 streams failing. 504 Gateway timeout",
+      warningMessage: null,
       lastAt: new Date("2026-08-20T10:00:00Z"),
       schedule: {
         every: [3600, 86_400],
@@ -158,6 +172,18 @@ describe("integrationView", () => {
         { resource: ResourceType.SourceRecord, count: 0 },
       ],
     });
+  });
+
+  it("shows a stream's warning while healthy, and not while another stream fails", () => {
+    const warned = { ...assets, warningMessage: "check permissions" };
+    const healthy = { ...workOrders, status: SyncStatusEnum.Success };
+
+    expect(integrationView(integration([healthy, warned])).warningMessage).toBe(
+      "check permissions",
+    );
+    expect(
+      integrationView(integration([workOrders, warned])).warningMessage,
+    ).toBeNull();
   });
 
   it("is paused when every stream is paused", () => {

@@ -164,3 +164,67 @@ describe("syncWorkOrders delete pass", () => {
     expect(mocks.deleteTickets).not.toHaveBeenCalled();
   });
 });
+
+describe("syncWorkOrders hidden rows warning", () => {
+  const visible = {
+    sys_id: "a1",
+    number: "CHG0000001",
+    sys_updated_on: "2026-05-01 08:00:00",
+  };
+
+  /** Answers the pull with `rows`, and the count request with `count`. */
+  const sync = (rows: unknown[], count: () => Response) => {
+    const request = vi.fn(async (path: string) => {
+      const { pathname, searchParams } = new URL(
+        path,
+        "https://dev.service-now.com",
+      );
+      if (pathname.endsWith("/sys_audit_delete")) return json([]);
+      return searchParams.get("sysparm_limit") === "1" ? count() : json(rows);
+    });
+    const ctx = {
+      ...RUN,
+      cursor: null,
+      session: { request },
+    } as unknown as ResourceSyncCtx<ServiceNowConfig, ServiceNowCreds>;
+    return syncWorkOrders(ctx);
+  };
+  const hidden = (total: string) => () =>
+    new Response(JSON.stringify({ result: [] }), {
+      headers: { "content-type": "application/json", "x-total-count": total },
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.ingest.mockResolvedValue({ shouldRetry: false, message: "" });
+    mocks.listMapped.mockResolvedValue([]);
+  });
+
+  it("tells the user to check permissions when ServiceNow hides every row", async () => {
+    const { warning } = await sync([], hidden("7"));
+
+    expect(warning).toMatch(/found 7 change requests.*permission/);
+  });
+
+  it("does not warn when there is nothing to pull", async () => {
+    expect((await sync([], hidden("0"))).warning).toBeUndefined();
+  });
+
+  it("does not ask for a count when the pull returned rows", async () => {
+    const count = vi.fn(hidden("7"));
+
+    expect((await sync([visible], count)).warning).toBeUndefined();
+    expect(count).not.toHaveBeenCalled();
+  });
+
+  it("keeps the pull's result when the count request fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const outcome = await sync([], () => new Response("{}", { status: 500 }));
+
+    expect(outcome.warning).toBeUndefined();
+    expect(outcome.cursor).toHaveProperty("updatedOn");
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+});

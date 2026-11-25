@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, TriangleAlertIcon } from "lucide-react";
 import ms from "ms";
 import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -50,12 +51,36 @@ const STATE_BADGES: Record<
   importing: { label: "Importing", className: getChipClass("sky") },
 };
 
-/** A failing badge with an error message underlines itself, like an <abbr>, and shows the message on hover or focus. */
+/**
+ * A failing badge with an error message underlines itself, like an <abbr>, and shows the message
+ * on hover or focus. A warning shows in the tooltip of an icon next to the badge.
+ */
 export const StatusBadge = ({
   state,
   errorMessage,
-}: Pick<ConnectorView, "state" | "errorMessage">) => {
+  warningMessage,
+}: Pick<ConnectorView, "state" | "errorMessage" | "warningMessage">) => {
   const { label, className } = STATE_BADGES[state];
+  if (warningMessage) {
+    return (
+      <div className="flex items-center gap-1">
+        <Badge className={className}>{label}</Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-6 cursor-help text-amber-600 hover:text-amber-600"
+              aria-label="Sync warning"
+            >
+              <TriangleAlertIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{warningMessage}</TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  }
   if (!errorMessage) {
     return <Badge className={className}>{label}</Badge>;
   }
@@ -194,7 +219,11 @@ const ParentRow = ({
       </div>
     </TableCell>
     <TableCell>
-      <StatusBadge state={view.state} errorMessage={view.errorMessage} />
+      <StatusBadge
+        state={view.state}
+        errorMessage={view.errorMessage}
+        warningMessage={view.warningMessage}
+      />
     </TableCell>
     <LastSyncCell view={view} />
     <RecordsCell view={view} />
@@ -224,7 +253,11 @@ const ChildRow = ({
       </div>
     </TableCell>
     <TableCell>
-      <StatusBadge state={view.state} errorMessage={view.errorMessage} />
+      <StatusBadge
+        state={view.state}
+        errorMessage={view.errorMessage}
+        warningMessage={view.warningMessage}
+      />
     </TableCell>
     <LastSyncCell view={view} />
     <RecordsCell view={view} />

@@ -8,6 +8,17 @@ import type {
   IntegrationResourceSyncItem,
 } from "../types";
 
+// The tooltip's arrow measures itself, and jsdom has no ResizeObserver.
+vi.hoisted(() => {
+  if (typeof window.ResizeObserver === "undefined") {
+    window.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  }
+});
+
 vi.mock("../hooks/use-integrations", () => {
   const idle = () => ({ mutate: vi.fn(), isPending: false });
   return {
@@ -42,6 +53,7 @@ const sync = (
   resource: ResourceType.Asset,
   status: SyncStatusEnum.Success,
   errorMessage: null,
+  warningMessage: null,
   lastAttemptAt: new Date(),
   lastSuccessfulSync: new Date(),
   nextSyncAt: new Date(Date.now() + 10 * 60_000),
@@ -120,13 +132,36 @@ const rowNamed = (name: string) => {
 describe("StatusBadge", () => {
   it("is a tooltip trigger only when there is an error to show", () => {
     const { rerender } = render(
-      <StatusBadge state="failing" errorMessage="401 Unauthorized" />,
+      <StatusBadge
+        state="failing"
+        errorMessage="401 Unauthorized"
+        warningMessage={null}
+      />,
     );
     expect(screen.getByRole("button", { name: "Failing" })).toBeInTheDocument();
 
-    rerender(<StatusBadge state="failing" errorMessage={null} />);
+    rerender(
+      <StatusBadge state="failing" errorMessage={null} warningMessage={null} />,
+    );
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("Failing")).toBeInTheDocument();
+  });
+
+  it("explains a warning in the tooltip of an icon next to the badge", async () => {
+    const user = userEvent.setup();
+    render(
+      <StatusBadge
+        state="healthy"
+        errorMessage={null}
+        warningMessage="Check permissions"
+      />,
+    );
+
+    expect(screen.getByText("Healthy")).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Sync warning" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Check permissions",
+    );
   });
 });
 

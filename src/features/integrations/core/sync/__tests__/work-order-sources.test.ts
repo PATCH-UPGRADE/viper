@@ -181,7 +181,6 @@ describe("ingestPulledWorkOrders", () => {
   };
   const options = {
     integrationId: "int-1",
-    integrationUserId: "user-1",
     observedAt: new Date("2026-11-01T00:00:00Z"),
     sourceLabel: "ServiceNow",
   };
@@ -203,7 +202,6 @@ describe("ingestPulledWorkOrders", () => {
       mockProcessIntegrationSync.mock.calls[0];
     expect(input).toEqual({ items: [pulled] });
     expect(run).toEqual({
-      userId: "user-1",
       integrationId: "int-1",
       observedAt: options.observedAt,
     });

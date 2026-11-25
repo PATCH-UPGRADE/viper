@@ -78,9 +78,7 @@ async function apply() {
   await applyChunk(input);
   const calls = vi.mocked(processIntegrationSync).mock.calls;
   const [add, link] = await Promise.all(
-    calls.map(([config, { items }]) =>
-      config.transformInputItem(items[0], "uploader"),
-    ),
+    calls.map(([config, { items }]) => config.transformInputItem(items[0])),
   );
   return { add, link, runs: calls.map(([, , run]) => run) };
 }
@@ -100,7 +98,6 @@ describe("applyChunk", () => {
   it("gives each row the time of the import, with the uploader as the actor, under one name", async () => {
     const { runs } = await apply();
     const run = {
-      userId: "uploader",
       integrationId: "int-1",
       observedAt,
       actorUserId: "uploader",

@@ -38,7 +38,6 @@ const ctxWith = (
 ) =>
   ({
     integrationId: "int-1",
-    integrationUserId: "user-1",
     observedAt: new Date("2026-11-01T00:00:00Z"),
     cursor,
     session: {

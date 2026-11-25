@@ -41,12 +41,10 @@ export async function ingestPulledWorkOrders(
   allItems: PulledWorkOrder[],
   {
     integrationId,
-    integrationUserId,
     observedAt,
     sourceLabel,
   }: {
     integrationId: string;
-    integrationUserId: string;
     observedAt: Date;
     sourceLabel: string;
   },
@@ -91,7 +89,7 @@ export async function ingestPulledWorkOrders(
       },
     },
     { items },
-    { userId: integrationUserId, integrationId, observedAt },
+    { integrationId, observedAt },
     ResourceType.WorkOrder,
   );
   await recordWorkOrderSources(items, integrationId);

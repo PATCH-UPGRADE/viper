@@ -750,8 +750,9 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("asset with no mapping Assets uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration, apiKey } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       // this won't cause an error if it misses which messes up the onTestFinished stack
@@ -773,7 +774,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetData = assetIntegrationPayload.items[0];
     const createdAssetRes = await request(BASE_URL)
       .post("/assets")
-      .set({ Authorization: apiKey.key })
+      .set(authHeader)
       .set(jsonHeader)
       .send(assetData);
 

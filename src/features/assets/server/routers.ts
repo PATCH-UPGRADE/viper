@@ -654,14 +654,14 @@ export const assetsRouter = createTRPCRouter({
         input.items.map((item) => item.deviceType),
       );
       // Validate provided token or throw error
-      const { userId, integrationId } = await processIntegrationToken(
+      const integrationId = await processIntegrationToken(
         input.token,
         ResourceType.Asset,
       );
 
       return processAssetIntegrationSync(
         input,
-        { userId, integrationId, observedAt },
+        { integrationId, observedAt },
         applyDeviceType,
       );
     }),

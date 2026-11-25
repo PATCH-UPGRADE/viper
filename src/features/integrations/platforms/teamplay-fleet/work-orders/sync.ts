@@ -91,7 +91,6 @@ export async function syncWorkOrders(
   await reconcileProvisionalMappings(items, ctx.integrationId);
   const response = await ingestPulledWorkOrders(items, {
     integrationId: ctx.integrationId,
-    integrationUserId: ctx.integrationUserId,
     observedAt: ctx.observedAt,
     sourceLabel: FLEET_SOURCE_LABEL,
   });

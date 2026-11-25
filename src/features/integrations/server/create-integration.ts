@@ -78,7 +78,6 @@ export async function createIntegration(
   input: IntegrationFormValues,
   userId: string,
 ) {
-  const { name } = input;
   const { row, module, config } = asBadRequest(() => toRowShape(input));
   const credentials = asBadRequest(() =>
     toCredentialBlob(module, input.credentials),
@@ -100,19 +99,11 @@ export async function createIntegration(
       }
     }
 
-    const integrationUser = await tx.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        name,
-      },
-    });
-
     return tx.integration.create({
       data: {
         ...row,
         credentials,
         userId,
-        integrationUserId: integrationUser.id,
         resourceSyncs: {
           create: resources.map((resource) => ({ resource })),
         },

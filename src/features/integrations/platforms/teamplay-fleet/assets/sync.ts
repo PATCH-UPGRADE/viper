@@ -78,10 +78,6 @@ async function ingestFleetAssets(
   integrationId: string,
   observedAt: Date,
 ): Promise<IntegrationResponse> {
-  const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
-    where: { id: integrationId },
-    select: { integrationUserId: true },
-  });
   const weakSerials = computeWeakSerials(items);
   const fleetCreatedKeys = await fleetCreatedEquipmentKeys(integrationId);
   const checkedProductIds = new Set<string>();
@@ -138,7 +134,7 @@ async function ingestFleetAssets(
       },
     },
     { items },
-    { userId: integrationUserId, integrationId, observedAt },
+    { integrationId, observedAt },
     ResourceType.Asset,
   );
 }

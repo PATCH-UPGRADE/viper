@@ -56,7 +56,7 @@ async function matchingIdFor(device: FleetDevice): Promise<string | null> {
 export async function syncRemediations(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
-  const { integrationId, integrationUserId, observedAt } = ctx;
+  const { integrationId, observedAt } = ctx;
 
   const devices = await prisma.externalAssetMapping.findMany({
     where: { integrationId },
@@ -127,7 +127,7 @@ export async function syncRemediations(
       },
     },
     { items },
-    { userId: integrationUserId, integrationId, observedAt },
+    { integrationId, observedAt },
     ResourceType.Remediation,
   );
   if (outcome.shouldRetry) {

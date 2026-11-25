@@ -271,8 +271,6 @@ export const ticketDetailInclude = {
           id: true,
           name: true,
           image: true,
-          // An integration relation marks the actor as an automation
-          integrationUser: { select: { id: true } },
         },
       },
     },
@@ -732,8 +730,6 @@ const ticketActivityUserSchema = z.object({
   id: z.string(),
   name: z.string(),
   image: z.string().nullable(),
-  // Non-null when the actor is an automation user (AI agent).
-  integrationUser: z.object({ id: z.string() }).nullable(),
 });
 
 export const ticketActivitySchema = z.object({

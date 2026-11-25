@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user-id";
 import { formatScheduled } from "@/lib/date-utils";
 import { initialsOf } from "@/lib/string-utils";
 
@@ -29,14 +30,14 @@ export const VIPER_ACTOR: TimelineActor = {
   isAgent: true,
 };
 
-const isAutomationActor = (user: { integrationUser?: { id: string } | null }) =>
-  !!user.integrationUser;
+// TODO VW-605 (PR 12): use the observation's `source = AUTOMATION`.
+const isAutomationActor = (user: { id: string }) =>
+  user.id === AUTOMATION_USER_ID;
 
 export const actorFromUser = (user: {
   id: string;
   name: string | null;
   image?: string | null;
-  integrationUser?: { id: string } | null;
 }): TimelineActor => ({
   name: user.name,
   image: user.image,

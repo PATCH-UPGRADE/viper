@@ -174,42 +174,29 @@ export const integrationsRouter = createTRPCRouter({
       );
       const resources = asBadRequest(() => resourcesFor(module, config));
 
-      return prisma.$transaction(async (tx) => {
-        const integration = await tx.integration.update({
-          where: { id },
-          data: {
-            ...row,
-            // credentialsPatch returns {} when omitted, so this spread is a no-op — keeps the stored value.
-            ...credentials,
-            resourceSyncs: {
-              updateMany: {
-                where: { resource: { notIn: resources } },
-                data: { enabled: false },
+      return prisma.integration.update({
+        where: { id },
+        data: {
+          ...row,
+          // credentialsPatch returns {} when omitted, so this spread is a no-op — keeps the stored value.
+          ...credentials,
+          resourceSyncs: {
+            updateMany: {
+              where: { resource: { notIn: resources } },
+              data: { enabled: false },
+            },
+            upsert: resources.map((resource) => ({
+              where: {
+                integrationId_resource: { integrationId: id, resource },
               },
-              upsert: resources.map((resource) => ({
-                where: {
-                  integrationId_resource: { integrationId: id, resource },
-                },
-                // A newly-implied resource starts enabled; an existing row's toggle (setResourceSyncEnabled) must not be reset here.
-                create: { resource },
-                update: {},
-              })),
-            },
+              // A newly-implied resource starts enabled; an existing row's toggle (setResourceSyncEnabled) must not be reset here.
+              create: { resource },
+              update: {},
+            })),
           },
-          include: integrationsInclude,
-          omit: omitCredentials,
-        });
-
-        if (integration.integrationUserId && data.name) {
-          await tx.user.update({
-            where: { id: integration.integrationUserId },
-            data: {
-              name: data.name,
-            },
-          });
-        }
-
-        return integration;
+        },
+        include: integrationsInclude,
+        omit: omitCredentials,
       });
     }),
 

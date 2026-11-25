@@ -43,11 +43,6 @@ async function ingestRemediations(
   integrationId: string,
   observedAt: Date,
 ): Promise<IntegrationResponse> {
-  const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
-    where: { id: integrationId },
-    select: { integrationUserId: true },
-  });
-
   // Items from one channel share a manufacturer and product, so the same
   // identity resolves many times over a sync. Each miss is several round trips.
   const matchingIdCache = new Map<string, string>();
@@ -127,7 +122,7 @@ async function ingestRemediations(
       },
     },
     { items },
-    { userId: integrationUserId, integrationId, observedAt },
+    { integrationId, observedAt },
     ResourceType.Remediation,
   );
 }

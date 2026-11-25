@@ -239,7 +239,6 @@ async function writeRow(
       },
       { items: [item] },
       {
-        userId: input.userId,
         integrationId: input.integrationId,
         observedAt: input.observedAt,
         actorUserId: input.userId,

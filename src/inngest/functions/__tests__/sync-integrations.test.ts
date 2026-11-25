@@ -102,7 +102,6 @@ const PLATFORM_MODULE = {
 
 const loadedRow = (overrides: Record<string, unknown> = {}) => ({
   platform: "PARTNER",
-  integrationUserId: "shadow-user",
   syncEvery: 300,
   config: { integrationUri: "https://p.example.com", resource: "Asset" },
   credentials: null,

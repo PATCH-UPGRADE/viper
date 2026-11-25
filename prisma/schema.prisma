@@ -33,7 +33,6 @@ model User {
 
   apikeys           Apikey[]
   integration       Integration[]
-  integrationUser   Integration?       @relation("integration_user")
   webhooks          Webhook[]
   threads           ChatThread[]
   notificationReads NotificationRead[]
@@ -1167,13 +1166,10 @@ model Integration {
   // ^if we're polling, that's how often to poll
   enabled   Boolean @default(true)
 
-  // The user who created the integration
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // TODO VW-605 (PR 7): drop it, with the shadow users. No row is attributed to it.
-  integrationUserId String @unique
-  integrationUser   User   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  /// The user who created the integration. Null for system integrations with no human creator,
+  /// like CISA CSAF.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   resourceSyncs IntegrationResourceSync[]
   tokens        IntegrationToken[]
@@ -1196,7 +1192,6 @@ model Integration {
   csvImports               CsvImport[]
 
   @@index([userId])
-  @@index([integrationUserId])
   @@map("integration")
 }
 

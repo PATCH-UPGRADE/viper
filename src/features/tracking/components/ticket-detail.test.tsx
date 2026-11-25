@@ -1295,7 +1295,7 @@ describe("TicketDetailContent — view mode", () => {
           type: "ASSET_ATTACHED",
           data: { assetId: "asset-x", assetLabel: "host-icu-1" },
           createdAt: new Date("2026-05-15T14:00:00Z"),
-          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+          user: { id: "u1", name: "Alice", image: null },
         },
       ],
     });
@@ -1330,7 +1330,7 @@ describe("TicketDetailContent — view mode", () => {
             priority: "NOT_A_PRIORITY",
           },
           createdAt: new Date("2026-05-15T12:00:00Z"),
-          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+          user: { id: "u1", name: "Alice", image: null },
         },
       ],
     });
@@ -1354,7 +1354,7 @@ describe("TicketDetailContent — view mode", () => {
           type: "PRIORITY_CHANGED",
           data: { from: "High", to: "Critical" },
           createdAt: new Date("2026-05-15T12:00:00Z"),
-          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+          user: { id: "u1", name: "Alice", image: null },
         },
       ],
     });
@@ -1401,7 +1401,7 @@ describe("TicketDetailContent — view mode", () => {
           type,
           data,
           createdAt: new Date("2026-05-15T12:00:00Z"),
-          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+          user: { id: "u1", name: "Alice", image: null },
         },
       ],
     });

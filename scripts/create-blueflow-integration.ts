@@ -7,7 +7,7 @@
 // capture. The token is single-use (consumed on first request), so mint it
 // immediately before registering the Blueflow webhook and push a single page.
 
-import { PlatformEnum, Prisma, ResourceType } from "@/generated/prisma";
+import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createIntegrationToken } from "@/lib/tokens";
 
@@ -24,49 +24,25 @@ async function main() {
     throw new Error("Seed user not found. Did the container run db:seed?");
   }
 
-  // Idempotent: drop any prior CI integration (cascades to its integrationUser).
-  const existing = await prisma.integration.findFirst({
+  // Idempotent: drop any prior CI integration.
+  await prisma.integration.deleteMany({
     where: { name: INTEGRATION_NAME, userId: seedUser.id },
   });
-  if (existing) {
-    try {
-      await prisma.user.delete({
-        where: { id: existing.integrationUserId },
-      });
-    } catch (err) {
-      // Ignore only "record already gone" (e.g. a concurrent cleanup);
-      // rethrow anything else so real failures aren't hidden and stale
-      // Integration rows can't silently pile up.
-      if (
-        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
-        err.code !== "P2025"
-      ) {
-        throw err;
-      }
-    }
-  }
 
-  // Mirror integrations.create: an Integration owns a dedicated integrationUser.
-  const integration = await prisma.$transaction(async (tx) => {
-    const integrationUser = await tx.user.create({
-      data: { id: crypto.randomUUID(), name: INTEGRATION_NAME },
-    });
-    return tx.integration.create({
-      data: {
-        name: INTEGRATION_NAME,
-        platform: PlatformEnum.PARTNER,
-        // integrationUri / resource live in the platform's config JSON now.
-        config: {
-          integrationUri: "http://blueflow:8000",
-          resource: ResourceType.Asset,
-        },
-        credentials: null,
-        syncEvery: 3600,
-        userId: seedUser.id,
-        integrationUserId: integrationUser.id,
-        resourceSyncs: { create: { resource: ResourceType.Asset } },
+  const integration = await prisma.integration.create({
+    data: {
+      name: INTEGRATION_NAME,
+      platform: PlatformEnum.PARTNER,
+      // integrationUri / resource live in the platform's config JSON now.
+      config: {
+        integrationUri: "http://blueflow:8000",
+        resource: ResourceType.Asset,
       },
-    });
+      credentials: null,
+      syncEvery: 3600,
+      userId: seedUser.id,
+      resourceSyncs: { create: { resource: ResourceType.Asset } },
+    },
   });
 
   const token = await createIntegrationToken(

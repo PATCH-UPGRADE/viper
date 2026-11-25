@@ -3,7 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { buildAgentGraph } from "@/features/agents/shared/build-graph";
 import { loadPersistentNotesMarkdown } from "@/features/agents/shared/notes-preload";
 import { makeQueryPlatformDataTool } from "@/features/agents/tools/query-platform-tool";
-import { AUTOMATION_USER_ID } from "@/lib/automation-user";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user-id";
 import { createChatModel } from "@/lib/llm/chat-model";
 import {
   enrichFindings,

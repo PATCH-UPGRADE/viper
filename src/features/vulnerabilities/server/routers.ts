@@ -385,7 +385,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { integrationId } = await processIntegrationToken(
+      const integrationId = await processIntegrationToken(
         input.token,
         ResourceType.Vulnerability,
       );

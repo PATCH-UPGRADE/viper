@@ -35,20 +35,6 @@ export async function seedFleetIntegration(userId: string) {
     where: { platform: PlatformEnum.FLEET },
   });
 
-  // Integrations own a service user — the creator of the tickets they ingest.
-  const integrationUser =
-    (await prisma.user.findFirst({
-      where: { email: "fleet-integration@viper.local" },
-    })) ??
-    (await prisma.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        email: "fleet-integration@viper.local",
-        name: "teamplay Fleet Integration",
-        emailVerified: true,
-      },
-    }));
-
   const integration =
     existing ??
     (await prisma.integration.create({
@@ -58,7 +44,6 @@ export async function seedFleetIntegration(userId: string) {
         config: {},
         syncEvery: 3600,
         userId,
-        integrationUserId: integrationUser.id,
         resourceSyncs: {
           create: [
             { resource: ResourceType.WorkOrder },

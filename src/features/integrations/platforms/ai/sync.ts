@@ -91,7 +91,6 @@ async function crawlAndIngest<R extends CrawlerResource>(
   const response = await ingest(
     { items },
     {
-      userId: ctx.integrationUserId,
       integrationId: ctx.integrationId,
       observedAt: ctx.observedAt,
     },

@@ -90,8 +90,6 @@ export interface ArtifactsContent {
 /** Where a sync's writes come from. */
 export interface SyncRun {
   integrationId: string;
-  // TODO VW-605 (PR 7): goes, with the shadow users.
-  userId: string;
   /** When the sync started or its request arrived, for all of its items. */
   observedAt: Date;
   /** The person who started it. Only a CSV import has one. */
@@ -118,7 +116,6 @@ export interface UntrackedSyncConfig<TInputItem>
   entityType?: undefined;
   transformInputItem: (
     item: TInputItem,
-    userId: string,
   ) => Promise<
     UntrackedWrite & { artifactsData: ArtifactsContent | undefined }
   >;
@@ -128,10 +125,7 @@ export interface UntrackedSyncConfig<TInputItem>
 export interface TrackedSyncConfig<TInputItem, E extends TrackedEntityType>
   extends BaseSyncConfig {
   entityType: E;
-  transformInputItem: (
-    item: TInputItem,
-    userId: string,
-  ) => Promise<TrackedWrite<E>>;
+  transformInputItem: (item: TInputItem) => Promise<TrackedWrite<E>>;
 }
 
 export type SyncConfig<TInputItem> =
@@ -201,11 +195,10 @@ async function syncItems<TInputItem extends SyncItem, TWrite>(
   config: BaseSyncConfig & {
     transformInputItem: (
       item: TInputItem,
-      userId: string,
     ) => Promise<TWrite & { artifactsData?: ArtifactsContent }>;
   },
   items: TInputItem[],
-  { integrationId, userId, observedAt }: SyncRun,
+  { integrationId, observedAt }: SyncRun,
 ): Promise<IntegrationResponse> {
   const errors: string[] = [];
 
@@ -231,7 +224,7 @@ async function syncItems<TInputItem extends SyncItem, TWrite>(
     const foundMapping = await store.findMapping(integrationId, externalId);
 
     // Transform the input item to get create/update data and unique conditions
-    const write = await config.transformInputItem(item, userId);
+    const write = await config.transformInputItem(item);
 
     // If we have a ExternalItemMapping, update the sync time and item
     if (foundMapping) {

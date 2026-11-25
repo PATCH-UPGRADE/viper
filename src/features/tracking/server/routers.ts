@@ -1560,7 +1560,7 @@ export const trackingRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       const observedAt = new Date();
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const integrationId = await processIntegrationToken(
         input.token,
         ResourceType.WorkOrder,
       );
@@ -1622,8 +1622,8 @@ export const trackingRouter = createTRPCRouter({
           onItemCreated: (id) => recordCreationActivity(prisma, id),
         },
         input,
-        { userId, integrationId, observedAt },
-        resource,
+        { integrationId, observedAt },
+        ResourceType.WorkOrder,
       );
     }),
 });

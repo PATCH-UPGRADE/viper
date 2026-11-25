@@ -201,7 +201,7 @@ Other models keep their owner column, which is null for rows that an integration
 Integrations still update their own rows through sync, which doesn't go through `requireOwnership`.
 
 One accepted change: deleting an integration deletes its mappings, so its records then have no owner
-and no mapping, and anyone can edit them. Today they stay locked to the shadow user.
+and no mapping, and anyone can edit them. Before PR 6 they stayed locked to the shadow user.
 
 ### what source a write has
 
@@ -695,23 +695,24 @@ the code.
 
 - [x] Replace `createUserToken` and `consumeUserToken` with integration versions, and update `purgeExpiredTokens`
 - [x] `createCallback` takes an `integrationId`
-- [ ] `processIntegrationToken` returns only `integrationId`
-- [ ] Remove `integrationUserId` from `ResourceSyncCtx`, and the `userId` parameter from
+- [x] `processIntegrationToken` returns only `integrationId`
+- [x] Remove `integrationUserId` from `ResourceSyncCtx`, and the `userId` parameter from
       `processIntegrationSync` and `transformInputItem`
-- [ ] Drop `Integration.integrationUserId`, and make `Integration.userId` nullable
+- [x] Drop `Integration.integrationUserId`, and make `Integration.userId` nullable
 - [ ] Reset staging and local databases after PR 9, see "existing rows"
-- [ ] Stop creating shadow users in `create-integration.ts`, and remove the name sync in the integrations router
-- [ ] Update `csaf-integration.ts`, `dev/fleet-integration.ts`, `create-blueflow-integration.ts`,
+- [x] Stop creating shadow users in `create-integration.ts`, and remove the name sync in the integrations router
+- [x] Update `csaf-integration.ts`, `dev/fleet-integration.ts`, `create-blueflow-integration.ts`,
       `seed-csaf-advisories.ts`
 - [x] Handle null `creatorId` in `asset-tickets.ts`, `interruptions.ts`, `tracking/types.ts`, tracking
       `columns.tsx` and `overview-card.tsx`
 - [x] Show the source name when the owner is null: remediation and device artifact columns,
       `remediations.tsx`. `vulnerabilities/utils.ts` and `vulnerability-drawer.tsx` already check the mapping first
 - [x] In `recordCreationActivity`, return early when `creatorId` is null, because `TicketActivity.userId` is required
-- [ ] Change `isAutomationActor` in `activity-timeline.tsx`, which checks for a shadow user, to compare with
-      `AUTOMATION_USER_ID`. Replace that with `source = AUTOMATION` when the ticket timeline switches to
-      `FieldChange`, and do the same for `isAgent` in the inbox router when the notification timeline does
-- [ ] Filter the automation user out of `listAssignable`. Shadow users leave that list on their own
+- [x] Change `isAutomationActor` in `activity-timeline.tsx`, which checks for a shadow user, to compare with
+      `AUTOMATION_USER_ID`
+- [ ] Replace that with `source = AUTOMATION` when the ticket timeline switches to `FieldChange`, and do the
+      same for `isAgent` in the inbox router when the notification timeline does
+- [x] Filter the automation user out of `listAssignable`. Shadow users leave that list on their own
 
 ### changing ownership
 
@@ -747,9 +748,9 @@ the code.
 ### API and docs
 
 - [ ] `/api/v1` breaking changes to list in the PR: `user` and `userId` removed from assets; nullable `user`
-      on remediations and device artifacts; nullable `creator` and `creatorId` on work orders; `activities` on
-      tickets; `source` on the work order `integrationUpload` input; a missing `device` on the asset
-      `integrationUpload` input no longer clears an existing asset's device
+      on remediations and device artifacts; nullable `creator` and `creatorId` on work orders; `integrationUser` on the
+      `user` of ticket activities; `activities` on tickets; `source` on the work order `integrationUpload` input; a
+      missing `device` on the asset `integrationUpload` input no longer clears an existing asset's device
 - [ ] Update `CLAUDE.md` (key models, background jobs, how to write tracked models, and no nested writes to them), `src/features/integrations/CLAUDE.md`, and the shadow user comments in `vulnerability-schema.md`
 
 ## Out of scope

@@ -16,7 +16,6 @@ import { sourceContentHash } from "@/lib/source-hash";
 import { parseTlp } from "@/lib/tlp";
 
 const SEED_USER_EMAIL = "user@example.com";
-const INTEGRATION_USER_EMAIL = "csaf-integration@viper.local";
 const CISA_PROVIDER_METADATA_URL =
   "https://www.cisa.gov/sites/default/files/csaf/provider-metadata.json";
 
@@ -524,19 +523,6 @@ const getCsafIntegration = async (userId: string) => {
   });
   if (existing) return existing;
 
-  const integrationUser =
-    (await prisma.user.findFirst({
-      where: { email: INTEGRATION_USER_EMAIL },
-    })) ??
-    (await prisma.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        email: INTEGRATION_USER_EMAIL,
-        name: "CSAF Integration",
-        emailVerified: true,
-      },
-    }));
-
   return prisma.integration.create({
     data: {
       name: "CISA CSAF Advisories",
@@ -544,7 +530,6 @@ const getCsafIntegration = async (userId: string) => {
       config: { providerMetadataUrl: CISA_PROVIDER_METADATA_URL },
       syncEvery: 604800,
       userId,
-      integrationUserId: integrationUser.id,
       resourceSyncs: { create: [{ resource: ResourceType.SourceRecord }] },
     },
   });

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user-id";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -13,6 +14,7 @@ import { apiTokenInputSchema } from "../types";
 export const userRouter = createTRPCRouter({
   listAssignable: protectedProcedure.query(async () => {
     return prisma.user.findMany({
+      where: { id: { not: AUTOMATION_USER_ID } },
       select: { id: true, name: true, email: true, image: true },
       orderBy: { name: "asc" },
     });

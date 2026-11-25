@@ -74,8 +74,6 @@ export interface SessionInput<TConfig = unknown, TCreds = unknown> {
 /** The fields every sync attempt carries, whichever shape runs it. */
 export interface BaseSyncCtx<TConfig = unknown, TCreds = unknown>
   extends SessionInput<TConfig, TCreds> {
-  // TODO VW-605 (PR 7): goes, with the shadow users. Nothing stores it.
-  integrationUserId: string;
   /** When this attempt started. Everything it ingests gets this time. */
   observedAt: Date;
   cursor: Cursor | null;

@@ -84,7 +84,6 @@ const makeConfig = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const RUN = {
-  userId: "user-1",
   integrationId: "integration-1",
   observedAt: new Date("2026-11-01T00:00:00Z"),
 };

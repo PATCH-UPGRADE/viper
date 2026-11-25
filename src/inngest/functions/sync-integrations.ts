@@ -93,7 +93,6 @@ export const syncIntegration = inngest.createFunction(
       const resourceSync = integration.resourceSyncs[0] ?? null;
       return {
         platform: integration.platform,
-        integrationUserId: integration.integrationUserId,
         syncEvery: integration.syncEvery,
         // Raw JSON. Step 3 narrows it with the platform's own configSchema.
         config: integration.config,
@@ -171,7 +170,6 @@ export const syncIntegration = inngest.createFunction(
           integrationId,
           config,
           creds,
-          integrationUserId: loaded.integrationUserId,
           observedAt: new Date(),
           cursor: loaded.cursor,
           lastSuccessfulSync: loaded.lastSuccessfulSync

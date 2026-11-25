@@ -10,7 +10,7 @@ import {
   type Prisma,
 } from "@/generated/prisma";
 import { requestNoteAction } from "@/inngest/functions/notes-action";
-import { AUTOMATION_USER_ID } from "@/lib/automation-user";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user-id";
 import prisma from "@/lib/db";
 import {
   deviceIdentitySelect,

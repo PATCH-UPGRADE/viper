@@ -1,7 +1,6 @@
 import request from "supertest";
 import { expect, onTestFinished } from "vitest";
 import type { IntegrationFormValues } from "@/features/integrations/types";
-import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { asRaw } from "@/lib/db-raw";
 import { normalizeName } from "@/lib/router-utils";
@@ -127,15 +126,6 @@ export const setupMockIntegration = async (
         where: { id: createdIntegration.id },
       })
       .catch(() => {});
-
-    // Clean up the integration user that was created
-    if (createdIntegration.integrationUserId) {
-      await prisma.user
-        .delete({
-          where: { id: createdIntegration.integrationUserId },
-        })
-        .catch(() => {});
-    }
   });
 
   expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
@@ -147,17 +137,5 @@ export const setupMockIntegration = async (
   // Credentials are encrypted bytes and must never come back to a client.
   expect(createdIntegration).not.toHaveProperty("credentials");
 
-  // create an api key for the integration user
-  // this will be used to simulate previous integrationUpload runs
-  const apiKey = await auth.api.createApiKey({
-    body: {
-      name: "integration-user-key",
-      userId: createdIntegration.integrationUserId,
-    },
-  });
-
-  return {
-    integration: createdIntegration,
-    apiKey,
-  };
+  return { integration: createdIntegration };
 };

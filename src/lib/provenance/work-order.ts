@@ -18,7 +18,8 @@ const fields = {
   scheduledAt: "tracked",
   scheduledEndTime: "tracked",
 
-  // Not worth a history: nobody can edit them.
+  // Unsure if these fields are sticking around in their current form, so not
+  // having them be tracked. Plus nobody writes them.
   sourceLabel: "ignored",
   suggestedAssignee: "ignored",
   priorityReasonWhy: "ignored",

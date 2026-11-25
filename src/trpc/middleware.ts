@@ -3,7 +3,7 @@ import prisma from "@/lib/db";
 import { formatResourceName } from "@/lib/string-utils";
 
 // Models requireOwnership can check: every one has a `userId` field, which is
-// what the `as typeof prisma.asset` cast below assumes. On vulnerabilityRecord it is
+// what the `as typeof prisma.webhook` cast below assumes. On vulnerabilityRecord it is
 // nullable: see `allowUnowned`. Adding a model here
 // that lacks `userId` fails at compile time on its call site, not silently at
 // runtime (see PR #227 review: passing a model without `userId` produces a
@@ -14,7 +14,6 @@ type OwnableModel =
   | "deviceArtifact"
   | "remediation"
   | "webhook"
-  | "asset"
   | "vulnerabilityRecord";
 
 /**
@@ -24,7 +23,7 @@ type OwnableModel =
  *
  * @param resourceId - The ID of the resource to check
  * @param userId - The ID of the current user
- * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerabilityRecord')
+ * @param modelName - The Prisma model name (e.g., 'webhook', 'vulnerabilityRecord')
  * @param options.allowUnowned - Let anyone modify a resource with no owner (a null `userId`),
  *   such as a vulnerability record an integration created
  * @returns The resource with userId field
@@ -35,7 +34,7 @@ export async function requireOwnership(
   modelName: OwnableModel,
   { allowUnowned = false }: { allowUnowned?: boolean } = {},
 ) {
-  const model = prisma[modelName] as unknown as typeof prisma.asset;
+  const model = prisma[modelName] as unknown as typeof prisma.webhook;
 
   const resource = requireExistence(
     await model.findUnique({

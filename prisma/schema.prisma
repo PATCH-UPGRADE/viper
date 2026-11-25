@@ -26,7 +26,6 @@ model User {
   sessions         Session[]
   accounts         Account[]
   workflows        Workflow[]
-  assets           Asset[]
   remediations     Remediation[]
   deviceArtifacts  DeviceArtifact[]
   artifacts        Artifact[]
@@ -470,9 +469,6 @@ model Asset {
   manufacturer Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: Restrict)
   product      Product?      @relation(fields: [manufacturerId, productId], references: [manufacturerId, id], onDelete: Restrict)
   version      Version?      @relation(fields: [productId, versionId], references: [productId, id], onDelete: Restrict)
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   issues               Issue[]
   externalMappings     ExternalAssetMapping[]

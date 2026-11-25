@@ -19,20 +19,32 @@ import {
 } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
-// TODO VW-605 (PR 5): read who created the asset from its CREATE observation.
 /**
  * The equipment whose device ids an update may change: the assets that Fleet
  * created. An asset that another source created keeps that source's device.
  */
 async function fleetCreatedEquipmentKeys(
   integrationId: string,
-  integrationUserId: string,
 ): Promise<Set<string>> {
-  const mappingsToFleetAssets = await prisma.externalAssetMapping.findMany({
-    where: { integrationId, item: { userId: integrationUserId } },
-    select: { externalId: true },
+  const mappings = await prisma.externalAssetMapping.findMany({
+    where: { integrationId },
+    select: { externalId: true, itemId: true },
   });
-  return new Set(mappingsToFleetAssets.map((m) => m.externalId));
+  const created = await prisma.observation.findMany({
+    where: {
+      entityType: "ASSET",
+      entityId: { in: mappings.map(({ itemId }) => itemId) },
+      kind: "CREATE",
+      integrationId,
+    },
+    select: { entityId: true },
+  });
+  const createdIds = new Set(created.map(({ entityId }) => entityId));
+  return new Set(
+    mappings
+      .filter(({ itemId }) => createdIds.has(itemId))
+      .map(({ externalId }) => externalId),
+  );
 }
 
 // TODO: VW-560
@@ -71,10 +83,7 @@ async function ingestFleetAssets(
     select: { integrationUserId: true },
   });
   const weakSerials = computeWeakSerials(items);
-  const fleetCreatedKeys = await fleetCreatedEquipmentKeys(
-    integrationId,
-    integrationUserId,
-  );
+  const fleetCreatedKeys = await fleetCreatedEquipmentKeys(integrationId);
   const checkedProductIds = new Set<string>();
 
   const assetsAlreadyMapped = await prisma.asset.findMany({
@@ -97,7 +106,7 @@ async function ingestFleetAssets(
       entityType: "ASSET",
       // finalize-sync already records this attempt; a second write double-counts consecutiveFailures.
       shouldRecordSyncOutcome: false,
-      transformInputItem: async (item: FleetAssetItem, userId: string) => {
+      transformInputItem: async (item: FleetAssetItem) => {
         const device = await resolveDevice({
           manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
           product: item.productName,
@@ -114,7 +123,7 @@ async function ingestFleetAssets(
           ...device,
         };
         return {
-          create: { fields, only: { userId } },
+          create: { fields },
           update: {
             fields,
             apply: fleetCreatedKeys.has(item.externalId)

@@ -177,7 +177,6 @@ async function seedSyngoPlazaVexScenario(userId: string) {
           ...asset,
           status: "Active" as AssetStatus,
           ...device,
-          userId,
         },
       });
     }),
@@ -600,7 +599,7 @@ async function upsertDeviceForAsset(
   };
 }
 
-async function seedDeserializationScenario(userId: string) {
+async function seedDeserializationScenario() {
   console.log("\n🌱 Seeding Siemens deserialization scenario...");
 
   // Sequential: several matchings share a product and version, and concurrent
@@ -666,7 +665,6 @@ async function seedDeserializationScenario(userId: string) {
           ...assetFields,
           status: "Active" as AssetStatus,
           ...device,
-          userId,
         },
       }),
     );
@@ -1119,7 +1117,7 @@ async function main() {
 
   const user = await getSeedUser();
   await seedSyngoPlazaVexScenario(user.id);
-  await seedDeserializationScenario(user.id);
+  await seedDeserializationScenario();
   await seedVendorCoverage();
   await seedQuestion();
   await seedMixedTlpSources();

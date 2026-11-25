@@ -30,8 +30,13 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
+vi.mock("@/lib/provenance/read", () => ({
+  attachSources: vi.fn(async (_entityType: string, rows: unknown[]) => rows),
+}));
+
 import { assetsRouter } from "@/features/assets/server/routers";
 import { IssueStatus } from "@/generated/prisma";
+import { attachSources } from "@/lib/provenance/read";
 import { createCallerFactory } from "@/trpc/init";
 import { issuesRouter } from "../routers";
 
@@ -280,6 +285,10 @@ describe("assets.getRecentVulnerableInternal — newly vulnerable assets", () =>
 
     expect(result.items.map((asset) => asset.id)).toEqual(["p2"]);
     expect(result.totalCount).toBe(2);
+    // Sources are only read for the rows that are returned.
+    expect(attachSources).toHaveBeenCalledWith("ASSET", [
+      expect.objectContaining({ id: "p2" }),
+    ]);
   });
 });
 

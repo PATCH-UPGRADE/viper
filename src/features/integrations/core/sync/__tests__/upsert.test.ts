@@ -186,7 +186,7 @@ describe("processIntegrationSync — tracked models", () => {
   const config = {
     entityType: "ASSET",
     transformInputItem: async () => ({
-      create: { fields: { hostname: "h" }, only: { userId: "user-1" } },
+      create: { fields: { hostname: "h" }, only: { id: "asset-1" } },
       update,
       uniqueFieldConditions: [{ hostname: "h" }],
     }),

@@ -4,10 +4,11 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ClampedCell } from "@/components/ui/clamped-cell";
 import { SortableHeader } from "@/components/ui/data-table";
 import { relativeTime } from "@/lib/date-utils";
-import type { AssetResponse } from "../types";
+import type { EntitySources } from "@/lib/provenance/types";
+import type { AssetWithRelations } from "../types";
 import { getAssetDeviceTypeLabel, getAssetSources } from "../utils";
 
-export const columns: ColumnDef<AssetResponse>[] = [
+export const columns: ColumnDef<AssetWithRelations & EntitySources>[] = [
   {
     id: "deviceType",
     meta: { title: "Device Type" },

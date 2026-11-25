@@ -150,6 +150,19 @@ describe("Assets Endpoint (/assets)", () => {
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
 
+  it("PATCH and DELETE /assets/{id} - For a missing asset, should be 404", async () => {
+    const patchRes = await request(BASE_URL)
+      .patch("/assets/missing")
+      .set(authHeader)
+      .send({ role: "Backup Server" });
+    expect(patchRes.status).toBe(404);
+
+    const deleteRes = await request(BASE_URL)
+      .delete("/assets/missing")
+      .set(authHeader);
+    expect(deleteRes.status).toBe(404);
+  });
+
   it("GET /assets/integrationUpload - Without auth, should be 401", async () => {
     const res = await request(BASE_URL).get(`/assets/integrationUpload`);
 
@@ -186,6 +199,8 @@ describe("Assets Endpoint (/assets)", () => {
 
     expectDevice(detailRes.body, payload.device);
     expect(detailRes.body).not.toHaveProperty("deviceGroup");
+    expect(detailRes.body).not.toHaveProperty("user");
+    expect(detailRes.body).not.toHaveProperty("userId");
 
     const updatePayload = {
       ip: "192.168.1.105", // Updated field

@@ -1,4 +1,8 @@
-import type { Prisma } from "@/generated/prisma";
+import type {
+  PlatformEnum,
+  Prisma,
+  ProvenanceSource,
+} from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 
 // ============================================================================
@@ -22,6 +26,35 @@ export type ObservationOrigin =
       actorUserId: string;
       observedAt?: Date; // defaults to now
     };
+
+// ============================================================================
+// Reading
+// ============================================================================
+
+/** Someone or something that has written an observation of an entity. */
+export type EntitySource =
+  | {
+      source: Extract<ProvenanceSource, "INTEGRATION">;
+      /** Null once the integration is deleted. */
+      integrationId: string | null;
+      /** Its current name, or the one it had if it is deleted. */
+      name: string;
+      /** Null once the integration is deleted. */
+      platform: PlatformEnum | null;
+    }
+  | {
+      source: Extract<ProvenanceSource, "MANUAL" | "API_CLIENT">;
+      /** Null once the user is deleted. */
+      actor: { id: string; name: string } | null;
+    }
+  | { source: Extract<ProvenanceSource, "AUTOMATION" | "EMAIL"> };
+
+export interface EntitySources {
+  /** Newest first. */
+  sources: EntitySource[];
+  /** Null when the entity has no CREATE observation. */
+  creator: EntitySource | null;
+}
 
 // ============================================================================
 // Transaction

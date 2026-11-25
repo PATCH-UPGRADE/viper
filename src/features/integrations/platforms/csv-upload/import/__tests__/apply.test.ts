@@ -120,7 +120,7 @@ describe("applyChunk", () => {
     expect(add).toMatchObject({
       create: {
         fields: { ...tracked, networkSegment: "VLAN-1", status: "Active" },
-        only: { id: addedAssetIdFor("import", 1), userId: "uploader" },
+        only: { id: addedAssetIdFor("import", 1) },
       },
       update: { fields: tracked, apply: [] },
     });

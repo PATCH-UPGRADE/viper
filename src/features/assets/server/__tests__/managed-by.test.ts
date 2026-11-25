@@ -95,15 +95,8 @@ const makeAssetRow = (managedBy: ManagedByRow[]) => ({
   location: null,
   status: null,
   utilization: null,
-  userId: FAKE_USER_ID,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-02"),
-  user: {
-    id: FAKE_USER_ID,
-    name: "Test User",
-    email: "test@example.com",
-    image: null,
-  },
   manufacturer: {
     id: "mf-siemens",
     canonicalName: "siemens healthineers",

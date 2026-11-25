@@ -3,53 +3,40 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma } = vi.hoisted(() => ({
-  mockPrisma: {
-    externalWorkOrderMapping: { findMany: vi.fn() },
-    externalSourceRecordMapping: {
-      findMany: vi.fn(),
-      createManyAndReturn: vi.fn(),
-      updateMany: vi.fn(),
+const { mockPrisma, mockProcessIntegrationSync, mockDelete } = vi.hoisted(
+  () => ({
+    mockPrisma: {
+      $transaction: vi.fn(),
+      assetTicket: { count: vi.fn() },
+      externalWorkOrderMapping: { findMany: vi.fn() },
+      workOrderTicket: { findMany: vi.fn(), delete: vi.fn() },
     },
-    sourceRecord: { findMany: vi.fn(), createManyAndReturn: vi.fn() },
-    sourceLink: { createMany: vi.fn() },
-    workOrderTicket: { deleteMany: vi.fn() },
-  },
-}));
+    mockProcessIntegrationSync: vi.fn(),
+    mockDelete: vi.fn(),
+  }),
+);
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
-
-const { mockProcessIntegrationSync } = vi.hoisted(() => ({
-  mockProcessIntegrationSync: vi.fn(),
+vi.mock("@/lib/provenance/write", () => ({
+  deleteWithObservation: mockDelete,
 }));
-
 vi.mock("../upsert", () => ({
   processIntegrationSync: mockProcessIntegrationSync,
-}));
-vi.mock("@/features/tracking/server/activities", () => ({
-  recordCreationActivity: vi.fn(),
+  integrationOrigin: async (run: object) => ({ source: "INTEGRATION", ...run }),
 }));
 
-import {
-  ResourceType,
-  SourceChannel,
-  TicketCategory,
-  TicketStatus,
-} from "@/generated/prisma";
-import { sourceContentHash } from "@/lib/source-hash";
+import { TRPCError } from "@trpc/server";
+import { ResourceType, TicketStatus } from "@/generated/prisma";
 import {
   deletePulledWorkOrders,
   ingestPulledWorkOrders,
   listMappedWorkOrders,
   type PulledWorkOrder,
-  recordWorkOrderSources,
-  type WorkOrderSourceItem,
 } from "../work-order-sources";
 
-const item: WorkOrderSourceItem = {
-  externalId: "sys-1",
-  raw: { number: "CHG0000001", state: "-5" },
-  body: "**CHG0000001**: Rollback Oracle Version",
+const run = {
+  integrationId: "int-1",
+  observedAt: new Date("2026-11-01T00:00:00Z"),
 };
 
 beforeEach(() => {
@@ -57,180 +44,43 @@ beforeEach(() => {
   mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
     { externalId: "sys-1", itemId: "ticket-1" },
   ]);
-  mockPrisma.externalSourceRecordMapping.findMany.mockResolvedValue([]);
-  mockPrisma.externalSourceRecordMapping.createManyAndReturn.mockResolvedValue([
-    { id: "srm-1", externalId: "sys-1" },
-  ]);
-  mockPrisma.sourceRecord.findMany.mockResolvedValue([]);
-  mockPrisma.sourceRecord.createManyAndReturn.mockResolvedValue([
-    { id: "sr-1", mappingId: "srm-1" },
-  ]);
-});
-
-describe("recordWorkOrderSources", () => {
-  it("snapshots a new record and links it to its ticket", async () => {
-    await recordWorkOrderSources([item], "int-1");
-
-    expect(
-      mockPrisma.externalSourceRecordMapping.createManyAndReturn,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: [
-          expect.objectContaining({
-            integrationId: "int-1",
-            externalId: "sys-1",
-          }),
-        ],
-      }),
-    );
-    expect(mockPrisma.sourceRecord.createManyAndReturn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: [
-          {
-            channel: SourceChannel.Integration,
-            mappingId: "srm-1",
-            contentHash: sourceContentHash(item.raw, item.body),
-            raw: item.raw,
-            markdown: item.body,
-          },
-        ],
-      }),
-    );
-    expect(mockPrisma.sourceLink.createMany).toHaveBeenCalledWith({
-      data: [{ sourceRecordId: "sr-1", workOrderTicketId: "ticket-1" }],
-      skipDuplicates: true,
-    });
-  });
-
-  describe("with an unchanged record", () => {
-    const newestSnapshot = (links: { workOrderTicketId: string | null }[]) => {
-      mockPrisma.externalSourceRecordMapping.findMany.mockResolvedValue([
-        { id: "srm-1", externalId: "sys-1" },
-      ]);
-      mockPrisma.sourceRecord.findMany.mockResolvedValue([
-        {
-          id: "sr-old",
-          mappingId: "srm-1",
-          contentHash: sourceContentHash(item.raw, item.body),
-          links,
-        },
-      ]);
-    };
-
-    it("writes nothing when the ticket has its link", async () => {
-      newestSnapshot([{ workOrderTicketId: "ticket-1" }]);
-
-      await recordWorkOrderSources([item], "int-1");
-
-      expect(
-        mockPrisma.externalSourceRecordMapping.updateMany,
-      ).toHaveBeenCalled();
-      expect(
-        mockPrisma.sourceRecord.createManyAndReturn,
-      ).not.toHaveBeenCalled();
-      expect(mockPrisma.sourceLink.createMany).not.toHaveBeenCalled();
-    });
-
-    it("links the newest snapshot to a ticket with no link", async () => {
-      newestSnapshot([{ workOrderTicketId: "ticket-deleted" }]);
-
-      await recordWorkOrderSources([item], "int-1");
-
-      expect(
-        mockPrisma.sourceRecord.createManyAndReturn,
-      ).not.toHaveBeenCalled();
-      expect(mockPrisma.sourceLink.createMany).toHaveBeenCalledWith({
-        data: [{ sourceRecordId: "sr-old", workOrderTicketId: "ticket-1" }],
-        skipDuplicates: true,
-      });
-    });
-  });
-
-  it("snapshots only the last item of a repeated externalId", async () => {
-    const newer = { ...item, body: "**CHG0000001**: Closed" };
-
-    await recordWorkOrderSources([item, newer], "int-1");
-
-    expect(mockPrisma.sourceRecord.createManyAndReturn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: [expect.objectContaining({ markdown: newer.body })],
-      }),
-    );
-  });
-
-  it("skips a record that has no ticket", async () => {
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([]);
-
-    await recordWorkOrderSources([item], "int-1");
-
-    expect(
-      mockPrisma.externalSourceRecordMapping.findMany,
-    ).not.toHaveBeenCalled();
-    expect(mockPrisma.sourceRecord.createManyAndReturn).not.toHaveBeenCalled();
-  });
 });
 
 describe("ingestPulledWorkOrders", () => {
   const pulled: PulledWorkOrder = {
-    ...item,
+    externalId: "sys-1",
+    raw: { number: "CHG0000001", state: "-5" },
     summary: "CHG0000001: Rollback Oracle Version",
+    body: "**CHG0000001**: Rollback Oracle Version",
     status: TicketStatus.TO_DO,
-    category: TicketCategory.OTHER,
     scheduledAt: "2026-04-16T23:00:00Z",
     scheduledEndTime: null,
   };
-  const options = {
-    integrationId: "int-1",
-    observedAt: new Date("2026-11-01T00:00:00Z"),
-    sourceLabel: "ServiceNow",
-  };
-  const response = {
-    message: "success",
-    createdItemsCount: 1,
-    updatedItemsCount: 0,
-    shouldRetry: false,
-  };
-
-  beforeEach(() => {
-    mockProcessIntegrationSync.mockResolvedValue(response);
-  });
+  const options = { ...run, sourceLabel: "ServiceNow" };
 
   it("maps each item onto the ticket fields with the source label", async () => {
     await ingestPulledWorkOrders([pulled], options);
 
-    const [config, input, run, resource] =
+    const [config, input, passedRun, resource] =
       mockProcessIntegrationSync.mock.calls[0];
     expect(input).toEqual({ items: [pulled] });
-    expect(run).toEqual({
-      integrationId: "int-1",
-      observedAt: options.observedAt,
-    });
+    expect(passedRun).toEqual(run);
     expect(resource).toBe(ResourceType.WorkOrder);
 
     const fields = {
       summary: pulled.summary,
       body: pulled.body,
       status: TicketStatus.TO_DO,
-      category: TicketCategory.OTHER,
       scheduledAt: new Date("2026-04-16T23:00:00Z"),
       scheduledEndTime: null,
       sourceLabel: "ServiceNow",
     };
-    await expect(config.transformInputItem(pulled)).resolves.toMatchObject({
-      createData: fields,
-      updateData: fields,
+    expect(await config.transformInputItem(pulled)).toEqual({
+      create: { fields },
+      update: { fields },
+      raw: pulled.raw,
+      uniqueFieldConditions: [],
     });
-  });
-
-  it("keeps the ticket's category when the platform sends none", async () => {
-    const { category: _, ...withoutCategory } = pulled;
-    await ingestPulledWorkOrders([withoutCategory], options);
-
-    const [config] = mockProcessIntegrationSync.mock.calls[0];
-    const { createData, updateData } =
-      await config.transformInputItem(withoutCategory);
-    expect(createData.category).toBe(TicketCategory.OTHER);
-    expect(updateData).not.toHaveProperty("category");
   });
 
   it("ingests only the last item of a repeated externalId", async () => {
@@ -241,16 +91,6 @@ describe("ingestPulledWorkOrders", () => {
     expect(mockProcessIntegrationSync.mock.calls[0][1]).toEqual({
       items: [newer],
     });
-  });
-
-  it("records the snapshots after the ingest and returns its response", async () => {
-    const result = await ingestPulledWorkOrders([pulled], options);
-
-    expect(result).toBe(response);
-    expect(mockPrisma.sourceRecord.createManyAndReturn).toHaveBeenCalled();
-    expect(mockProcessIntegrationSync.mock.invocationCallOrder[0]).toBeLessThan(
-      mockPrisma.externalWorkOrderMapping.findMany.mock.invocationCallOrder[0],
-    );
   });
 });
 
@@ -276,22 +116,58 @@ describe("listMappedWorkOrders", () => {
 });
 
 describe("deletePulledWorkOrders", () => {
-  it("deletes the ticket and its asset sub-tickets", async () => {
-    await deletePulledWorkOrders("int-1", ["sys-1"]);
+  const deletedIds = () =>
+    mockPrisma.workOrderTicket.delete.mock.calls.map(([arg]) => arg.where.id);
 
-    expect(mockPrisma.workOrderTicket.deleteMany).toHaveBeenCalledWith({
-      where: {
-        OR: [
-          { id: { in: ["ticket-1"] } },
-          { ticket: { parentTicketId: { in: ["ticket-1"] } } },
-        ],
-      },
+  beforeEach(() => {
+    mockPrisma.$transaction.mockImplementation((fn) => fn(mockPrisma));
+    mockPrisma.assetTicket.count.mockResolvedValue(0);
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+    mockDelete.mockImplementation((tx, _params, remove) => remove(tx));
+  });
+
+  it("writes a TOMBSTONE for the ticket and each asset sub-ticket", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([{ id: "sub-1" }]);
+
+    await deletePulledWorkOrders(run, ["sys-1"]);
+
+    expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { ticket: { parentTicketId: "ticket-1" } },
+      }),
+    );
+    expect(mockDelete.mock.calls.map(([, params]) => params)).toEqual(
+      ["ticket-1", "sub-1"].map((entityId) => ({
+        entityType: "WORK_ORDER",
+        entityId,
+        origin: { source: "INTEGRATION", ...run },
+      })),
+    );
+    expect(deletedIds()).toEqual(["sub-1", "ticket-1"]);
+  });
+
+  it("allows more time for a ticket with more asset sub-tickets", async () => {
+    mockPrisma.assetTicket.count.mockResolvedValue(100);
+
+    await deletePulledWorkOrders(run, ["sys-1"]);
+
+    expect(mockPrisma.assetTicket.count).toHaveBeenCalledWith({
+      where: { parentTicketId: "ticket-1" },
+    });
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.anything(), {
+      timeout: 35_000,
     });
   });
 
-  it("does nothing for an empty list", async () => {
-    await deletePulledWorkOrders("int-1", []);
+  it("goes on after a ticket that is already gone", async () => {
+    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+      { itemId: "gone" },
+      { itemId: "ticket-1" },
+    ]);
+    mockDelete.mockRejectedValueOnce(new TRPCError({ code: "NOT_FOUND" }));
 
-    expect(mockPrisma.workOrderTicket.deleteMany).not.toHaveBeenCalled();
+    await deletePulledWorkOrders(run, ["sys-0", "sys-1"]);
+
+    expect(deletedIds()).toEqual(["ticket-1"]);
   });
 });

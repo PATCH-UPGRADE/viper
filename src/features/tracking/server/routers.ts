@@ -35,7 +35,6 @@ import {
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
-import { sourceContentHash } from "@/lib/source-hash";
 import {
   baseProcedure,
   createTRPCRouter,
@@ -1567,59 +1566,31 @@ export const trackingRouter = createTRPCRouter({
 
       return processIntegrationSync(
         {
-          // TODO VW-605 (PR 8): `entityType: "WORK_ORDER"` in place of the delegates.
-          model: prisma.workOrderTicket,
-          mappingModel: prisma.externalWorkOrderMapping,
-          mappingRelation: "externalMapping",
+          entityType: "WORK_ORDER",
           transformInputItem: async (item: (typeof input)["items"][number]) => {
             const {
-              externalId,
-              scheduledAt,
-              source,
+              externalId: _externalId,
               upstreamApi: _upstreamApi,
               webUrl: _webUrl,
-              ...fields
+              scheduledAt,
+              ...stated
             } = item;
-            const scheduled = scheduledAt ? new Date(scheduledAt) : null;
+            const fields = {
+              ...stated,
+              // A missing start keeps the one that the ticket has, and null
+              // clears it.
+              scheduledAt:
+                scheduledAt == null ? scheduledAt : new Date(scheduledAt),
+            };
             return {
-              createData: {
-                ...fields,
-                scheduledAt: scheduled,
-                // Attach an ingested-source record (created once with the
-                // ticket) so it shows a source badge. Re-syncs take the update
-                // path and leave sources alone.
-                ...(source
-                  ? {
-                      sourceLinks: {
-                        create: {
-                          sourceRecord: {
-                            create: {
-                              channel: source.channel,
-                              externalId: source.externalId ?? externalId,
-                              markdown: source.markdown ?? null,
-                              raw: source.raw ?? {},
-                              contentHash: sourceContentHash(
-                                source.raw ?? {},
-                                source.markdown,
-                              ),
-                            },
-                          },
-                        },
-                      },
-                    }
-                  : {}),
-              },
-              updateData: {
-                ...fields,
-                scheduledAt: scheduled,
-              },
+              create: { fields },
+              update: { fields },
+              raw: item,
               // No natural business key for a work order — always create a new
               // ticket when there's no existing external mapping.
               uniqueFieldConditions: [],
-              artifactsData: undefined,
             };
           },
-          onItemCreated: (id) => recordCreationActivity(prisma, id),
         },
         input,
         { integrationId, observedAt },

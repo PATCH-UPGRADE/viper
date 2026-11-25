@@ -13,9 +13,9 @@ type SampleTicket = {
   status: TicketStatus;
   category: TicketCategory;
   department: string | string[];
-  // When set, the seed creates a linked NotificationSource on this channel
-  // (the ticket renders as ingested). Omitted ⇒ manually created.
-  sourceChannel?: SourceChannel;
+  // An emailed ticket gets a linked SourceRecord.
+  isEmail?: boolean;
+  // Fills the Source column. Omitted ⇒ manually created.
   sourceLabel?: string;
   scheduledAt?: Date;
   linkedCveIds?: string[];
@@ -104,7 +104,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
     department: ["Radiology", "IT", "Administration"],
     description:
       "Five hosts in the imaging chain — the CT acquisition workstation, the PACS server, two diagnostic reading workstations, and the ED bedside viewer — are EOL Windows 7 / Server 2008 R2 and vulnerable to MS17-010. Each will be touched on its own schedule to keep at least one diagnostic workstation online at all times. Expect a brief read interruption (under 5 minutes) per workstation; PACS work will run in a dedicated overnight maintenance window with CMO sign-off.",
-    sourceChannel: SourceChannel.Integration,
     sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2017-0144"],
     linkedAssetIds: [
@@ -125,7 +124,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        sourceChannel: SourceChannel.Integration,
         sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-ws-001"],
@@ -141,7 +139,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.REQUIRES_APPROVAL,
         category: TicketCategory.VULN_REMEDIATION,
         department: "Radiology",
-        sourceChannel: SourceChannel.Email,
+        isEmail: true,
         sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(10),
         linkedCveIds: ["CVE-2017-0144"],
@@ -196,7 +194,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
     status: TicketStatus.TO_DO,
     category: TicketCategory.VULN_REMEDIATION,
     department: "Radiology",
-    sourceChannel: SourceChannel.Integration,
     sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2020-25175"],
     linkedAssetIds: ["rad-ct-001", "rad-us-001", "rad-us-002", "rad-xr-001"],
@@ -211,7 +208,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        sourceChannel: SourceChannel.Integration,
         sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2020-25175"],
         linkedAssetIds: [
@@ -252,7 +248,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.IN_PROGRESS,
         category: TicketCategory.PATCH,
         department: "IT",
-        sourceChannel: SourceChannel.Email,
+        isEmail: true,
         sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(3),
         linkedCveIds: ["CVE-2016-6366"],
@@ -527,15 +523,13 @@ async function createWorkOrderTicket(
       status: ticket.status,
       category: ticket.category,
       sourceLabel: ticket.sourceLabel,
-      // For ingested demo tickets, attach a SourceRecord on the given channel
-      // so the Source column renders the channel icon + label.
-      sourceLinks: ticket.sourceChannel
+      sourceLinks: ticket.isEmail
         ? {
             create: [
               {
                 sourceRecord: {
                   create: {
-                    channel: ticket.sourceChannel,
+                    channel: SourceChannel.Email,
                     raw: {},
                     contentHash: sourceContentHash({}, null),
                   },

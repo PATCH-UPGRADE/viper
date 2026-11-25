@@ -40,7 +40,10 @@ async function removeDeletedWorkOrders(
         gone.push(externalId);
       }
     }
-    await deletePulledWorkOrders(ctx.integrationId, gone);
+    await deletePulledWorkOrders(
+      { integrationId: ctx.integrationId, observedAt: ctx.observedAt },
+      gone,
+    );
     return deletedOn;
   } catch (error) {
     console.warn(
